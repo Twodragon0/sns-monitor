@@ -1,7 +1,7 @@
 # 🛡️ Security Policy & Guidelines
 
-이 문서는 **SNS Monitoring System** 프로젝트의 보안 정책, 취약점 대응 절차, 그리고 개발 가이드라인을 정의합니다.
-이 리포지토리는 **내부 전용(Internal Only)**이며, 모든 기여자는 아래의 보안 표준(OWASP, ISMS-P)을 준수해야 합니다.
+이 문서는 **SNS Monitor** 프로젝트의 보안 정책, 취약점 대응 절차, 그리고 개발 가이드라인을 정의합니다.
+모든 기여자는 아래의 보안 표준(OWASP, ISMS-P)을 준수해야 합니다.
 
 ---
 
@@ -10,8 +10,8 @@
 보안 취약점을 발견했을 경우, 공개된 Issue 트래커에 올리는 것을 **금지**합니다. 대신 아래 절차를 따라주세요.
 
 ### 신고 채널
-* **담당자 이메일**: `security@levvels.io` (또는 담당자 사내 메신저)
 * **GitHub**: `Security` 탭 > `Report a vulnerability` (Private Reporting)
+* **이메일**: Repository owner에게 직접 연락
 
 ### 대응 타임라인 (SLA)
 심각도에 따라 다음 기한 내에 패치를 완료해야 합니다.
@@ -45,12 +45,7 @@
 
 ## 💻 3. 개발 가이드라인 (Development Guidelines)
 
-개발 시 AI 도구(Cursor)와 자동화 도구가 이 규칙을 강제합니다.
-
-### 🤖 AI Coding Assistant (`.cursorrules`)
-이 프로젝트는 **`.cursorrules`** 파일을 통해 AI가 보안 코딩을 하도록 설정되어 있습니다.
-* Cursor가 생성한 코드는 기본적으로 이 보안 정책을 따릅니다.
-* AI의 제안이라도 보안 위배 사항(하드코딩 등)이 보이면 즉시 거부하십시오.
+개발 시 아래의 보안 코딩 규칙을 준수합니다.
 
 ### 🚫 절대 금지 사항 (Prohibited)
 다음 항목 발견 시 **Code Review에서 즉시 거절(Reject)** 됩니다.
@@ -154,11 +149,10 @@ PR 생성 및 배포 전 다음 항목을 확인해 주세요.
 
 ## 📚 참고 자료
 * [OWASP Top 10](https://owasp.org/www-project-top-ten/)
-* [프로젝트 .cursorrules 설정 파일](./.cursorrules)
 * [AWS Well-Architected Framework - Security Pillar](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/welcome.html)
 * [Kubernetes Security Best Practices](https://kubernetes.io/docs/concepts/security/)
 * [GitHub Security Best Practices](https://docs.github.com/en/code-security)
 
 ---
-**Last Updated**: 2025-12-30
-**Maintainer**: DevSecOps Team  
+**Last Updated**: 2026-03-10
+**Maintainer**: @Twodragon0

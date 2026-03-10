@@ -1,0 +1,22 @@
+# Default owner for all files
+* @Twodragon0
+
+# Backend
+/backend/ @Twodragon0
+/crawlers/ @Twodragon0
+
+# Frontend
+/frontend/ @Twodragon0
+
+# Infrastructure
+/helm/ @Twodragon0
+/terraform/ @Twodragon0
+/k8s/ @Twodragon0
+/docker/ @Twodragon0
+
+# CI/CD
+/.github/ @Twodragon0
+
+# Security-sensitive files require explicit review
+SECURITY.md @Twodragon0
+.github/workflows/ @Twodragon0
