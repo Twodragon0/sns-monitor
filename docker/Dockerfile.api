@@ -17,4 +17,4 @@ RUN mkdir -p /app/local-data/youtube/channels \
 
 EXPOSE 8080
 
-CMD ["python", "app.py"]
+CMD ["python", "run.py"]

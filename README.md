@@ -80,10 +80,13 @@ curl http://localhost:8080/api/platforms
 ## Project Structure
 
 ```
-├── backend/                  # Flask API server
-│   ├── app.py                # Application entry point
-│   ├── api_handlers.py       # REST API route handlers
-│   ├── platform_analyzer.py  # Multi-platform URL analyzer
+├── backend/                  # Flask API server (app factory pattern)
+│   ├── run.py                # Entry point
+│   ├── app/                  # Flask application package
+│   │   ├── api/              # Route blueprints (analyze, legacy)
+│   │   ├── services/         # Business logic (platform_analyzer, redis)
+│   │   └── utils/            # Logging, helpers
+│   ├── api_handlers.py       # Legacy API route handlers
 │   └── requirements.txt      # Python dependencies
 ├── crawlers/                 # Periodic data collection
 │   ├── youtube/              # YouTube Data API crawler

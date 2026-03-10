@@ -57,9 +57,19 @@ User → Frontend (React :3000)
 
 ```
 ├── backend/                  # Flask API server
-│   ├── app.py                # Application entry point
-│   ├── api_handlers.py       # REST API route handlers
-│   ├── platform_analyzer.py  # Multi-platform URL analyzer
+│   ├── run.py                # Entry point
+│   ├── api_handlers.py       # Legacy API route handlers
+│   ├── app/
+│   │   ├── __init__.py       # Flask app factory (create_app)
+│   │   ├── config.py         # Centralized configuration
+│   │   ├── api/
+│   │   │   ├── analyze.py    # /api/analyze/url, /api/platforms
+│   │   │   └── legacy.py     # Bridge to api_handlers
+│   │   ├── services/
+│   │   │   ├── platform_analyzer.py  # Multi-platform URL analyzer
+│   │   │   └── redis_client.py       # Redis with graceful fallback
+│   │   └── utils/
+│   │       └── logger.py     # Logging configuration
 │   └── requirements.txt      # Python dependencies
 ├── crawlers/                 # Periodic data collection
 │   ├── youtube/              # YouTube Data API crawler
@@ -79,9 +89,13 @@ User → Frontend (React :3000)
 ### Key Components
 
 **Backend** (`backend/`):
-- `app.py` - Flask application entry point
-- `platform_analyzer.py` - Multi-platform URL analyzer (YouTube, DCInside, Reddit, Telegram, Kakao)
-- `api_handlers.py` - API handlers (dashboard, members, galleries)
+- `run.py` - Entry point, creates Flask app via factory
+- `app/__init__.py` - Flask app factory (`create_app()`)
+- `app/config.py` - Centralized configuration (Config class)
+- `app/api/analyze.py` - URL analysis routes
+- `app/api/legacy.py` - Bridge to legacy api_handlers
+- `app/services/platform_analyzer.py` - Multi-platform URL analyzer
+- `api_handlers.py` - Legacy API handlers (dashboard, members, galleries)
 
 **Frontend** (`frontend/src/components/`):
 - `URLAnalyzer.jsx` - URL input and analysis results with sentiment charts
