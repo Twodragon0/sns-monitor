@@ -23,10 +23,10 @@ if __name__ == "__main__":
             }
             logger.info("Running in channel mode with %d channels", len(YOUTUBE_CHANNELS))
         else:
-            # 기본 이벤트: IVNIT 키워드 검색
+            # 기본 이벤트: ExampleCorp 키워드 검색
             event = {
                 "type": "keyword",
-                "keywords": ["IVNIT"]
+                "keywords": ["ExampleCorp"]
             }
             logger.info("Running in keyword mode (no channels found in environment)")
 

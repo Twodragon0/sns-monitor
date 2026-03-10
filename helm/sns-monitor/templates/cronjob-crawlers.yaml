@@ -65,7 +65,7 @@ spec:
                 - name: API_ENDPOINT
                   value: "http://{{ include "sns-monitor.fullname" . }}-api-backend:8080"
                 - name: CHANNELS
-                  value: "{{ .Values.crawlers.youtube.channels | default "@AkaivStudioOfficial,@BARABARA_KR" }}"
+                  value: "{{ .Values.crawlers.youtube.channels | default "@example-creator-1,@example-creator-2" }}"
                 - name: MAX_VIDEOS
                   value: "{{ .Values.crawlers.youtube.maxVideos | default "5" }}"
                 - name: MAX_COMMENTS
@@ -145,7 +145,7 @@ spec:
                 - name: API_ENDPOINT
                   value: "http://{{ include "sns-monitor.fullname" . }}-api-backend:8080"
                 - name: GALLERIES
-                  value: "{{ .Values.crawlers.dcinside.galleries | default "ivnit,akaiv,skoshism" }}"
+                  value: "{{ .Values.crawlers.dcinside.galleries | default "example-gallery-1,example-gallery-2" }}"
                 - name: MAX_PAGES
                   value: "{{ .Values.crawlers.dcinside.maxPages | default "3" }}"
               resources:

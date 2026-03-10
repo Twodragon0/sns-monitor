@@ -128,29 +128,29 @@ def calculate_sentiment_from_comments(comment_samples, total_comments):
 
 
 def is_archive_studio_channel(channel_id, channel_title, channel_handle, channel_filter_from_data, channel_handle_from_data):
-    """아카이브 스튜디오 채널인지 확인"""
-    # 채널 필터가 있고, 현재 비디오의 채널 ID와 일치하면 아카이브 스튜디오 채널
+    """Example Studio 채널인지 확인"""
+    # 채널 필터가 있고, 현재 비디오의 채널 ID와 일치하면 Example Studio 채널
     if channel_filter_from_data and channel_id and str(channel_id) == str(channel_filter_from_data):
         return True
-    
+
     # 채널 핸들 정보 확인
     if channel_handle_from_data:
-        if '@AkaivStudioOfficial' in channel_handle_from_data or 'AkaivStudioOfficial' in channel_handle_from_data:
+        if '@example-studio-official' in channel_handle_from_data or 'ExampleStudioOfficial' in channel_handle_from_data:
             if channel_id and channel_filter_from_data and str(channel_id) == str(channel_filter_from_data):
                 return True
-    
+
     # 채널 제목 확인
     if channel_title:
         channel_title_lower = channel_title.lower()
-        if 'archive studio' in channel_title_lower or '아카이브스튜디오' in channel_title or 'akaiv' in channel_title_lower:
+        if 'example studio' in channel_title_lower or 'examplestyle' in channel_title_lower:
             return True
-    
+
     # 채널 ID 확인
     if channel_id:
         channel_id_str = str(channel_id)
-        if 'AkaivStudioOfficial' in channel_id_str or 'akaivstudioofficial' in channel_id_str.lower():
+        if 'ExampleStudioOfficial' in channel_id_str or 'example-studio-official' in channel_id_str.lower():
             return True
-    
+
     return False
 
 
@@ -470,21 +470,21 @@ def _load_data_from_s3(s3_key, s3_client, bucket):
 
 
 def should_skip_archive_studio_channel(channel_title, channel_id, is_archive_studio):
-    """아카이브 스튜디오 채널 필터링 (중첩 if 제거)"""
+    """Example Studio 채널 필터링 (중첩 if 제거)"""
     if not is_archive_studio:
         return False
-    
+
     # 채널 제목 확인
     if channel_title:
         channel_title_lower = channel_title.lower()
-        if 'archive studio' in channel_title_lower or '아카이브스튜디오' in channel_title:
-            return False  # 아카이브 스튜디오 채널이므로 스킵하지 않음
-    
+        if 'example studio' in channel_title_lower or 'examplestyle' in channel_title_lower:
+            return False  # Example Studio 채널이므로 스킵하지 않음
+
     # 채널 ID 확인
-    if channel_id and 'AkaivStudioOfficial' in str(channel_id):
-        return False  # 아카이브 스튜디오 채널이므로 스킵하지 않음
-    
-    return True  # 아카이브 스튜디오 채널이 아니므로 스킵
+    if channel_id and 'ExampleStudioOfficial' in str(channel_id):
+        return False  # Example Studio 채널이므로 스킵하지 않음
+
+    return True  # Example Studio 채널이 아니므로 스킵
 
 
 def extract_comment_sentiment(comment, comment_text):
@@ -523,7 +523,7 @@ def extract_comments_from_video_data(video_data, comment_cutoff_date, is_archive
     channel_title = video.get('channel_title', '')
     channel_id = video.get('channel_id', '')
     
-    # 아카이브 스튜디오 채널 필터링
+    # ExampleStudio channel filtering
     if should_skip_archive_studio_channel(channel_title, channel_id, is_archive_studio):
         return []
     
@@ -594,7 +594,7 @@ def process_youtube_comments(s3_data, scan, is_archive_studio, channel_handle):
         channel_title = video.get('channel_title', '')
         channel_id = video.get('channel_id', '')
         
-        # 아카이브스튜디오 채널 필터링
+        # Example Studio 채널 필터링
         if is_archive_studio:
             channel_filter_from_data = s3_data.get('channel_filter')
             channel_handle_from_data = s3_data.get('channel_handle')
@@ -645,9 +645,9 @@ def process_youtube_platform_data(s3_data, scan, keyword, table, local_mode):
     # 영상 정보 추출
     scan['videos'] = process_youtube_videos(s3_data)
     
-    # 아카이브스튜디오 관련 키워드 확인
+    # ExampleStudio related keyword check
     keyword_lower = scan.get('keyword', '').lower()
-    is_archive_studio = any(kw in keyword_lower for kw in ['archive studio', '아카이브스튜디오', 'akaiv', '아카이브'])
+    is_archive_studio = any(kw in keyword_lower for kw in ['example studio', 'examplestyle', 'examplestudio'])
     
     # 댓글 샘플 및 국가별 통계 처리
     channel_handle = scan.get('channel', '')
@@ -1420,9 +1420,9 @@ def _process_comprehensive_analysis(comprehensive_analysis):
         comment_samples = []
         video_links = []
         
-        # 아카이브 스튜디오 채널 확인 (두 섹션에서 공통 사용)
+        # Example Studio 채널 확인 (두 섹션에서 공통 사용)
         creator_name_lower = creator_name.lower()
-        is_archive_studio = any(kw in creator_name_lower for kw in ['archive studio', '아카이브스튜디오', 'akaiv', '아카이브'])
+        is_archive_studio = any(kw in creator_name_lower for kw in ['example studio', 'examplestyle', 'examplestudio'])
         comment_cutoff_date = datetime.now() - timedelta(days=14)
         
         # YouTube 검색 결과 처리
@@ -1870,22 +1870,22 @@ def _normalize_video_id_and_url(video_id, video_url):
     return normalized_id, normalized_url
 
 
-def _handle_akaiv_studio_members():
-    """AkaiV Studio 멤버 목록 엔드포인트"""
+def _handle_group_a_members():
+    """GroupA 멤버 목록 엔드포인트"""
     try:
         creators = []
         last_crawled = ''
 
         if LOCAL_MODE:
-            # 먼저 akaiv-studio-members.json 파일에서 읽기 (빠름)
-            akaiv_json_path = os.path.join(LOCAL_DATA_DIR, 'vuddy', 'comprehensive_analysis', 'akaiv-studio-members.json')
-            if os.path.exists(akaiv_json_path):
-                with open(akaiv_json_path, 'r', encoding='utf-8') as f:
-                    akaiv_data = json.load(f)
+            # 먼저 group-a-members.json 파일에서 읽기 (빠름)
+            group_a_json_path = os.path.join(LOCAL_DATA_DIR, 'vuddy', 'comprehensive_analysis', 'group-a-members.json')
+            if os.path.exists(group_a_json_path):
+                with open(group_a_json_path, 'r', encoding='utf-8') as f:
+                    group_a_data = json.load(f)
 
-                last_crawled = akaiv_data.get('updated_at', '')
+                last_crawled = group_a_data.get('updated_at', '')
 
-                for creator in akaiv_data.get('creators', []):
+                for creator in group_a_data.get('creators', []):
                     # 댓글 샘플 변환
                     comment_samples = []
                     for sample in creator.get('comment_samples', [])[:50]:
@@ -1893,7 +1893,7 @@ def _handle_akaiv_studio_members():
                             sample.get('video_id', '') or '',
                             sample.get('video_url', '')
                         )
-                        
+
                         comment_samples.append({
                             'text': sample.get('text', ''),
                             'author': sample.get('author', '익명'),
@@ -1925,10 +1925,10 @@ def _handle_akaiv_studio_members():
                     }
                     creators.append(creator_info)
 
-                logger.info(f"Loaded {len(creators)} AkaiV Studio members from JSON file")
+                logger.info(f"Loaded {len(creators)} GroupA members from JSON file")
 
     except Exception as e:
-        logger.error(f"Error getting AkaiV Studio members: {e}", exc_info=True)
+        logger.error(f"Error getting GroupA members: {e}", exc_info=True)
         creators = []
 
     return {
@@ -1944,31 +1944,31 @@ def _handle_akaiv_studio_members():
     }
 
 
-def _handle_barabara_members():
-    """BARABARA 멤버 목록 엔드포인트"""
+def _handle_group_b_members():
+    """GroupB 멤버 목록 엔드포인트"""
     try:
         creators = []
         data = None
 
         if LOCAL_MODE:
-            # 로컬 모드: barabara-members.json 파일 로드
-            filepath = os.path.join(LOCAL_DATA_DIR, 'vuddy', 'comprehensive_analysis', 'barabara-members.json')
+            # 로컬 모드: group-b-members.json 파일 로드
+            filepath = os.path.join(LOCAL_DATA_DIR, 'vuddy', 'comprehensive_analysis', 'group-b-members.json')
             if os.path.exists(filepath):
                 try:
                     with open(filepath, 'r', encoding='utf-8') as f:
                         data = json.load(f)
                 except Exception as e:
-                    logger.error(f"Error loading BARABARA members data: {e}", exc_info=True)
+                    logger.error(f"Error loading GroupB members data: {e}", exc_info=True)
         else:
-            # 프로덕션 모드: S3에서 barabara-members.json 가져오기
+            # 프로덕션 모드: S3에서 group-b-members.json 가져오기
             try:
                 obj = s3_client.get_object(
                     Bucket=S3_BUCKET,
-                    Key='raw-data/vuddy/comprehensive_analysis/barabara-members.json'
+                    Key='raw-data/vuddy/comprehensive_analysis/group-b-members.json'
                 )
                 data = json.loads(obj['Body'].read().decode('utf-8'))
             except Exception as e:
-                logger.error(f"Error loading S3 data for BARABARA members: {e}", exc_info=True)
+                logger.error(f"Error loading S3 data for GroupB members: {e}", exc_info=True)
 
         # 전체 수집 날짜
         last_crawled = data.get('timestamp', '') if data else ''
@@ -2002,7 +2002,7 @@ def _handle_barabara_members():
 
                 # 댓글 샘플 변환 (최근 14일 이내 댓글만)
                 comment_cutoff_date = datetime.now() - timedelta(days=14)
-                creator_info['comment_samples'] = _process_barabara_comments(creator_data, comment_cutoff_date)
+                creator_info['comment_samples'] = _process_group_b_comments(creator_data, comment_cutoff_date)
 
                 # 비디오 링크 변환
                 for video in creator_data.get('video_links', [])[:10]:
@@ -2033,7 +2033,7 @@ def _handle_barabara_members():
                 creators.append(creator_info)
 
     except Exception as e:
-        logger.error(f"Error getting BARABARA members: {e}", exc_info=True)
+        logger.error(f"Error getting GroupB members: {e}", exc_info=True)
         creators = []
         last_crawled = ''
 
@@ -2050,31 +2050,31 @@ def _handle_barabara_members():
     }
 
 
-def _handle_psy_chord_members():
-    """PSY_CHORD 멤버 목록 엔드포인트"""
+def _handle_group_c_members():
+    """GroupC 멤버 목록 엔드포인트"""
     try:
         creators = []
         data = None
 
         if LOCAL_MODE:
-            # 로컬 모드: psy-chord-members.json 파일 로드
-            filepath = os.path.join(LOCAL_DATA_DIR, 'vuddy', 'comprehensive_analysis', 'psy-chord-members.json')
+            # 로컬 모드: group-c-members.json 파일 로드
+            filepath = os.path.join(LOCAL_DATA_DIR, 'vuddy', 'comprehensive_analysis', 'group-c-members.json')
             if os.path.exists(filepath):
                 try:
                     with open(filepath, 'r', encoding='utf-8') as f:
                         data = json.load(f)
                 except Exception as e:
-                    logger.error(f"Error loading PSY_CHORD members data: {e}", exc_info=True)
+                    logger.error(f"Error loading GroupC members data: {e}", exc_info=True)
         else:
-            # 프로덕션 모드: S3에서 psy-chord-members.json 가져오기
+            # 프로덕션 모드: S3에서 group-c-members.json 가져오기
             try:
                 obj = s3_client.get_object(
                     Bucket=S3_BUCKET,
-                    Key='raw-data/vuddy/comprehensive_analysis/psy-chord-members.json'
+                    Key='raw-data/vuddy/comprehensive_analysis/group-c-members.json'
                 )
                 data = json.loads(obj['Body'].read().decode('utf-8'))
             except Exception as e:
-                logger.error(f"Error loading S3 data for PSY_CHORD members: {e}", exc_info=True)
+                logger.error(f"Error loading S3 data for GroupC members: {e}", exc_info=True)
 
         # 전체 수집 날짜
         last_crawled = data.get('timestamp', '') if data else ''
@@ -2108,7 +2108,7 @@ def _handle_psy_chord_members():
 
                 # 댓글 샘플 변환 (최근 14일 이내 댓글만)
                 comment_cutoff_date = datetime.now() - timedelta(days=14)
-                creator_info['comment_samples'] = _process_barabara_comments(creator_data, comment_cutoff_date)
+                creator_info['comment_samples'] = _process_group_b_comments(creator_data, comment_cutoff_date)
 
                 # 비디오 링크 변환
                 for video in creator_data.get('video_links', [])[:10]:
@@ -2139,7 +2139,7 @@ def _handle_psy_chord_members():
                 creators.append(creator_info)
 
     except Exception as e:
-        logger.error(f"Error getting PSY_CHORD members: {e}", exc_info=True)
+        logger.error(f"Error getting GroupC members: {e}", exc_info=True)
         creators = []
         last_crawled = ''
 
@@ -2156,46 +2156,46 @@ def _handle_psy_chord_members():
     }
 
 
-def _load_psy_chord_members_data():
-    """PSY_CHORD 멤버 데이터 로드"""
+def _load_group_c_members_data():
+    """GroupC 멤버 데이터 로드"""
     data = None
     if LOCAL_MODE:
-        filepath = os.path.join(LOCAL_DATA_DIR, 'vuddy', 'comprehensive_analysis', 'psy-chord-members.json')
+        filepath = os.path.join(LOCAL_DATA_DIR, 'vuddy', 'comprehensive_analysis', 'group-c-members.json')
         if os.path.exists(filepath):
             try:
                 with open(filepath, 'r', encoding='utf-8') as f:
                     data = json.load(f)
             except Exception as e:
-                logger.error(f"Error loading PSY_CHORD members data: {e}", exc_info=True)
+                logger.error(f"Error loading GroupC members data: {e}", exc_info=True)
     else:
         try:
             obj = s3_client.get_object(
                 Bucket=S3_BUCKET,
-                Key='raw-data/vuddy/comprehensive_analysis/psy-chord-members.json'
+                Key='raw-data/vuddy/comprehensive_analysis/group-c-members.json'
             )
             data = json.loads(obj['Body'].read().decode('utf-8'))
         except Exception as e:
-            logger.error(f"Error loading S3 data for PSY_CHORD members: {e}", exc_info=True)
+            logger.error(f"Error loading S3 data for GroupC members: {e}", exc_info=True)
     return data
 
 
-def _handle_psy_chord_channel(event):
-    """PSY_CHORD 채널 정보 엔드포인트"""
+def _handle_group_c_channel(event):
+    """GroupC 채널 정보 엔드포인트"""
     try:
         # 쿼리 파라미터에서 channel_handle 가져오기
         query_params = event.get('queryStringParameters') or {}
         requested_handle = query_params.get('channel_handle') or query_params.get('channel', '')
 
-        # 특정 채널 요청이 없으면 모든 PSY_CHORD 멤버 데이터 집계
+        # 특정 채널 요청이 없으면 모든 GroupC 멤버 데이터 집계
         if not requested_handle:
             channels_data = []
             last_crawled = ''
-            psy_chord_data = _load_psy_chord_members_data()
+            group_c_data = _load_group_c_members_data()
 
-            if psy_chord_data:
-                last_crawled = psy_chord_data.get('updated_at', '') or psy_chord_data.get('timestamp', '')
+            if group_c_data:
+                last_crawled = group_c_data.get('updated_at', '') or group_c_data.get('timestamp', '')
 
-                for creator in psy_chord_data.get('creators', []):
+                for creator in group_c_data.get('creators', []):
                     # channel_handle이 없으면 youtube_channel 사용
                     channel_handle = creator.get('channel_handle', '') or creator.get('youtube_channel', '')
                     # channel_title 추출
@@ -2215,7 +2215,7 @@ def _handle_psy_chord_channel(event):
                     }
                     channels_data.append(channel_info)
 
-                logger.info(f"Loaded {len(channels_data)} PSY_CHORD channels from JSON file")
+                logger.info(f"Loaded {len(channels_data)} GroupC channels from JSON file")
 
             return {
                 'statusCode': 200,
@@ -2233,7 +2233,7 @@ def _handle_psy_chord_channel(event):
         if not requested_handle.startswith('@'):
             requested_handle = '@' + requested_handle
 
-        logger.debug(f"PSY_CHORD - Requested channel handle: {requested_handle}")
+        logger.debug(f"GroupC - Requested channel handle: {requested_handle}")
 
         channel_data = None
 
@@ -2252,14 +2252,14 @@ def _handle_psy_chord_channel(event):
             if matching_files:
                 latest_file, latest_data = max(matching_files, key=lambda x: x[0]['LastModified'])
                 channel_data = latest_data
-                logger.info(f"Found PSY_CHORD channel data for {requested_handle} in S3: {latest_file['Key']}")
+                logger.info(f"Found GroupC channel data for {requested_handle} in S3: {latest_file['Key']}")
 
         if channel_data:
             # 댓글 데이터 변환
             videos_list = channel_data.get('videos', [])
             videos, total_comments, total_vtuber_comments, total_vtuber_likes = _process_channel_videos(videos_list)
 
-            logger.info(f"PSY_CHORD: Processed {len(videos)} videos, total_comments: {total_comments}")
+            logger.info(f"GroupC: Processed {len(videos)} videos, total_comments: {total_comments}")
 
             last_crawled_date = channel_data.get('timestamp', '') or channel_data.get('analysis_date', '')
 
@@ -2288,11 +2288,11 @@ def _handle_psy_chord_channel(event):
             }
 
     except Exception as e:
-        logger.error(f"Error getting PSY_CHORD channel data: {e}", exc_info=True)
+        logger.error(f"Error getting GroupC channel data: {e}", exc_info=True)
         result = {
-            'channel_title': 'PSY_CHORD',
+            'channel_title': 'GroupC',
             'channel_id': '',
-            'channel_handle': '@psy_chord',
+            'channel_handle': '@example-group-c',
             'videos': [],
             'total_comments': 0,
             'total_vtuber_comments': 0,
@@ -2386,8 +2386,8 @@ def _create_comment_sample_from_data(comment):
     }
 
 
-def _process_barabara_comments(creator_data, comment_cutoff_date):
-    """BARABARA 멤버의 댓글 샘플 처리 (중첩 if 제거)"""
+def _process_group_b_comments(creator_data, comment_cutoff_date):
+    """GroupB/C 멤버의 댓글 샘플 처리 (중첩 if 제거)"""
     comment_samples = []
     
     for comment in creator_data.get('comment_samples', [])[:50]:
@@ -2445,56 +2445,56 @@ def _extract_channel_title_from_name(creator):
     return channel_title
 
 
-def _load_barabara_members_data():
+def _load_group_b_members_data():
     """
-    BARABARA 멤버 데이터를 로드하는 헬퍼 함수
+    GroupB 멤버 데이터를 로드하는 헬퍼 함수
     로컬 모드면 파일에서, 프로덕션 모드면 S3에서 로드합니다.
-    
+
     Returns:
-        dict: barabara_data 또는 None
+        dict: group_b_data 또는 None
     """
-    barabara_data = None
-    
+    group_b_data = None
+
     if LOCAL_MODE:
-        # 먼저 barabara-members.json 파일에서 읽기 (빠름)
-        barabara_json_path = os.path.join(LOCAL_DATA_DIR, 'vuddy', 'comprehensive_analysis', 'barabara-members.json')
-        if os.path.exists(barabara_json_path):
+        # 먼저 group-b-members.json 파일에서 읽기 (빠름)
+        group_b_json_path = os.path.join(LOCAL_DATA_DIR, 'vuddy', 'comprehensive_analysis', 'group-b-members.json')
+        if os.path.exists(group_b_json_path):
             try:
-                with open(barabara_json_path, 'r', encoding='utf-8') as f:
-                    barabara_data = json.load(f)
+                with open(group_b_json_path, 'r', encoding='utf-8') as f:
+                    group_b_data = json.load(f)
             except Exception as e:
-                logger.error(f"Error loading BARABARA members data: {e}", exc_info=True)
+                logger.error(f"Error loading GroupB members data: {e}", exc_info=True)
     else:
-        # 프로덕션 모드: S3에서 barabara-members.json 가져오기
+        # 프로덕션 모드: S3에서 group-b-members.json 가져오기
         try:
             obj = s3_client.get_object(
                 Bucket=S3_BUCKET,
-                Key='raw-data/vuddy/comprehensive_analysis/barabara-members.json'
+                Key='raw-data/vuddy/comprehensive_analysis/group-b-members.json'
             )
-            barabara_data = json.loads(obj['Body'].read().decode('utf-8'))
+            group_b_data = json.loads(obj['Body'].read().decode('utf-8'))
         except Exception as e:
-            logger.error(f"Error loading S3 data for BARABARA members: {e}", exc_info=True)
-    
-    return barabara_data
+            logger.error(f"Error loading S3 data for GroupB members: {e}", exc_info=True)
+
+    return group_b_data
 
 
-def _handle_barabara_channel(event):
-    """BARABARA 채널 정보 엔드포인트"""
+def _handle_group_b_channel(event):
+    """GroupB 채널 정보 엔드포인트"""
     try:
         # 쿼리 파라미터에서 channel_handle 가져오기
         query_params = event.get('queryStringParameters') or {}
         requested_handle = query_params.get('channel_handle') or query_params.get('channel', '')
 
-        # 특정 채널 요청이 없으면 모든 BARABARA 멤버 데이터 집계
+        # 특정 채널 요청이 없으면 모든 GroupB 멤버 데이터 집계
         if not requested_handle:
             channels_data = []
             last_crawled = ''
-            barabara_data = _load_barabara_members_data()
+            group_b_data = _load_group_b_members_data()
 
-            if barabara_data:
-                last_crawled = barabara_data.get('updated_at', '') or barabara_data.get('timestamp', '')
+            if group_b_data:
+                last_crawled = group_b_data.get('updated_at', '') or group_b_data.get('timestamp', '')
 
-                for creator in barabara_data.get('creators', []):
+                for creator in group_b_data.get('creators', []):
                     # channel_handle이 없으면 youtube_channel 사용
                     channel_handle = creator.get('channel_handle', '') or creator.get('youtube_channel', '')
                     # channel_title 추출
@@ -2514,7 +2514,7 @@ def _handle_barabara_channel(event):
                     }
                     channels_data.append(channel_info)
 
-                logger.info(f"Loaded {len(channels_data)} BARABARA channels from JSON file")
+                logger.info(f"Loaded {len(channels_data)} GroupB channels from JSON file")
 
             return {
                 'statusCode': 200,
@@ -2532,7 +2532,7 @@ def _handle_barabara_channel(event):
         if not requested_handle.startswith('@'):
             requested_handle = '@' + requested_handle
 
-        logger.debug(f"BARABARA - Requested channel handle: {requested_handle}")
+        logger.debug(f"GroupB - Requested channel handle: {requested_handle}")
 
         channel_data = None
 
@@ -2551,14 +2551,14 @@ def _handle_barabara_channel(event):
             if matching_files:
                 latest_file, latest_data = max(matching_files, key=lambda x: x[0]['LastModified'])
                 channel_data = latest_data
-                logger.info(f"Found BARABARA channel data for {requested_handle} in S3: {latest_file['Key']}")
+                logger.info(f"Found GroupB channel data for {requested_handle} in S3: {latest_file['Key']}")
 
         if channel_data:
             # 댓글 데이터 변환
             videos_list = channel_data.get('videos', [])
             videos, total_comments, total_vtuber_comments, total_vtuber_likes = _process_channel_videos(videos_list)
 
-            logger.info(f"BARABARA: Processed {len(videos)} videos, total_comments: {total_comments}")
+            logger.info(f"GroupB: Processed {len(videos)} videos, total_comments: {total_comments}")
 
             last_crawled_date = channel_data.get('timestamp', '') or channel_data.get('analysis_date', '')
 
@@ -2587,11 +2587,11 @@ def _handle_barabara_channel(event):
             }
 
     except Exception as e:
-        logger.error(f"Error getting BARABARA channel data: {e}", exc_info=True)
+        logger.error(f"Error getting GroupB channel data: {e}", exc_info=True)
         result = {
-            'channel_title': 'BARABARA',
+            'channel_title': 'GroupB',
             'channel_id': '',
-            'channel_handle': '@BARABARA_KR',
+            'channel_handle': '@example-group-b',
             'videos': [],
             'total_comments': 0,
             'total_vtuber_comments': 0,
@@ -2635,22 +2635,22 @@ def _trigger_youtube_crawler(requested_handle):
         logger.error(f"Error triggering YouTube crawler for {requested_handle}: {e}", exc_info=True)
 
 
-def _load_skoshism_members_from_local():
-    """로컬에서 SKOSHISM 멤버 데이터 로드 (중첩 if 제거)"""
+def _load_group_a_channel_members_from_local():
+    """로컬에서 GroupA channel 멤버 데이터 로드 (중첩 if 제거)"""
     channels_data = []
     last_crawled = ''
-    
-    skoshism_json_path = os.path.join(LOCAL_DATA_DIR, 'vuddy', 'comprehensive_analysis', 'skoshism-members.json')
-    if not os.path.exists(skoshism_json_path):
+
+    group_a_channel_json_path = os.path.join(LOCAL_DATA_DIR, 'vuddy', 'comprehensive_analysis', 'group-a-channel-members.json')
+    if not os.path.exists(group_a_channel_json_path):
         return channels_data, last_crawled
-    
+
     try:
-        with open(skoshism_json_path, 'r', encoding='utf-8') as f:
-            skoshism_data = json.load(f)
-        
-        last_crawled = skoshism_data.get('updated_at', '')
-        
-        for creator in skoshism_data.get('creators', []):
+        with open(group_a_channel_json_path, 'r', encoding='utf-8') as f:
+            group_a_channel_data = json.load(f)
+
+        last_crawled = group_a_channel_data.get('updated_at', '')
+
+        for creator in group_a_channel_data.get('creators', []):
             channel_info = {
                 'channel_handle': creator.get('channel_handle', ''),
                 'channel_title': creator.get('channel_title', creator.get('name', '')),
@@ -2658,27 +2658,27 @@ def _load_skoshism_members_from_local():
                 'subscriber_count': creator.get('subscriber_count', 0),
                 'total_comments': creator.get('total_comments', 0),
                 'total_videos': creator.get('total_videos', 0),
-                'analysis_date': last_crawled or skoshism_data.get('timestamp', ''),
+                'analysis_date': last_crawled or group_a_channel_data.get('timestamp', ''),
                 'videos': [],
                 'comment_samples': creator.get('comment_samples', [])
             }
             channels_data.append(channel_info)
-        
-        logger.info(f"Loaded {len(channels_data)} SKOSHISM channels from JSON file")
+
+        logger.info(f"Loaded {len(channels_data)} GroupA channel members from JSON file")
     except Exception as e:
-        logger.error(f"Error loading SKOSHISM members from local: {e}", exc_info=True)
-    
+        logger.error(f"Error loading GroupA channel members from local: {e}", exc_info=True)
+
     return channels_data, last_crawled
 
 
-def _handle_skoshism_all_channels():
-    """모든 SKOSHISM 채널 데이터 반환 (중첩 if 제거)"""
+def _handle_group_a_channel_all_channels():
+    """모든 GroupA channel 데이터 반환 (중첩 if 제거)"""
     channels_data = []
     last_crawled = ''
-    
+
     if LOCAL_MODE:
-        channels_data, last_crawled = _load_skoshism_members_from_local()
-    
+        channels_data, last_crawled = _load_group_a_channel_members_from_local()
+
     return {
         'statusCode': 200,
         'headers': {
@@ -2692,16 +2692,16 @@ def _handle_skoshism_all_channels():
     }
 
 
-def _handle_skoshism_channel(event):
-    """SKOSHISM 채널 정보 엔드포인트"""
+def _handle_group_a_channel(event):
+    """GroupA channel 정보 엔드포인트"""
     try:
         # 쿼리 파라미터에서 channel_handle 가져오기
         query_params = event.get('queryStringParameters') or {}
         requested_handle = query_params.get('channel_handle') or query_params.get('channel', '')
 
-        # 특정 채널 요청이 없으면 모든 SKOSHISM 멤버 데이터 집계
+        # 특정 채널 요청이 없으면 모든 GroupA channel 멤버 데이터 집계
         if not requested_handle:
-            return _handle_skoshism_all_channels()
+            return _handle_group_a_channel_all_channels()
 
         # @ 기호가 없으면 추가
         if not requested_handle.startswith('@'):
@@ -2771,11 +2771,11 @@ def _handle_skoshism_channel(event):
             }
 
     except Exception as e:
-        logger.error(f"Error getting SKOSHISM channel data: {e}", exc_info=True)
+        logger.error(f"Error getting GroupA channel data: {e}", exc_info=True)
         result = {
-            'channel_title': 'SKOSHISM',
+            'channel_title': 'GroupA Channel',
             'channel_id': '',
-            'channel_handle': '@SKOSHISM',
+            'channel_handle': '@example-group-a-channel',
             'videos': [],
             'total_comments': 0,
             'total_vtuber_comments': 0,
@@ -2870,14 +2870,13 @@ def _handle_dcinside_galleries():
         galleries_data = []
 
         # DC인사이드 갤러리 목록
-        gallery_ids = ['ivnit', 'akaiv', 'soopvirtualstreamer', 'spv', 'soopstreaming', 'skoshism']
+        gallery_ids = ['example-gallery-1', 'example-gallery-2', 'example-gallery-3', 'example-gallery-4', 'example-gallery-5']
         gallery_names = {
-            'ivnit': '이브닛 미니 갤러리',
-            'akaiv': '아카이브 스튜디오 갤러리',
-            'soopvirtualstreamer': '숲 종합 갤러리',
-            'spv': '숲 버추얼 갤러리',
-            'soopstreaming': '숲 스트리밍 갤러리',
-            'skoshism': '스코시즘 갤러리'
+            'example-gallery-1': 'Example Gallery 1',
+            'example-gallery-2': 'Example Gallery 2',
+            'example-gallery-3': 'Example Gallery 3',
+            'example-gallery-4': 'Example Gallery 4',
+            'example-gallery-5': 'Example Gallery 5',
         }
 
         for gallery_id in gallery_ids:
@@ -3469,29 +3468,29 @@ def lambda_handler(event, context):
         elif path.endswith('/vuddy/creators'):
             return _handle_vuddy_creators()
 
-        # GET /api/akaiv-studio/members
-        elif path.endswith('/akaiv-studio/members'):
-            return _handle_akaiv_studio_members()
+        # GET /api/group-a/members (GroupA members)
+        elif path.endswith('/group-a/members'):
+            return _handle_group_a_members()
 
-        # GET /api/barabara/members
-        elif path.endswith('/barabara/members'):
-            return _handle_barabara_members()
+        # GET /api/group-b/members (GroupB members)
+        elif path.endswith('/group-b/members'):
+            return _handle_group_b_members()
 
-        # GET /api/barabara/channel
-        elif path.endswith('/barabara/channel'):
-            return _handle_barabara_channel(event)
+        # GET /api/group-b/channel (GroupB channel)
+        elif path.endswith('/group-b/channel'):
+            return _handle_group_b_channel(event)
 
-        # GET /api/psy-chord/members
-        elif path.endswith('/psy-chord/members'):
-            return _handle_psy_chord_members()
+        # GET /api/group-c/members (GroupC members)
+        elif path.endswith('/group-c/members'):
+            return _handle_group_c_members()
 
-        # GET /api/psy-chord/channel
-        elif path.endswith('/psy-chord/channel'):
-            return _handle_psy_chord_channel(event)
+        # GET /api/group-c/channel (GroupC channel)
+        elif path.endswith('/group-c/channel'):
+            return _handle_group_c_channel(event)
 
-        # GET /api/skoshism/channel
-        elif path.endswith('/skoshism/channel'):
-            return _handle_skoshism_channel(event)
+        # GET /api/group-a/channel (GroupA channel)
+        elif path.endswith('/group-a/channel'):
+            return _handle_group_a_channel(event)
 
         # GET /api/dcinside/galleries
         elif path.endswith('/dcinside/galleries'):

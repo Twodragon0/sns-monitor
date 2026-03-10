@@ -184,9 +184,7 @@ crawlers:
         cpu: 100m
         memory: 128Mi
     schedule: "10 */2 * * *"  # 매 2시간 10분마다 실행 (댓글 지속 수집)
-    # 채널 목록: 한결(@hangyeol8008), 비몽(@beemong_), 샤르망(@owo_zzzz) 포함
-    # PSY_CHORD 멤버 추가: 루이쨘, 감제이, 연이, 하루토, 늦잠
-    channels: "@akaivstudioofficial,@Yeorumi,@beemong_,@u32S2,@hangyeol8008,@owo_zzzz,@IVNITOFFICIAL,@irocloud_,@NIN0SUNDAY,@KoyoTempest,@otorainy,@RoboFroster,@BARABARA_KR,@aoseijun,@AkazuneKatsuki,@Shironeharu,@NeruKuroming,@sinichocoreito,@mizuiroSyu,@louiszzan,@9jayaj9,@yeon2vt,@psy_haruto,@oversleepZzz"
+    channels: "@example-creator-1,@example-creator-2,@example-creator-3,@example-creator-4,@example-creator-5"
     maxVideos: 15
     maxComments: 50
 
@@ -203,14 +201,14 @@ crawlers:
         cpu: 150m
         memory: 256Mi
     schedule: "10 */2 * * *"  # 매 2시간 10분 (YouTube와 동일)
-    galleries: "ivnit,akaiv,skoshism,soopvirtualstreamer,spv,soopstreaming"
+    galleries: "example-gallery-1,example-gallery-2,example-gallery-3"
     maxPages: 3
 
   twitter:
     enabled: false
 
   # JSON 업데이트 크론잡 - YouTube 크롤러 완료 후 실행 (크롤러가 약 10-20분 소요되므로 30분 후 실행)
-  # 한결, 비몽, 샤르망의 댓글 데이터를 포함하여 업데이트
+  # Update comment data for all group members
   jsonUpdate:
     enabled: true
     schedule: "40 */2 * * *"  # 매 2시간 40분 (YouTube 크롤러 완료 후 약 30분 뒤)
