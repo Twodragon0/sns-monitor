@@ -4,12 +4,15 @@ YouTube Data API v3를 사용하여 특정 키워드의 영상 및 댓글 수집
 """
 
 import json
+import logging
 import os
 import sys
 import boto3
 import time
 from datetime import datetime, timezone, timedelta
 from googleapiclient.discovery import build
+
+logger = logging.getLogger(__name__)
 
 # KST 타임존 (UTC+9)
 KST = timezone(timedelta(hours=9))
@@ -34,7 +37,7 @@ LOCAL_MODE_ENV = os.environ.get('LOCAL_MODE', 'false').lower()
 LOCAL_MODE = LOCAL_MODE_ENV == 'true'
 LOCAL_DATA_DIR = os.environ.get('LOCAL_DATA_DIR', './local-data')
 
-print(f"🔧 LOCAL_MODE: {LOCAL_MODE} (env: {LOCAL_MODE_ENV})")
+logger.info("LOCAL_MODE: %s (env: %s)", LOCAL_MODE, LOCAL_MODE_ENV)
 
 # 로컬 모드가 아닐 때만 AWS 클라이언트 초기화
 if not LOCAL_MODE:
@@ -64,7 +67,7 @@ else:
                 save_metadata_to_local, 
                 is_local_mode
             )
-            print("✅ Successfully imported local_storage from current directory")
+            logger.info("Successfully imported local_storage from current directory")
         except ImportError:
             # 여러 경로 시도
             common_paths = [
@@ -83,7 +86,7 @@ else:
                             is_local_mode
                         )
                         imported = True
-                        print(f"✅ Successfully imported local_storage from {common_path}")
+                        logger.info("Successfully imported local_storage from %s", common_path)
                         break
                     except ImportError:
                         continue
@@ -91,7 +94,7 @@ else:
             if not imported:
                 raise ImportError("Could not find local_storage module in any path")
     except ImportError as e:
-        print(f"Warning: Could not import local_storage: {e}")
+        logger.warning("Could not import local_storage: %s", e)
         save_to_local_file = None
         save_metadata_to_local = None
     
@@ -147,10 +150,10 @@ CHANNEL_ID_OVERRIDE = {
     '@bee_mong': 'UCO11lxcm_-212ciYIGXZRgw',  # 비몽 (이전 핸들)
     '@beemong': 'UCO11lxcm_-212ciYIGXZRgw',   # 비몽 (핸들 변형)
 
-    # Vuddy 소속
-    '@BARABARA_KR': 'UCPbZ7kkVqeoEQ6vAiWazYBQ', # 바라바라 (Vuddy 소속)
+    # CreatorBrand 소속
+    '@BARABARA_KR': 'UCPbZ7kkVqeoEQ6vAiWazYBQ', # 바라바라 (CreatorBrand 소속)
 
-    # BARABARA 멤버들 (Vuddy 소속)
+    # BARABARA 멤버들 (CreatorBrand 소속)
     '@aoseijun': 'UCbP5tBgdBXy0UqxHaj4eUdA',      # 아오세이준
     '@AkazuneKatsuki': 'UCOHxnPvdeY0e9qqI8NmoNiA', # 아카즈네 카츠키
     '@Shironeharu': 'UC6cT7F_oCJ8_l1IdCaWOIuQ',   # 시로네 하루
@@ -238,7 +241,7 @@ def get_youtube_api_key():
         secret = json.loads(response['SecretString'])
         return secret['youtube_api_key']
     except Exception as e:
-        print(f"Error getting YouTube API key: {e}")
+        logger.error("Error getting YouTube API key: %s", e)
         raise
 
 def execute_with_retry(api_call, max_retries=MAX_RETRIES, backoff_base=RETRY_BACKOFF_BASE):
@@ -260,7 +263,7 @@ def execute_with_retry(api_call, max_retries=MAX_RETRIES, backoff_base=RETRY_BAC
             # Rate limiting: 요청 간 딜레이
             if attempt > 0:
                 delay = backoff_base ** attempt
-                print(f"Retrying API call after {delay:.2f} seconds (attempt {attempt + 1}/{max_retries + 1})")
+                logger.debug("Retrying API call after %.2f seconds (attempt %d/%d)", delay, attempt + 1, max_retries + 1)
                 time.sleep(delay)
             elif attempt == 0:
                 # 첫 요청 전에도 기본 딜레이 적용
@@ -283,58 +286,58 @@ def execute_with_retry(api_call, max_retries=MAX_RETRIES, backoff_base=RETRY_BAC
             # 403 Forbidden: 할당량 초과 또는 권한 없음
             if error_code == 403:
                 if error_reason in ['quotaExceeded', 'dailyLimitExceeded']:
-                    print(f"⚠️  YouTube API quota exceeded. Reason: {error_reason}")
+                    logger.warning("YouTube API quota exceeded. Reason: %s", error_reason)
                     if attempt < max_retries:
                         # 할당량 초과 시 더 긴 대기 시간
                         wait_time = (backoff_base ** (attempt + 2)) * 10  # 최소 40초 대기
-                        print(f"Waiting {wait_time:.0f} seconds before retry...")
+                        logger.debug("Waiting %.0f seconds before retry...", wait_time)
                         time.sleep(wait_time)
                         continue
                     else:
                         raise Exception(f"YouTube API quota exceeded after {max_retries + 1} attempts")
                 elif error_reason == 'commentsDisabled':
-                    print(f"Comments disabled for this video/channel")
+                    logger.info("Comments disabled for this video/channel")
                     return None  # 댓글이 비활성화된 경우는 오류가 아님
                 else:
-                    print(f"403 Forbidden error: {error_reason or 'Unknown reason'}")
+                    logger.error("403 Forbidden error: %s", error_reason or 'Unknown reason')
                     if attempt < max_retries:
                         continue
                     else:
                         raise
-            
+
             # 429 Too Many Requests: Rate limit 초과
             elif error_code == 429:
-                print(f"⚠️  Rate limit exceeded (429). Attempt {attempt + 1}/{max_retries + 1}")
+                logger.warning("Rate limit exceeded (429). Attempt %d/%d", attempt + 1, max_retries + 1)
                 if attempt < max_retries:
                     # Rate limit 초과 시 더 긴 대기 시간
                     wait_time = (backoff_base ** (attempt + 1)) * 5  # 최소 10초 대기
-                    print(f"Waiting {wait_time:.0f} seconds before retry...")
+                    logger.debug("Waiting %.0f seconds before retry...", wait_time)
                     time.sleep(wait_time)
                     continue
                 else:
                     raise Exception(f"Rate limit exceeded after {max_retries + 1} attempts")
-            
+
             # 400 Bad Request: 잘못된 요청 (재시도 불필요)
             elif error_code == 400:
-                print(f"400 Bad Request: {error_reason or 'Invalid request'}")
+                logger.error("400 Bad Request: %s", error_reason or 'Invalid request')
                 raise
-            
+
             # 404 Not Found: 리소스 없음 (재시도 불필요)
             elif error_code == 404:
-                print(f"404 Not Found: Resource not found")
+                logger.warning("404 Not Found: Resource not found")
                 return None
-            
+
             # 기타 오류: 재시도
             else:
-                print(f"YouTube API error {error_code}: {e}")
+                logger.error("YouTube API error %s: %s", error_code, e)
                 if attempt < max_retries:
                     continue
                 else:
                     raise
-        
+
         except Exception as e:
             last_exception = e
-            print(f"Unexpected error: {e}")
+            logger.error("Unexpected error: %s", e)
             if attempt < max_retries:
                 continue
             else:
@@ -409,8 +412,8 @@ def search_videos(youtube, keyword, max_results=10, regions=None, channel_id_fil
                     # 정확한 키워드 매칭 확인
                     should_include = False
                     
-                    if keyword == "Levvels" or keyword == "levvels":
-                        if "levvels" in title_lower or "levvels" in description_lower:
+                    if keyword == "ExampleCorp" or keyword == "examplecorp":
+                        if "examplecorp" in title_lower or "examplecorp" in description_lower:
                             should_include = True
                         else:
                             continue
@@ -449,10 +452,10 @@ def search_videos(youtube, keyword, max_results=10, regions=None, channel_id_fil
                             all_videos.append(video_info)
                 
                 videos_by_region[region['code']] = region_videos
-                print(f"Found {len(region_videos)} videos from {region['name']} ({region['code']})")
-                
+                logger.info("Found %d videos from %s (%s)", len(region_videos), region['name'], region['code'])
+
             except Exception as e:
-                print(f"YouTube API error for region {region['code']}: {e}")
+                logger.error("YouTube API error for region %s: %s", region['code'], e)
                 continue
         
         # 우선 지역(한국, 미국, 일본)의 영상을 먼저 포함하고, 나머지는 추가
@@ -472,11 +475,11 @@ def search_videos(youtube, keyword, max_results=10, regions=None, channel_id_fil
             if not any(v['video_id'] == video['video_id'] for v in prioritized_videos):
                 prioritized_videos.append(video)
         
-        print(f"Found {len(prioritized_videos)} videos matching exact keyword '{keyword}' (prioritized by region)")
+        logger.info("Found %d videos matching exact keyword '%s' (prioritized by region)", len(prioritized_videos), keyword)
         return prioritized_videos[:max_results]
 
     except HttpError as e:
-        print(f"YouTube API error in search_videos: {e}")
+        logger.error("YouTube API error in search_videos: %s", e)
         return []
 
 def get_channel_id_from_handle(youtube, channel_handle):
@@ -512,7 +515,7 @@ def get_channel_id_from_handle(youtube, channel_handle):
         # 1. 먼저 CHANNEL_ID_OVERRIDE에서 직접 매핑 확인
         if original_handle in CHANNEL_ID_OVERRIDE and CHANNEL_ID_OVERRIDE[original_handle]:
             override_id = CHANNEL_ID_OVERRIDE[original_handle]
-            print(f"Using override channel ID for {original_handle}: {override_id}")
+            logger.info("Using override channel ID for %s: %s", original_handle, override_id)
             return override_id
 
         # 2. forHandle API로 직접 검색 시도 (가장 정확함)
@@ -525,7 +528,7 @@ def get_channel_id_from_handle(youtube, channel_handle):
         channels_response = execute_with_retry(get_channel_by_handle_api_call)
         if channels_response and channels_response.get('items'):
             channel_id = channels_response['items'][0]['id']
-            print(f"Found channel ID via forHandle for {original_handle}: {channel_id}")
+            logger.info("Found channel ID via forHandle for %s: %s", original_handle, channel_id)
             return channel_id
 
         # 3. 한국어 이름으로 검색 시도 (VTuber 채널용)
@@ -546,7 +549,7 @@ def get_channel_id_from_handle(youtube, channel_handle):
                     title = item['snippet']['title']
                     if korean_name in title or handle.lower() in title.lower():
                         channel_id = item['snippet']['channelId']
-                        print(f"Found channel ID via Korean name search for {original_handle}: {channel_id} ({title})")
+                        logger.info("Found channel ID via Korean name search for %s: %s (%s)", original_handle, channel_id, title)
                         return channel_id
 
         # 4. 추가 검색 키워드로 검색 시도
@@ -567,7 +570,7 @@ def get_channel_id_from_handle(youtube, channel_handle):
                     # 핸들명이나 한국어 이름이 포함된 채널 찾기
                     if handle.lower() in title or (korean_name and korean_name in item['snippet']['title']):
                         channel_id = item['snippet']['channelId']
-                        print(f"Found channel ID via additional keyword '{search_keyword}' for {original_handle}: {channel_id} ({item['snippet']['title']})")
+                        logger.info("Found channel ID via additional keyword '%s' for %s: %s (%s)", search_keyword, original_handle, channel_id, item['snippet']['title'])
                         return channel_id
 
         # 5. 영문 핸들로 일반 검색
@@ -584,14 +587,14 @@ def get_channel_id_from_handle(youtube, channel_handle):
             channel_id = search_response['items'][0]['snippet']['channelId']
             # 차단된 채널 ID 확인
             if channel_id in BLOCKED_CHANNEL_IDS:
-                print(f"Blocked channel ID detected for {original_handle}: {channel_id} - skipping")
+                logger.warning("Blocked channel ID detected for %s: %s - skipping", original_handle, channel_id)
                 return None
-            print(f"Found channel ID via general search for {original_handle}: {channel_id}")
+            logger.info("Found channel ID via general search for %s: %s", original_handle, channel_id)
             return channel_id
 
         return None
     except Exception as e:
-        print(f"Error getting channel ID for {channel_handle}: {e}")
+        logger.error("Error getting channel ID for %s: %s", channel_handle, e)
         return None
 
 def get_channel_videos(youtube, channel_id, max_results=10):
@@ -606,7 +609,7 @@ def get_channel_videos(youtube, channel_id, max_results=10):
 
         channel_response = execute_with_retry(get_channel_details_api_call)
         if not channel_response or not channel_response.get('items'):
-            print(f"Channel not found: {channel_id}")
+            logger.warning("Channel not found: %s", channel_id)
             return []
         
         uploads_playlist_id = channel_response['items'][0]['contentDetails']['relatedPlaylists']['uploads']
@@ -653,7 +656,7 @@ def get_channel_videos(youtube, channel_id, max_results=10):
 
         return videos[:max_results]
     except HttpError as e:
-        print(f"YouTube API error in get_channel_videos: {e}")
+        logger.error("YouTube API error in get_channel_videos: %s", e)
         return []
 
 def is_vtuber_comment(author_name, author_channel_id=None):
@@ -838,7 +841,7 @@ def get_video_comments(youtube, video_id, max_results=100, analyze_vtubers=False
         return result
 
     except Exception as e:
-        print(f"YouTube API error in get_video_comments: {e}")
+        logger.error("YouTube API error in get_video_comments: %s", e)
         return {'comments': [], 'vtuber_stats': None, 'country_stats': {'KR': {'comments': 0, 'likes': 0}, 'US': {'comments': 0, 'likes': 0}, 'JP': {'comments': 0, 'likes': 0}, 'Other': {'comments': 0, 'likes': 0}}}
 
 def save_to_s3(data, keyword):
@@ -860,18 +863,18 @@ def save_to_s3(data, keyword):
                 Body=json.dumps(data, ensure_ascii=False, indent=2),
                 ContentType='application/json'
             )
-            print(f"Data saved to s3://{S3_BUCKET}/{key}")
+            logger.info("Data saved to s3://%s/%s", S3_BUCKET, key)
             return key
         except Exception as e:
-            print(f"Error saving to S3: {e}")
+            logger.error("Error saving to S3: %s", e)
             raise
 
 def trigger_llm_analysis(s3_key, keyword, total_comments):
     """LLM 분석기 호출"""
     if LOCAL_MODE:
-        print(f"⚠️  로컬 모드: LLM 분석은 건너뜁니다. (s3_key: {s3_key})")
+        logger.warning("로컬 모드: LLM 분석은 건너뜁니다. (s3_key: %s)", s3_key)
         return
-    
+
     try:
         payload = {
             'source': 'youtube',
@@ -886,13 +889,13 @@ def trigger_llm_analysis(s3_key, keyword, total_comments):
             InvocationType='Event',  # 비동기 호출
             Payload=json.dumps(payload)
         )
-        print(f"LLM analysis triggered for {s3_key}")
+        logger.info("LLM analysis triggered for %s", s3_key)
     except Exception as e:
-        print(f"Error triggering LLM analysis: {e}")
+        logger.error("Error triggering LLM analysis: %s", e)
 
 def analyze_channel(youtube, channel_handle, max_videos=10, max_comments_per_video=100):
     """특정 채널의 영상과 댓글 분석 (버튜버 분석 포함)"""
-    print(f"Analyzing channel: {channel_handle}")
+    logger.info("Analyzing channel: %s", channel_handle)
     
     # 채널 ID 가져오기
     channel_id = get_channel_id_from_handle(youtube, channel_handle)
@@ -918,7 +921,7 @@ def analyze_channel(youtube, channel_handle, max_videos=10, max_comments_per_vid
         channel_title = channel_data['snippet']['title']
         channel_stats = channel_data.get('statistics', {})
     except Exception as e:
-        print(f"Error getting channel info: {e}")
+        logger.error("Error getting channel info: %s", e)
         channel_title = "Unknown"
         channel_stats = {}
     
@@ -941,7 +944,7 @@ def analyze_channel(youtube, channel_handle, max_videos=10, max_comments_per_vid
     
     # 각 영상의 댓글 수집 및 분석 - 최적화된 함수 사용
     for video in videos:
-        print(f"Fetching comments for video: {video['title']} (ID: {video['video_id']})")
+        logger.info("Fetching comments for video: %s (ID: %s)", video['title'], video['video_id'])
 
         try:
             comment_result = get_video_comments_optimized(
@@ -967,7 +970,7 @@ def analyze_channel(youtube, channel_handle, max_videos=10, max_comments_per_vid
                 total_vtuber_likes += vtuber_stats['vtuber_total_likes']
                 all_vtuber_comments.extend(vtuber_stats['vtuber_comments'])
             
-            print(f"  ✅ Collected {len(comments)} comments for video: {video['title']}")
+            logger.info("Collected %d comments for video: %s", len(comments), video['title'])
             
             video_data.append({
                 'video': video,
@@ -977,7 +980,7 @@ def analyze_channel(youtube, channel_handle, max_videos=10, max_comments_per_vid
                 'country_stats': country_stats
             })
         except Exception as e:
-            print(f"  ❌ Error fetching comments for video {video['video_id']}: {e}")
+            logger.error("Error fetching comments for video %s: %s", video['video_id'], e)
             # 댓글 수집 실패해도 영상 정보는 저장
             video_data.append({
                 'video': video,
@@ -1040,16 +1043,16 @@ def clean_creator_name_for_search(creator_name):
     for member_name, variants in member_mapping.items():
         for variant in variants:
             if variant.lower() in cleaned_name.lower() or variant.lower() in creator_name.lower():
-                print(f"Cleaned creator name: '{creator_name}' -> '{member_name}'")
+                logger.debug("Cleaned creator name: '%s' -> '%s'", creator_name, member_name)
                 return member_name
-    
+
     # 멤버 이름을 찾지 못한 경우, 정제된 이름 반환
     if cleaned_name:
-        print(f"Cleaned creator name: '{creator_name}' -> '{cleaned_name}'")
+        logger.debug("Cleaned creator name: '%s' -> '%s'", creator_name, cleaned_name)
         return cleaned_name
-    
+
     # 모두 실패하면 원본 반환
-    print(f"Using original creator name: '{creator_name}'")
+    logger.debug("Using original creator name: '%s'", creator_name)
     return creator_name
 
 def _get_keyword_channel_map():
@@ -1106,12 +1109,12 @@ def _resolve_channel_filter(youtube, keyword, search_keyword):
         channel_id = get_channel_id_from_handle(youtube, channel_handle)
         if channel_id:
             channel_filter = channel_id
-            print(f"Filtering by channel: {channel_handle} (ID: {channel_id}) for keyword: {keyword}")
+            logger.info("Filtering by channel: %s (ID: %s) for keyword: %s", channel_handle, channel_id, keyword)
             # 아카이브 스튜디오 채널인 경우 채널 정보 저장
             if '@AkaivStudioOfficial' in channel_handle or 'akaiv' in channel_handle.lower():
-                print(f"Archive Studio channel detected: {channel_handle} -> {channel_id}")
+                logger.info("Archive Studio channel detected: %s -> %s", channel_handle, channel_id)
         else:
-            print(f"Warning: Could not get channel ID for {channel_handle}")
+            logger.warning("Could not get channel ID for %s", channel_handle)
     
     return channel_filter, channel_handle
 
@@ -1126,7 +1129,7 @@ def _save_channel_analysis_result(analysis_result, channel_handle):
     
     if LOCAL_MODE and save_to_local_file:
         s3_key = save_to_local_file(analysis_result, 'youtube', channel_name, 'channels')
-        print(f"Channel analysis saved to local file: {s3_key}")
+        logger.info("Channel analysis saved to local file: %s", s3_key)
         return s3_key
     else:
         s3_key = f"raw-data/youtube/channels/{channel_name}/{timestamp}.json"
@@ -1137,10 +1140,10 @@ def _save_channel_analysis_result(analysis_result, channel_handle):
                 Body=json.dumps(analysis_result, ensure_ascii=False, indent=2),
                 ContentType='application/json'
             )
-            print(f"Channel analysis saved to s3://{S3_BUCKET}/{s3_key}")
+            logger.info("Channel analysis saved to s3://%s/%s", S3_BUCKET, s3_key)
             return s3_key
         except Exception as e:
-            print(f"Error saving to S3: {e}")
+            logger.error("Error saving to S3: %s", e)
             raise
 
 def _process_channel_analysis(youtube, event, results):
@@ -1152,8 +1155,8 @@ def _process_channel_analysis(youtube, event, results):
         if not channel_handle:
             continue
         
-        print(f"Analyzing channel: {channel_handle}")
-        
+        logger.info("Analyzing channel: %s", channel_handle)
+
         try:
             max_videos = event.get('max_videos') or MAX_VIDEOS
             max_comments_per_video = event.get('max_comments_per_video') or MAX_COMMENTS
@@ -1188,7 +1191,7 @@ def _process_channel_analysis(youtube, event, results):
             })
             
         except Exception as e:
-            print(f"Error analyzing channel '{channel_handle}': {e}")
+            logger.error("Error analyzing channel '%s': %s", channel_handle, e)
             results.append({
                 'channel': channel_handle,
                 'error': str(e)
@@ -1206,7 +1209,7 @@ def _process_keyword_search(youtube, event, results):
         # AkaiV Studio 멤버의 경우 "AkaiV" 제거하고 순수한 이름만 사용
         search_keyword = clean_creator_name_for_search(keyword)
 
-        print(f"Searching YouTube for keyword: {search_keyword} (original: {keyword})")
+        logger.info("Searching YouTube for keyword: %s (original: %s)", search_keyword, keyword)
         
         # 키워드에 해당하는 채널 필터 확인
         channel_filter, channel_handle = _resolve_channel_filter(youtube, keyword, search_keyword)
@@ -1221,7 +1224,7 @@ def _process_keyword_search(youtube, event, results):
 
             # 각 영상의 댓글 수집 - 최적화된 함수 사용
             for video in videos:
-                print(f"Fetching comments for video: {video['title']}")
+                logger.info("Fetching comments for video: %s", video['title'])
 
                 comment_result = get_video_comments_optimized(
                     youtube,
@@ -1279,13 +1282,13 @@ def _process_keyword_search(youtube, event, results):
                 
                 if LOCAL_MODE:
                     save_metadata_to_local(metadata, 'youtube')
-                    print(f"Saved metadata to local file: {item_id}")
+                    logger.info("Saved metadata to local file: %s", item_id)
                 else:
                     table = dynamodb.Table(DYNAMODB_TABLE)
                     table.put_item(Item=metadata)
-                print(f"Saved to DynamoDB: {item_id}")
+                    logger.info("Saved to DynamoDB: %s", item_id)
             except Exception as e:
-                print(f"Error saving metadata: {e}")
+                logger.error("Error saving metadata: %s", e)
 
             # LLM 분석 트리거
             trigger_llm_analysis(s3_key, keyword, total_comments)
@@ -1298,7 +1301,7 @@ def _process_keyword_search(youtube, event, results):
             })
 
         except Exception as e:
-            print(f"Error processing keyword '{keyword}': {e}")
+            logger.error("Error processing keyword '%s': %s", keyword, e)
             results.append({
                 'keyword': keyword,
                 'error': str(e)
@@ -1315,7 +1318,7 @@ def lambda_handler(event, context):
     - 키워드 검색: {"type": "keyword", "keywords": ["keyword1", "keyword2"]}
     - 채널 분석: {"type": "channel", "channels": ["@channel1", "https://youtube.com/@channel2"]}
     """
-    print(f"Event: {json.dumps(event)}")
+    logger.info("Event: %s", json.dumps(event))
 
     # Reset API statistics at the start of each lambda invocation
     reset_api_stats()
@@ -1351,9 +1354,9 @@ def lambda_handler(event, context):
         _process_keyword_search(youtube, event, results)
 
     # Print API usage statistics at the end
-    print("\n=== YouTube API Usage Statistics ===")
+    logger.info("=== YouTube API Usage Statistics ===")
     print_api_stats()
-    print("====================================\n")
+    logger.info("====================================\n")
 
     return {
         'statusCode': 200,

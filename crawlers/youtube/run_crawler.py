@@ -3,9 +3,12 @@
 YouTube 크롤러 실행 스크립트
 """
 import json
+import logging
 import sys
 import os
 from lambda_function import lambda_handler, YOUTUBE_CHANNELS
+
+logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
     # 이벤트 설정
@@ -18,17 +21,17 @@ if __name__ == "__main__":
                 "type": "channel",
                 "channels": YOUTUBE_CHANNELS
             }
-            print(f"Running in channel mode with {len(YOUTUBE_CHANNELS)} channels")
+            logger.info("Running in channel mode with %d channels", len(YOUTUBE_CHANNELS))
         else:
             # 기본 이벤트: IVNIT 키워드 검색
             event = {
                 "type": "keyword",
                 "keywords": ["IVNIT"]
             }
-            print("Running in keyword mode (no channels found in environment)")
+            logger.info("Running in keyword mode (no channels found in environment)")
 
     # Lambda 핸들러 실행
     result = lambda_handler(event, None)
 
     # 결과 출력
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+    logger.info("Result: %s", json.dumps(result, ensure_ascii=False, indent=2))

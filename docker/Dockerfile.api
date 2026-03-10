@@ -2,6 +2,10 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Install curl for healthcheck
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install dependencies
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
@@ -9,12 +13,20 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Application code
 COPY backend/ .
 
-# Create local-data directory structure
+# Create local-data directory structure and non-root user
 RUN mkdir -p /app/local-data/youtube/channels \
              /app/local-data/dcinside \
              /app/local-data/vuddy/comprehensive_analysis \
-             /app/local-data/analysis
+             /app/local-data/analysis \
+             /app/logs \
+    && groupadd -r appuser && useradd -r -g appuser -d /app -s /sbin/nologin appuser \
+    && chown -R appuser:appuser /app
+
+USER appuser
 
 EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
 
 CMD ["python", "run.py"]

@@ -287,7 +287,7 @@ config:
   apiBackendEndpoint: "http://sns-monitor-api-backend:8080"
   localMode: "true"
   localDataDir: "/app/local-data"
-  searchKeywords: "Levvels,levvels,LEVVELS,레벨스,Vuddy,vuddy,VUDDY,버디,굿즈"
+  searchKeywords: "ExampleCorp,examplecorp,EXAMPLECORP,예시기업,CreatorBrand,creatorbrand,CREATORBRAND,크리에이터브랜드,굿즈"
   # S3 설정 (데이터 백업용)
   s3Bucket: "sns-monitor-data"
   s3Prefix: "data"

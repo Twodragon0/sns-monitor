@@ -40,7 +40,7 @@ data:
 
   # Crawler Configuration
   CRAWL_SCHEDULE: "*/30 * * * *"  # Every 30 minutes
-  SEARCH_KEYWORDS: "Levvels,Vuddy,굿즈"
+  SEARCH_KEYWORDS: "ExampleCorp,CreatorBrand,굿즈"
 
   # Frontend Configuration
   REACT_APP_API_URL: "http://api-backend:8080"

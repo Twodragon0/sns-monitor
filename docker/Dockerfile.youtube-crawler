@@ -11,4 +11,11 @@ RUN pip install --no-cache-dir flask requests
 COPY crawlers/youtube/*.py .
 COPY crawlers/common/ ./common/
 
+# Create directories and non-root user
+RUN mkdir -p /app/local-data /app/logs \
+    && groupadd -r appuser && useradd -r -g appuser -d /app -s /sbin/nologin appuser \
+    && chown -R appuser:appuser /app
+
+USER appuser
+
 CMD ["python", "run_crawler.py"]

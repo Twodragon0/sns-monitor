@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import './Dashboard.css';
 
-// 모니터링 키워드 정의 (버디/레벨스/크리에이터 중심)
+// 모니터링 키워드 정의 (크리에이터브랜드/예시기업/크리에이터 중심)
 const MONITORING_KEYWORDS = [
   // ★★★ 최우선순위: 보안/해킹 관련 ★★★
   '해킹', '해킹당함', '해킹됨', 'hack', 'hacked', 'hacking',
   '보안', 'security', '유출', 'leak', 'leaked', '정보유출',
   '계정탈취', '계정해킹', '비밀번호', 'password', '피싱', 'phishing',
   '사기', 'scam', '개인정보', '침해', 'DDoS', '악성코드', 'malware',
-  // ★★★ 최우선순위: 버디 및 레벨스 ★★★
-  '버디', 'vuddy', 'Vuddy', 'VUDDY',
-  '레벨스', 'levvels', 'Levvels', 'LEVVELS',
+  // ★★★ 최우선순위: 크리에이터브랜드 및 예시기업 ★★★
+  '크리에이터브랜드', 'creatorbrand', 'CreatorBrand', 'CREATORBRAND',
+  '예시기업', 'examplecorp', 'ExampleCorp', 'EXAMPLECORP',
   // ★★★ 최우선순위: 크리에이터 이름 ★★★
   '이브닛', 'IVNIT', 'ivnit',
   '아카이브', 'AkaiV', 'akaiv', '아카이브스튜디오',
@@ -50,8 +50,8 @@ const MONITORING_KEYWORDS = [
 const KEYWORD_CATEGORIES = {
   // ★★★ 최우선순위: 보안 ★★★
   '🚨보안/해킹': ['해킹', '해킹당함', '해킹됨', 'hack', 'hacked', 'hacking', '보안', 'security', '유출', 'leak', 'leaked', '정보유출', '계정탈취', '계정해킹', '비밀번호', 'password', '피싱', 'phishing', '사기', 'scam', '개인정보', '침해', 'DDoS', '악성코드', 'malware'],
-  '버디/Vuddy': ['버디', 'vuddy', 'Vuddy', 'VUDDY'],
-  '레벨스/Levvels': ['레벨스', 'levvels', 'Levvels', 'LEVVELS'],
+  '크리에이터브랜드/CreatorBrand': ['크리에이터브랜드', 'creatorbrand', 'CreatorBrand', 'CREATORBRAND'],
+  '예시기업/ExampleCorp': ['예시기업', 'examplecorp', 'ExampleCorp', 'EXAMPLECORP'],
   '크리에이터': [
     '이브닛', 'IVNIT', 'ivnit',
     '아카이브', 'AkaiV', 'akaiv', '아카이브스튜디오',
@@ -198,7 +198,7 @@ function Dashboard() {
 
   // 트위터 자동 모니터링용 크리에이터 키워드
   const TWITTER_AUTO_MONITOR_KEYWORDS = [
-    '버디', '레벨스', '스코시즘', '아카이브', '바라바라', '이브닛',
+    '크리에이터브랜드', '예시기업', '스코시즘', '아카이브', '바라바라', '이브닛',
     'u32', '여르미', '한결', '비몽', '샤르망', '나나문'
   ];
 
@@ -237,7 +237,7 @@ function Dashboard() {
         setChannels(channelsData.channels || []);
       }
 
-      // Vuddy 크리에이터 데이터 로드 (로컬 테스트 데이터 사용)
+      // CreatorBrand 크리에이터 데이터 로드 (로컬 테스트 데이터 사용)
       try {
       const vuddyResponse = await fetch('/api/vuddy/creators');
       if (vuddyResponse.ok) {
@@ -546,7 +546,7 @@ function Dashboard() {
   const TWITTER_MONITORING_KEYWORDS = [
     '아카이브', 'archive', '바라바라', 'barabara', '이브닛', 'ivnit', '스코시즘', 'skoshism',
     'u32', '사미', '우사미', '여르미', '엶', '한결', '결', '비몽', '몽', '샤르망', '쭈쭈', '나나문', '쿠우',
-    '버디', 'vuddy', '레벨스', 'levvels', 'Levvels',
+    '크리에이터브랜드', 'creatorbrand', '예시기업', 'examplecorp', 'ExampleCorp',
     '굿즈', '포토카드', '포카', '아크릴', '키링', '스티커', '포스터', '앨범', '음반', '한정판',
     '구매', '판매', '주문', '예약', '결제', '배송', '품절', '재입고', '가격', '할인', '이벤트', '특전',
     '팬싸', '영통팬싸', '응모', '당첨', '생일카페', '서포트', '조공',
@@ -856,7 +856,7 @@ function Dashboard() {
               <h3>총 수집 개수</h3>
               <p className="stat-value">
                 {(() => {
-                  // Vuddy 크리에이터 댓글 수
+                  // CreatorBrand 크리에이터 댓글 수
                   const vuddyComments = allVuddyCreators.reduce((sum, creator) =>
                     sum + (creator.comments?.length || 0), 0);
 
@@ -875,7 +875,7 @@ function Dashboard() {
               <h3>총 댓글 수</h3>
               <p className="stat-value">
                 {(() => {
-                  // Vuddy 크리에이터 댓글 수
+                  // CreatorBrand 크리에이터 댓글 수
                   const vuddyComments = allVuddyCreators.reduce((sum, creator) =>
                     sum + (creator.comments?.length || 0), 0);
 
@@ -896,7 +896,7 @@ function Dashboard() {
                 {(() => {
                   const dates = [];
 
-                  // Vuddy 크리에이터 날짜
+                  // CreatorBrand 크리에이터 날짜
                   allVuddyCreators.forEach(creator => {
                     if (creator.last_crawled) dates.push(new Date(creator.last_crawled));
                   });
@@ -1066,8 +1066,8 @@ function Dashboard() {
                     .sort((a, b) => b[1] - a[1]);
 
                   const categoryColors = {
-                    '버디/Vuddy': '#9b59b6',
-                    '레벨스/Levvels': '#e74c3c',
+                    '크리에이터브랜드/CreatorBrand': '#9b59b6',
+                    '예시기업/ExampleCorp': '#e74c3c',
                     '크리에이터': '#3498db',
                     '굿즈/상품': '#f39c12',
                     '판매/구매': '#27ae60',
@@ -1203,8 +1203,8 @@ function Dashboard() {
                                   k.toLowerCase() !== (post.matched_keyword || '').toLowerCase()
                                 );
                                 const categoryColors = {
-                                  '버디/Vuddy': '#9b59b6',
-                                  '레벨스/Levvels': '#e74c3c',
+                                  '크리에이터브랜드/CreatorBrand': '#9b59b6',
+                                  '예시기업/ExampleCorp': '#e74c3c',
                                   '크리에이터': '#3498db',
                                   '굿즈/상품': '#f39c12',
                                   '판매/구매': '#27ae60',
@@ -1300,8 +1300,8 @@ function Dashboard() {
                                 const commentSentiment = analyzeSentiment(commentText);
                                 const commentKeywords = findMatchingKeywords(commentText);
                                 const commentCategoryColors = {
-                                  '버디/Vuddy': '#9b59b6',
-                                  '레벨스/Levvels': '#e74c3c',
+                                  '크리에이터브랜드/CreatorBrand': '#9b59b6',
+                                  '예시기업/ExampleCorp': '#e74c3c',
                                   '크리에이터': '#3498db',
                                   '굿즈/상품': '#f39c12',
                                   '판매/구매': '#27ae60',
@@ -1509,7 +1509,7 @@ function Dashboard() {
                   window.open(`https://twitter.com/search?q=${encodeURIComponent(twitterKeywordSearch)}&src=typed_query&f=live`, '_blank');
                 }
               }}
-              placeholder="검색할 키워드 입력... (예: 버디, 굿즈)"
+              placeholder="검색할 키워드 입력... (예: 크리에이터브랜드, 굿즈)"
               style={{
                 flex: 1,
                 minWidth: '200px',
@@ -1549,7 +1549,7 @@ function Dashboard() {
               🎤 크리에이터 검색
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {['버디', '레벨스', '스코시즘', '아카이브', '바라바라', '이브닛', 'u32', '여르미', '한결', '비몽', '샤르망', '나나문'].map((keyword) => (
+              {['크리에이터브랜드', '예시기업', '스코시즘', '아카이브', '바라바라', '이브닛', 'u32', '여르미', '한결', '비몽', '샤르망', '나나문'].map((keyword) => (
                 <a
                   key={keyword}
                   href={`https://twitter.com/search?q=${encodeURIComponent(keyword)}&src=typed_query&f=live`}
@@ -1591,7 +1591,7 @@ function Dashboard() {
                 { label: 'u32 굿즈', query: 'u32 굿즈' },
                 { label: '나나문 굿즈', query: '나나문 굿즈' },
                 { label: '스코시즘 굿즈', query: '스코시즘 굿즈' },
-                { label: '버디 굿즈', query: '버디 굿즈' },
+                { label: '크리에이터브랜드 굿즈', query: '크리에이터브랜드 굿즈' },
                 { label: '이브닛 굿즈', query: '이브닛 굿즈' },
                 { label: '아카이브 굿즈', query: '아카이브 굿즈' },
               ].map((item) => (
@@ -1679,8 +1679,8 @@ function Dashboard() {
                 '비몽', '몽',
                 '샤르망', '쭈쭈',
                 '나나문', '쿠우',
-                // ★★★ 최우선순위: 버디 및 레벨스 ★★★
-                '버디', 'vuddy', '레벨스', 'levvels', 'Levvels',
+                // ★★★ 최우선순위: 크리에이터브랜드 및 예시기업 ★★★
+                '크리에이터브랜드', 'creatorbrand', '예시기업', 'examplecorp', 'ExampleCorp',
                 // ★★★ 최우선순위: 굿즈/상품 ★★★
                 '굿즈', '포토카드', '포카', '아크릴', '키링', '스티커', '포스터', '엽서',
                 '앨범', '음반', '한정판', '시즌그리팅', '캘린더', '머치', '공식굿즈',
@@ -2003,7 +2003,7 @@ function Dashboard() {
                platformSummary.platform === 'youtube' ? 'YouTube' :
                platformSummary.platform === 'telegram' ? 'Telegram' :
                platformSummary.platform === 'rss' ? 'RSS' :
-               platformSummary.platform === 'vuddy' ? 'Vuddy' :
+               platformSummary.platform === 'vuddy' ? 'CreatorBrand' :
                platformSummary.platform === 'dcinside' ? 'DC인사이드' :
                platformSummary.platform.toUpperCase()} 플랫폼 요약
             </h3>
@@ -2051,7 +2051,7 @@ function Dashboard() {
                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                   <div style={{ background: '#fafafa', padding: '12px', borderRadius: '8px', flex: '1', minWidth: '200px' }}>
                     <div style={{ fontSize: '12px', color: '#1da1f2', marginBottom: '8px', fontWeight: 'bold' }}>🎤 크리에이터</div>
-                    <div style={{ fontSize: '13px', color: '#333' }}>버디, 레벨스, 스코시즘, 아카이브, 바라바라, 이브닛, u32, 여르미, 한결, 비몽, 샤르망, 나나문</div>
+                    <div style={{ fontSize: '13px', color: '#333' }}>크리에이터브랜드, 예시기업, 스코시즘, 아카이브, 바라바라, 이브닛, u32, 여르미, 한결, 비몽, 샤르망, 나나문</div>
                   </div>
                   <div style={{ background: '#fafafa', padding: '12px', borderRadius: '8px', flex: '1', minWidth: '200px' }}>
                     <div style={{ fontSize: '12px', color: '#9c27b0', marginBottom: '8px', fontWeight: 'bold' }}>🔍 복합 검색</div>

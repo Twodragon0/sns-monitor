@@ -32,8 +32,8 @@ const MONITORING_KEYWORDS = [
   // ★★★ 최우선순위: 크리에이터 이름 및 별명 ★★★
   '스코시즘', 'skoshism', '니노', '선데이', '코요', '템페스트', '이로', '클라우드',
   '오토', '레이니', '로보', '프로스터', 'nino', 'koyo', 'iro', 'oto', 'robo',
-  // ★★★ 최우선순위: 버디 및 레벨스 ★★★
-  '버디', 'vuddy', '레벨스', 'levvels', 'Levvels',
+  // ★★★ 최우선순위: 크리에이터브랜드 및 예시기업 ★★★
+  '크리에이터브랜드', 'creatorbrand', '예시기업', 'examplecorp', 'ExampleCorp',
   // ★★★ 최우선순위: 굿즈/상품 ★★★
   '굿즈', '포토카드', '포카', '아크릴', '키링', '스티커', '포스터', '엽서',
   '앨범', '음반', '한정판', '시즌그리팅', '캘린더', '머치', '공식굿즈',
@@ -63,7 +63,7 @@ const KEYWORD_CATEGORIES = {
   '🚨보안/해킹': ['해킹', '해킹당함', '해킹됨', 'hack', 'hacked', 'hacking', '보안', 'security', '유출', 'leak', 'leaked', '정보유출', '계정탈취', '계정해킹', '비밀번호', 'password', '피싱', 'phishing', '사기', 'scam', '개인정보', '침해', 'DDoS', '악성코드', 'malware'],
   // ★★★ 최우선순위 카테고리 ★★★
   '크리에이터': ['스코시즘', 'skoshism', '니노', '선데이', '코요', '템페스트', '이로', '클라우드', '오토', '레이니', '로보', '프로스터', 'nino', 'koyo', 'iro', 'oto', 'robo'],
-  '버디/레벨스': ['버디', 'vuddy', '레벨스', 'levvels', 'Levvels'],
+  '크리에이터브랜드/예시기업': ['크리에이터브랜드', 'creatorbrand', '예시기업', 'examplecorp', 'ExampleCorp'],
   '굿즈/상품': ['굿즈', '포토카드', '포카', '아크릴', '키링', '스티커', '포스터', '엽서', '앨범', '음반', '한정판', '시즌그리팅', '캘린더', '머치', '공식굿즈'],
   // ★★ 높은 우선순위 카테고리 ★★
   '판매/구매': ['구매', '판매', '주문', '예약', '결제', '배송', '품절', '재입고', '가격', '할인', '이벤트', '특전'],
@@ -1086,7 +1086,7 @@ function SkoshismDetail() {
                                     {topKeywords.map(([keyword, count], kidx) => {
                                       const category = getKeywordCategory(keyword);
                                       const categoryColors = {
-                                        '버디/레벨스': { bg: '#fff0f0', color: '#e74c3c', border: '#ffcccb' },
+                                        '크리에이터브랜드/예시기업': { bg: '#fff0f0', color: '#e74c3c', border: '#ffcccb' },
                                         '굿즈/상품': { bg: '#fff8e1', color: '#f39c12', border: '#ffe082' },
                                         '크리에이터': { bg: '#f0f5ff', color: '#1d39c4', border: '#adc6ff' },
                                         '판매/구매': { bg: '#e8f5e9', color: '#27ae60', border: '#a5d6a7' },
@@ -1197,7 +1197,7 @@ function SkoshismDetail() {
                                               {matchedKeywords.slice(0, 4).map((keyword, kidx) => {
                                                 const category = getKeywordCategory(keyword);
                                                 const categoryColors = {
-                                                  '버디/레벨스': { bg: '#fff0f0', color: '#e74c3c' },
+                                                  '크리에이터브랜드/예시기업': { bg: '#fff0f0', color: '#e74c3c' },
                                                   '굿즈/상품': { bg: '#fff8e1', color: '#f39c12' },
                                                   '크리에이터': { bg: '#f0f5ff', color: '#1d39c4' },
                                                   '기타': { bg: '#f5f5f5', color: '#595959' }
@@ -1293,8 +1293,8 @@ function SkoshismDetail() {
                         // 영상 키워드 분류 (우선순위 순서대로)
                         const videoKeywords = [
                           // ★★★ 최우선순위: 비즈니스/플랫폼 ★★★
-                          { name: '레벨스/Levvels', keywords: ['레벨스', 'levvels', 'Levvels', 'LEVVELS'], color: { bg: '#fff0f0', border: '#e74c3c', icon: '🏆' } },
-                          { name: 'Vuddy/버디', keywords: ['vuddy', 'Vuddy', 'VUDDY', '버디'], color: { bg: '#f0f0ff', border: '#9b59b6', icon: '💜' } },
+                          { name: '예시기업/ExampleCorp', keywords: ['예시기업', 'examplecorp', 'ExampleCorp', 'EXAMPLECORP'], color: { bg: '#fff0f0', border: '#e74c3c', icon: '🏆' } },
+                          { name: 'CreatorBrand/크리에이터브랜드', keywords: ['creatorbrand', 'CreatorBrand', 'CREATORBRAND', '크리에이터브랜드'], color: { bg: '#f0f0ff', border: '#9b59b6', icon: '💜' } },
                           { name: '굿즈/상품', keywords: ['굿즈', '포카', '포토카드', '키링', '아크릴', '앨범', '머치', '한정판', '시즌그리팅'], color: { bg: '#fff8e1', border: '#f39c12', icon: '🛍️' } },
                           // ★★ 높은 우선순위: 이벤트/팬활동 ★★
                           { name: '이벤트/팬싸', keywords: ['팬싸', '영통', '이벤트', '응모', '당첨', '생일카페', '서포트'], color: { bg: '#e8f5e9', border: '#27ae60', icon: '🎉' } },

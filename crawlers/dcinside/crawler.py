@@ -4,6 +4,7 @@ DC인사이드 갤러리 크롤러
 """
 
 import json
+import logging
 import os
 import sys
 import boto3
@@ -13,6 +14,8 @@ from bs4 import BeautifulSoup
 import time
 import re
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
+
+logger = logging.getLogger(__name__)
 
 # KST 시간대 설정
 KST = timezone(timedelta(hours=9))
@@ -42,9 +45,9 @@ LOCAL_DATA_DIR = os.environ.get('LOCAL_DATA_DIR', './local-data')
 # DC인사이드 갤러리 설정
 # 공통 키워드 (모든 갤러리에서 사용)
 COMMON_KEYWORDS = [
-    # ★★★ 최우선순위: 버디/레벨스 (플랫폼) ★★★
-    '버디', 'vuddy', 'Vuddy', 'VUDDY',
-    '레벨스', 'levvels', 'Levvels', 'LEVVELS',
+    # ★★★ 최우선순위: 크리에이터브랜드/예시기업 (플랫폼) ★★★
+    '크리에이터브랜드', 'creatorbrand', 'CreatorBrand', 'CREATORBRAND',
+    '예시기업', 'examplecorp', 'ExampleCorp', 'EXAMPLECORP',
     # ★★★ 최우선순위: 이브닛 관련 ★★★
     '이브닛', 'IVNIT', 'ivnit', 'u32',
     # ★★★ 최우선순위: 멤버 이름 ★★★
@@ -95,8 +98,8 @@ GALLERIES = {
         'type': 'mgallery',
         'keywords': COMMON_KEYWORDS + [
             '스코시즘', 'skoshism', 'SKOSHISM', '스코',
-            '버디샵', 'vuddy shop', 'vuddy.io',
-            '버디 팝업', '버디팝업', 'vuddy popup'
+            '크리에이터브랜드샵', 'creatorbrand shop', 'creatorbrand.io',
+            '크리에이터브랜드 팝업', '크리에이터브랜드팝업', 'creatorbrand popup'
         ]
     }
 }
@@ -106,7 +109,7 @@ def get_gallery_posts(gallery_id, max_posts=20):
     try:
         gallery_info = GALLERIES.get(gallery_id)
         if not gallery_info:
-            print(f"Unknown gallery: {gallery_id}")
+            logger.warning("Unknown gallery: %s", gallery_id)
             return []
 
         url = gallery_info['url']
@@ -200,14 +203,14 @@ def get_gallery_posts(gallery_id, max_posts=20):
                 })
 
             except Exception as e:
-                print(f"Error parsing post: {e}")
+                logger.error("Error parsing post: %s", e)
                 continue
 
-        print(f"Found {len(posts)} posts in gallery '{gallery_id}'")
+        logger.info("Found %d posts in gallery '%s'", len(posts), gallery_id)
         return posts
 
     except Exception as e:
-        print(f"Error getting gallery posts: {e}")
+        logger.error("Error getting gallery posts: %s", e)
         import traceback
         traceback.print_exc()
         return []
@@ -238,7 +241,7 @@ def get_e_s_n_o_token(gallery_id, post_id, gallery_type='mini'):
 
         return ''
     except Exception as e:
-        print(f"  Error getting e_s_n_o token: {e}")
+        logger.error("Error getting e_s_n_o token: %s", e)
         return ''
 
 
@@ -260,7 +263,7 @@ def _extract_comments_from_json(data):
                 potential_comments = data.get(key, [])
                 if isinstance(potential_comments, list) and len(potential_comments) > 0:
                     comments = potential_comments
-                    print(f"  Found comments in field: {key}")
+                    logger.debug("Found comments in field: %s", key)
                     break
     
     return comments
@@ -309,9 +312,9 @@ def _parse_html_comments(soup):
                     'date': date_str
                 })
         except Exception as e:
-            print(f"  Error parsing comment item: {e}")
+            logger.error("Error parsing comment item: %s", e)
             continue
-    
+
     return parsed_comments
 
 def get_post_comments_ajax(gallery_id, post_id, gallery_type='mini'):
@@ -320,7 +323,7 @@ def get_post_comments_ajax(gallery_id, post_id, gallery_type='mini'):
         # 먼저 e_s_n_o 토큰 획득
         e_s_n_o = get_e_s_n_o_token(gallery_id, post_id, gallery_type)
         if not e_s_n_o:
-            print(f"  Failed to get e_s_n_o token, trying without token")
+            logger.warning("Failed to get e_s_n_o token, trying without token")
             e_s_n_o = ''
 
         # 데스크톱 버전 댓글 API 사용
@@ -351,17 +354,17 @@ def get_post_comments_ajax(gallery_id, post_id, gallery_type='mini'):
                 response = requests.get(url, headers=headers, params=params, timeout=15, verify=True)
 
                 if response.status_code != 200:
-                    print(f"  AJAX request failed with status {response.status_code}, response: {response.text[:200]}")
+                    logger.warning("AJAX request failed with status %d, response: %s", response.status_code, response.text[:200])
                     break
 
                 # JSON 응답 시도
                 try:
                     data = response.json()
-                    print(f"  AJAX response keys: {list(data.keys()) if isinstance(data, dict) else 'list'}")
-                    
+                    logger.debug("AJAX response keys: %s", list(data.keys()) if isinstance(data, dict) else 'list')
+
                     comments = _extract_comments_from_json(data)
                     if not comments:
-                        print(f"  No comments found in JSON response (page {page}), response sample: {str(data)[:200]}")
+                        logger.debug("No comments found in JSON response (page %d), response sample: %s", page, str(data)[:200])
                         # 첫 페이지에서 댓글이 없으면 종료, 그 외에는 다음 페이지 시도
                         if page == 1:
                             break
@@ -379,22 +382,22 @@ def get_post_comments_ajax(gallery_id, post_id, gallery_type='mini'):
                             
                 except (ValueError, json.JSONDecodeError) as json_error:
                     # HTML 응답인 경우
-                    print(f"  JSON decode failed, trying HTML parsing: {json_error}")
-                    print(f"  Response content type: {response.headers.get('Content-Type', 'unknown')}")
-                    print(f"  Response text preview: {response.text[:500]}")
-                    
+                    logger.debug("JSON decode failed, trying HTML parsing: %s", json_error)
+                    logger.debug("Response content type: %s", response.headers.get('Content-Type', 'unknown'))
+                    logger.debug("Response text preview: %s", response.text[:500])
+
                     soup = BeautifulSoup(response.text, 'html.parser')
                     parsed_comments = _parse_html_comments(soup)
-                    
+
                     if not parsed_comments:
-                        print(f"  No comment items found in HTML (page {page})")
+                        logger.debug("No comment items found in HTML (page %d)", page)
                         # 응답이 HTML이지만 댓글이 없는 경우, 실제 HTML 구조 확인
                         comment_containers = soup.select('.comment_box, .comment_wrap, .cmt_list, ul.cmt_list')
                         if comment_containers:
-                            print(f"  Found {len(comment_containers)} comment containers but no parsed comments")
+                            logger.debug("Found %d comment containers but no parsed comments", len(comment_containers))
                             # 더 넓은 범위의 셀렉터 시도
                             all_li_items = soup.select('li[data-no], li.cmt_info, li.reply_info')
-                            print(f"  Found {len(all_li_items)} potential comment items")
+                            logger.debug("Found %d potential comment items", len(all_li_items))
                         
                         # 첫 페이지에서 댓글이 없으면 종료, 그 외에는 다음 페이지 시도
                         if page == 1:
@@ -410,7 +413,7 @@ def get_post_comments_ajax(gallery_id, post_id, gallery_type='mini'):
                 time.sleep(0.5)  # Rate limiting 증가
 
             except Exception as e:
-                print(f"  Error fetching comments page {page}: {e}")
+                logger.error("Error fetching comments page %d: %s", page, e)
                 import traceback
                 traceback.print_exc()
                 # 에러가 발생해도 다음 페이지 시도
@@ -419,11 +422,11 @@ def get_post_comments_ajax(gallery_id, post_id, gallery_type='mini'):
                     continue
                 break
 
-        print(f"  Total comments collected via AJAX: {len(all_comments)}")
+        logger.info("Total comments collected via AJAX: %d", len(all_comments))
         return all_comments
 
     except Exception as e:
-        print(f"Error getting comments via AJAX: {e}")
+        logger.error("Error getting comments via AJAX: %s", e)
         import traceback
         traceback.print_exc()
         return []
@@ -498,7 +501,7 @@ def _parse_comment_item(item):
                 'comment_id': item.get('data-no', '') or item.get('data-id', '')
             }
     except Exception as e:
-        print(f"  Error parsing comment item: {e}")
+        logger.error("Error parsing comment item: %s", e)
         import traceback
         traceback.print_exc()
     return None
@@ -536,20 +539,20 @@ def get_post_comments_direct(gallery_id, post_id, gallery_type='mini'):
             if not comment_items:
                 continue
                 
-            print(f"  Found {len(comment_items)} items with selector: {selector}")
+            logger.debug("Found %d items with selector: %s", len(comment_items), selector)
             for item in comment_items:
                 comment = _parse_comment_item(item)
                 if comment:
                     comments.append(comment)
 
             if comments:
-                print(f"  Successfully parsed {len(comments)} comments with selector: {selector}")
+                logger.info("Successfully parsed %d comments with selector: %s", len(comments), selector)
                 break
 
         return comments
 
     except Exception as e:
-        print(f"Error getting comments directly: {e}")
+        logger.error("Error getting comments directly: %s", e)
         return []
 
 def get_comments_with_playwright(gallery_id, post_id, gallery_type='mini'):
@@ -568,7 +571,7 @@ def get_comments_with_playwright(gallery_id, post_id, gallery_type='mini'):
             try:
                 page.wait_for_selector('.comment_box, .cmt_list, ul.cmt_list', timeout=10000)
             except PlaywrightTimeoutError as e:
-                print(f"  Comment elements not found, trying anyway... (Error: {e})")
+                logger.warning("Comment elements not found, trying anyway... (Error: %s)", e)
 
             # 추가 대기 (동적 로딩 완료)
             time.sleep(3)
@@ -597,14 +600,14 @@ def get_comments_with_playwright(gallery_id, post_id, gallery_type='mini'):
                 if not comment_items:
                     continue
                     
-                print(f"  Found {len(comment_items)} items with selector: {selector} (Playwright)")
+                logger.debug("Found %d items with selector: %s (Playwright)", len(comment_items), selector)
                 for item in comment_items:
                     comment = _parse_comment_item(item)
                     if comment:
                         comments.append(comment)
 
                 if comments:
-                    print(f"  Successfully parsed {len(comments)} comments with Playwright (selector: {selector})")
+                    logger.info("Successfully parsed %d comments with Playwright (selector: %s)", len(comments), selector)
                     break
 
             # 댓글 수 확인
@@ -616,7 +619,7 @@ def get_comments_with_playwright(gallery_id, post_id, gallery_type='mini'):
                     if comment_count_from_page > comment_count:
                         comment_count = comment_count_from_page
                 except (ValueError, AttributeError) as e:
-                    print(f"  Could not parse comment count: {e}")
+                    logger.warning("Could not parse comment count: %s", e)
 
             return {
                 'comments': comments,
@@ -624,7 +627,7 @@ def get_comments_with_playwright(gallery_id, post_id, gallery_type='mini'):
             }
 
     except Exception as e:
-        print(f"Error getting comments with Playwright: {e}")
+        logger.error("Error getting comments with Playwright: %s", e)
         import traceback
         traceback.print_exc()
         return {'comments': [], 'comment_count': 0}
@@ -660,7 +663,7 @@ def get_post_content(gallery_id, post_id, gallery_type='mini'):
         }
 
     except Exception as e:
-        print(f"Error getting post content: {e}")
+        logger.error("Error getting post content: %s", e)
         import traceback
         traceback.print_exc()
         return {
@@ -699,7 +702,7 @@ def save_to_s3(data, gallery_id):
             with open(filepath, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
 
-            print(f"Saved locally: {filepath}")
+            logger.info("Saved locally: %s", filepath)
             return key
         else:
             # 프로덕션 모드: S3에 저장
@@ -709,10 +712,10 @@ def save_to_s3(data, gallery_id):
                 Body=json.dumps(data, ensure_ascii=False, indent=2),
                 ContentType='application/json'
             )
-            print(f"Saved to s3://{S3_BUCKET}/{key}")
+            logger.info("Saved to s3://%s/%s", S3_BUCKET, key)
             return key
     except Exception as e:
-        print(f"Error saving data: {e}")
+        logger.error("Error saving data: %s", e)
         return None
 
 def save_to_dynamodb(gallery_id, s3_key, total_posts, total_comments, positive_count, negative_count):
@@ -740,9 +743,9 @@ def save_to_dynamodb(gallery_id, s3_key, total_posts, total_comments, positive_c
         }
 
         table.put_item(Item=item)
-        print(f"Saved to DynamoDB: {gallery_id}")
+        logger.info("Saved to DynamoDB: %s", gallery_id)
     except Exception as e:
-        print(f"Error saving to DynamoDB: {e}")
+        logger.error("Error saving to DynamoDB: %s", e)
 
 def trigger_llm_analysis(s3_key, gallery_id, total_comments):
     """LLM 분석 트리거"""
@@ -759,7 +762,7 @@ def trigger_llm_analysis(s3_key, gallery_id, total_comments):
             verify=True
         )
     except Exception as e:
-        print(f"Error triggering LLM analysis: {e}")
+        logger.error("Error triggering LLM analysis: %s", e)
 
 def lambda_handler(event, context):
     """
@@ -769,17 +772,17 @@ def lambda_handler(event, context):
     또는 API Gateway를 통한 수동 호출
     """
 
-    print(f"Event: {json.dumps(event)}")
+    logger.info("Event: %s", json.dumps(event))
 
     galleries_to_crawl = event.get('galleries', list(GALLERIES.keys()))
     results = []
 
     for gallery_id in galleries_to_crawl:
         if gallery_id not in GALLERIES:
-            print(f"Unknown gallery: {gallery_id}")
+            logger.warning("Unknown gallery: %s", gallery_id)
             continue
 
-        print(f"Crawling gallery: {gallery_id} ({GALLERIES[gallery_id]['name']})")
+        logger.info("Crawling gallery: %s (%s)", gallery_id, GALLERIES[gallery_id]['name'])
 
         try:
             # 게시글 수집 (더 많이 가져오기)
@@ -792,7 +795,7 @@ def lambda_handler(event, context):
             # 최소 10개 게시글 보장
             min_posts = 10
             if len(filtered_posts) < min_posts and len(posts) >= min_posts:
-                print(f"Filtered posts ({len(filtered_posts)}) < minimum ({min_posts}), adding more posts")
+                logger.info("Filtered posts (%d) < minimum (%d), adding more posts", len(filtered_posts), min_posts)
                 # 필터링된 게시글이 부족하면 필터링되지 않은 게시글도 추가
                 filtered_post_ids = {p['post_id'] for p in filtered_posts}
                 for post in posts:
@@ -801,7 +804,7 @@ def lambda_handler(event, context):
                         if len(filtered_posts) >= min_posts:
                             break
 
-            print(f"Filtered {len(filtered_posts)} posts with keywords (minimum {min_posts} guaranteed)")
+            logger.info("Filtered %d posts with keywords (minimum %d guaranteed)", len(filtered_posts), min_posts)
 
             # 각 게시글의 내용 및 댓글 수집
             total_comments = 0
@@ -821,7 +824,7 @@ def lambda_handler(event, context):
             gallery_type = GALLERIES[gallery_id].get('type', 'mini')
 
             for post in filtered_posts[:30]:  # 최대 30개 게시글
-                print(f"Processing post: {post['post_id']} - {post.get('title', '')[:30]}")
+                logger.info("Processing post: %s - %s", post['post_id'], post.get('title', '')[:30])
 
                 # 게시글 목록에서 이미 가져온 댓글 수
                 post_comment_count = post.get('comment_count', 0)
@@ -829,23 +832,23 @@ def lambda_handler(event, context):
                 # 댓글이 있는 게시글만 댓글 수집 (효율성)
                 post_comments = []
                 if post_comment_count > 0:
-                    print(f"  Collecting {post_comment_count} comments...")
+                    logger.info("Collecting %d comments...", post_comment_count)
 
                     # 1순위: 직접 파싱 (가장 빠름)
                     post_comments = get_post_comments_direct(gallery_id, post['post_id'], gallery_type)
-                    
+
                     # 2순위: AJAX로 댓글 수집 시도 (안정적)
                     if not post_comments:
-                        print(f"  Direct parsing failed, trying AJAX...")
+                        logger.info("Direct parsing failed, trying AJAX...")
                         post_comments = get_post_comments_ajax(gallery_id, post['post_id'], gallery_type)
-                    
+
                     # 3순위: Playwright를 사용하여 댓글 수집 (가장 안정적이지만 느림)
                     if not post_comments:
-                        print(f"  AJAX failed, trying Playwright...")
+                        logger.info("AJAX failed, trying Playwright...")
                         comment_data = get_comments_with_playwright(gallery_id, post['post_id'], gallery_type)
                         post_comments = comment_data.get('comments', [])
 
-                    print(f"  Collected {len(post_comments)} comments")
+                    logger.info("Collected %d comments", len(post_comments))
 
                     # 댓글에 대한 키워드 필터링 및 감성 분석
                     for comment in post_comments:
@@ -920,7 +923,7 @@ def lambda_handler(event, context):
             })
 
         except Exception as e:
-            print(f"Error crawling gallery '{gallery_id}': {e}")
+            logger.error("Error crawling gallery '%s': %s", gallery_id, e)
             import traceback
             traceback.print_exc()
             results.append({

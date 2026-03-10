@@ -8,12 +8,15 @@ YouTube API v3 최적화 모듈
 """
 
 import json
+import logging
 import os
 import time
 import random
 import hashlib
 from datetime import datetime, timedelta
 from googleapiclient.errors import HttpError
+
+logger = logging.getLogger(__name__)
 
 # Redis 클라이언트 (선택적)
 try:
@@ -30,9 +33,9 @@ try:
     # Redis 연결 테스트
     redis_client.ping()
     REDIS_AVAILABLE = True
-    print("✅ Redis cache enabled")
+    logger.info("Redis cache enabled")
 except Exception as e:
-    print(f"⚠️  Redis not available, caching disabled: {e}")
+    logger.warning("Redis not available, caching disabled: %s", e)
     redis_client = None
     REDIS_AVAILABLE = False
 
@@ -81,12 +84,12 @@ def get_from_cache(api_name, params):
 
         if cached_data:
             api_stats[api_name]['cache_hits'] += 1
-            print(f"✅ Cache hit for {api_name} (saved {QUOTA_COSTS.get(api_name, 1)} quota)")
+            logger.debug("Cache hit for %s (saved %d quota)", api_name, QUOTA_COSTS.get(api_name, 1))
             return json.loads(cached_data)
 
         return None
     except Exception as e:
-        print(f"⚠️  Cache read error: {e}")
+        logger.warning("Cache read error: %s", e)
         return None
 
 def save_to_cache(api_name, params, data):
@@ -103,7 +106,7 @@ def save_to_cache(api_name, params, data):
             json.dumps(data, ensure_ascii=False)
         )
     except Exception as e:
-        print(f"⚠️  Cache write error: {e}")
+        logger.warning("Cache write error: %s", e)
 
 def execute_with_retry_and_cache(api_call, api_name, params, max_retries=3, backoff_base=2.0):
     """
@@ -132,7 +135,7 @@ def execute_with_retry_and_cache(api_call, api_name, params, max_retries=3, back
             # Jitter 추가: 랜덤 지연으로 동시 요청 분산
             if attempt > 0:
                 delay = (backoff_base ** attempt) + random.uniform(0, 1)
-                print(f"🔄 Retrying {api_name} after {delay:.2f}s (attempt {attempt + 1}/{max_retries + 1})")
+                logger.debug("Retrying %s after %.2fs (attempt %d/%d)", api_name, delay, attempt + 1, max_retries + 1)
                 time.sleep(delay)
             elif attempt == 0:
                 # 첫 요청 전 기본 딜레이 + jitter
@@ -168,20 +171,20 @@ def execute_with_retry_and_cache(api_call, api_name, params, max_retries=3, back
             # 403 Forbidden
             if error_code == 403:
                 if error_reason in ['quotaExceeded', 'dailyLimitExceeded']:
-                    print(f"⚠️  YouTube API quota exceeded. Reason: {error_reason}")
+                    logger.warning("YouTube API quota exceeded. Reason: %s", error_reason)
                     if attempt < max_retries:
                         # 할당량 초과 시 더 긴 대기 + jitter
                         wait_time = (backoff_base ** (attempt + 2)) * 10 + random.uniform(0, 5)
-                        print(f"Waiting {wait_time:.0f} seconds before retry...")
+                        logger.debug("Waiting %.0f seconds before retry...", wait_time)
                         time.sleep(wait_time)
                         continue
                     else:
                         raise Exception(f"YouTube API quota exceeded after {max_retries + 1} attempts")
                 elif error_reason == 'commentsDisabled':
-                    print(f"Comments disabled for this video/channel")
+                    logger.info("Comments disabled for this video/channel")
                     return None
                 else:
-                    print(f"403 Forbidden error: {error_reason or 'Unknown reason'}")
+                    logger.error("403 Forbidden error: %s", error_reason or 'Unknown reason')
                     if attempt < max_retries:
                         continue
                     else:
@@ -189,11 +192,11 @@ def execute_with_retry_and_cache(api_call, api_name, params, max_retries=3, back
 
             # 429 Too Many Requests
             elif error_code == 429:
-                print(f"⚠️  Rate limit exceeded (429). Attempt {attempt + 1}/{max_retries + 1}")
+                logger.warning("Rate limit exceeded (429). Attempt %d/%d", attempt + 1, max_retries + 1)
                 if attempt < max_retries:
                     # Rate limit 초과 시 더 긴 대기 + jitter
                     wait_time = (backoff_base ** (attempt + 1)) * 5 + random.uniform(0, 3)
-                    print(f"Waiting {wait_time:.0f} seconds before retry...")
+                    logger.debug("Waiting %.0f seconds before retry...", wait_time)
                     time.sleep(wait_time)
                     continue
                 else:
@@ -201,17 +204,17 @@ def execute_with_retry_and_cache(api_call, api_name, params, max_retries=3, back
 
             # 400 Bad Request (재시도 불필요)
             elif error_code == 400:
-                print(f"400 Bad Request: {error_reason or 'Invalid request'}")
+                logger.error("400 Bad Request: %s", error_reason or 'Invalid request')
                 raise
 
             # 404 Not Found (재시도 불필요)
             elif error_code == 404:
-                print(f"404 Not Found: Resource not found")
+                logger.warning("404 Not Found: Resource not found")
                 return None
 
             # 기타 오류: 재시도
             else:
-                print(f"YouTube API error {error_code}: {e}")
+                logger.error("YouTube API error %s: %s", error_code, e)
                 if attempt < max_retries:
                     continue
                 else:
@@ -220,7 +223,7 @@ def execute_with_retry_and_cache(api_call, api_name, params, max_retries=3, back
         except Exception as e:
             last_exception = e
             api_stats[api_name]['errors'] += 1
-            print(f"Unexpected error in {api_name}: {e}")
+            logger.error("Unexpected error in %s: %s", api_name, e)
             if attempt < max_retries:
                 continue
             else:
@@ -263,7 +266,7 @@ def get_videos_batch(youtube, video_ids, max_batch_size=50):
             if response:
                 all_videos.extend(response.get('items', []))
         except Exception as e:
-            print(f"Error fetching video batch: {e}")
+            logger.error("Error fetching video batch: %s", e)
             continue
 
     return all_videos
@@ -289,7 +292,7 @@ def search_videos_optimized(youtube, keyword, max_results=10, channel_id=None, p
     """
     # 채널이 지정된 경우: PlaylistItems API 사용 (더 효율적)
     if channel_id:
-        print(f"🔍 Using PlaylistItems API for channel {channel_id} (quota: 1)")
+        logger.info("Using PlaylistItems API for channel %s (quota: 1)", channel_id)
 
         try:
             # 채널의 uploads 플레이리스트 ID 가져오기
@@ -308,7 +311,7 @@ def search_videos_optimized(youtube, keyword, max_results=10, channel_id=None, p
             )
 
             if not channel_response or not channel_response.get('items'):
-                print(f"Channel not found: {channel_id}")
+                logger.warning("Channel not found: %s", channel_id)
                 return []
 
             uploads_playlist_id = channel_response['items'][0]['contentDetails']['relatedPlaylists']['uploads']
@@ -384,15 +387,15 @@ def search_videos_optimized(youtube, keyword, max_results=10, channel_id=None, p
                 filtered_videos.sort(key=lambda x: x['view_count'], reverse=True)
                 filtered_videos = filtered_videos[:top_n_by_views]
 
-            print(f"Found {len(filtered_videos)} videos matching '{keyword}' (quota saved: ~{100 - 1 - 1})")
+            logger.info("Found %d videos matching '%s' (quota saved: ~%d)", len(filtered_videos), keyword, 100 - 1 - 1)
             return filtered_videos[:max_results]
 
         except Exception as e:
-            print(f"Error using optimized channel search: {e}")
-            print("Falling back to Search API...")
+            logger.error("Error using optimized channel search: %s", e)
+            logger.info("Falling back to Search API...")
 
     # Search API 사용 (마지막 수단)
-    print(f"⚠️  Using Search API for '{keyword}' (quota: 100)")
+    logger.warning("Using Search API for '%s' (quota: 100)", keyword)
 
     search_params = {
         'q': f'"{keyword}"',
@@ -455,7 +458,7 @@ def search_videos_optimized(youtube, keyword, max_results=10, channel_id=None, p
         return result[:max_results]
 
     except Exception as e:
-        print(f"Error in search_videos_optimized: {e}")
+        logger.error("Error in search_videos_optimized: %s", e)
         return []
 
 def detect_comment_country(comment_text):
@@ -599,7 +602,7 @@ def get_video_comments_optimized(youtube, video_id, max_results=100):
         }
 
     except Exception as e:
-        print(f"Error fetching comments for {video_id}: {e}")
+        logger.error("Error fetching comments for %s: %s", video_id, e)
         return {
             'comments': [],
             'vtuber_stats': None,
@@ -608,9 +611,9 @@ def get_video_comments_optimized(youtube, video_id, max_results=100):
 
 def print_api_stats():
     """API 호출 통계 출력"""
-    print("\n" + "="*60)
-    print("📊 YouTube API Usage Statistics")
-    print("="*60)
+    logger.info("=" * 60)
+    logger.info("YouTube API Usage Statistics")
+    logger.info("=" * 60)
 
     total_calls = 0
     total_quota = 0
@@ -619,33 +622,27 @@ def print_api_stats():
 
     for api_name, stats in api_stats.items():
         if stats['calls'] > 0 or stats['cache_hits'] > 0:
-            print(f"\n{api_name}:")
-            print(f"  API Calls: {stats['calls']}")
-            print(f"  Cache Hits: {stats['cache_hits']}")
-            print(f"  Quota Used: {stats['quota']}")
-            print(f"  Errors: {stats['errors']}")
+            logger.info("%s: API Calls=%d, Cache Hits=%d, Quota Used=%d, Errors=%d",
+                        api_name, stats['calls'], stats['cache_hits'], stats['quota'], stats['errors'])
             if stats['calls'] > 0:
                 error_rate = (stats['errors'] / stats['calls']) * 100
-                print(f"  Error Rate: {error_rate:.2f}%")
+                logger.info("  Error Rate: %.2f%%", error_rate)
 
             total_calls += stats['calls']
             total_quota += stats['quota']
             total_errors += stats['errors']
             total_cache_hits += stats['cache_hits']
 
-    print(f"\n{'-'*60}")
-    print(f"Total API Calls: {total_calls}")
-    print(f"Total Cache Hits: {total_cache_hits}")
-    print(f"Total Quota Used: {total_quota}")
-    print(f"Total Errors: {total_errors}")
+    logger.info("-" * 60)
+    logger.info("Total API Calls: %d, Cache Hits: %d, Quota Used: %d, Errors: %d",
+                total_calls, total_cache_hits, total_quota, total_errors)
 
     if total_calls > 0:
         overall_error_rate = (total_errors / total_calls) * 100
         cache_hit_rate = (total_cache_hits / (total_calls + total_cache_hits)) * 100 if (total_calls + total_cache_hits) > 0 else 0
-        print(f"Overall Error Rate: {overall_error_rate:.2f}%")
-        print(f"Cache Hit Rate: {cache_hit_rate:.2f}%")
+        logger.info("Overall Error Rate: %.2f%%, Cache Hit Rate: %.2f%%", overall_error_rate, cache_hit_rate)
 
-    print("="*60 + "\n")
+    logger.info("=" * 60)
 
 def reset_api_stats():
     """API 통계 초기화"""

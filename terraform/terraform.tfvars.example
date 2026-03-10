@@ -20,7 +20,7 @@ project_name = "sns-monitor"
 # ==========================================
 
 # 모니터링할 키워드 목록
-search_keywords = ["Levvels", "Vuddy", "굿즈"]
+search_keywords = ["ExampleCorp", "CreatorBrand", "굿즈"]
 
 # ==========================================
 # 크롤링 스케줄

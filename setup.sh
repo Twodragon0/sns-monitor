@@ -47,7 +47,7 @@ TELEGRAM_BOT_TOKEN=
 TELEGRAM_CHANNELS=
 
 # 검색 키워드
-SEARCH_KEYWORDS=Levvels,Vuddy,굿즈
+SEARCH_KEYWORDS=ExampleCorp,CreatorBrand,굿즈
 
 # YouTube 채널 (인수한 회사 및 주요 크리에이터)
 YOUTUBE_CHANNELS=@IVNITOFFICIAL,@BARABARA_KR
