@@ -178,8 +178,8 @@ status-prod:
 # ============================================
 test:
 	@echo "🧪 Running tests..."
-	cd lambda/youtube-crawler && python -m pytest -v || true
-	cd lambda/dcinside-crawler && python -m pytest -v || true
+	cd crawlers/youtube && python -m pytest -v || true
+	cd crawlers/dcinside && python -m pytest -v || true
 	@echo "✅ Tests complete!"
 
 test-local:

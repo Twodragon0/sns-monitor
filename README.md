@@ -80,22 +80,24 @@ curl http://localhost:8080/api/platforms
 ## Project Structure
 
 ```
-├── frontend/               # React 18 dashboard
+├── backend/                  # Flask API server
+│   ├── app.py                # Application entry point
+│   ├── api_handlers.py       # REST API route handlers
+│   ├── platform_analyzer.py  # Multi-platform URL analyzer
+│   └── requirements.txt      # Python dependencies
+├── crawlers/                 # Periodic data collection
+│   ├── youtube/              # YouTube Data API crawler
+│   ├── dcinside/             # DCInside gallery scraper
+│   └── common/               # Shared utilities
+├── frontend/                 # React 18 dashboard
 │   └── src/components/
-│       ├── URLAnalyzer.jsx  # URL analysis UI
-│       ├── Dashboard.jsx    # Main dashboard
-│       └── *Detail.jsx      # Creator detail pages
-├── lambda/
-│   ├── api-backend/         # Flask API
-│   │   ├── app.py           # Application entry point
-│   │   ├── platform_analyzer.py  # Multi-platform analyzer
-│   │   └── lambda_function.py    # Legacy API handlers
-│   ├── youtube-crawler/     # YouTube Data API crawler
-│   └── dcinside-crawler/    # DCInside scraper
-├── docker/                  # Dockerfiles
-├── helm/                    # Kubernetes Helm chart (optional)
-├── terraform/               # AWS infrastructure (optional)
-└── docker-compose.yml       # Local development
+│       ├── URLAnalyzer.jsx   # URL analysis UI
+│       ├── Dashboard.jsx     # Main dashboard
+│       └── *Detail.jsx       # Creator detail pages
+├── docker/                   # Dockerfiles
+├── helm/                     # Kubernetes Helm chart (optional)
+├── terraform/                # AWS infrastructure (optional)
+└── docker-compose.yml        # Local development
 ```
 
 ## Environment Variables

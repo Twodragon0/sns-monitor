@@ -9,7 +9,8 @@ on:
       - develop
     paths:
       - 'docker/**'
-      - 'lambda/**'
+      - 'backend/**'
+      - 'crawlers/**'
       - 'frontend/**'
       - '.github/workflows/docker-build-push.yaml'
   pull_request:

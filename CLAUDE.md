@@ -53,12 +53,35 @@ User → Frontend (React :3000)
        CronJob Crawlers (optional, every 2 hours)
 ```
 
+### Project Structure
+
+```
+├── backend/                  # Flask API server
+│   ├── app.py                # Application entry point
+│   ├── api_handlers.py       # REST API route handlers
+│   ├── platform_analyzer.py  # Multi-platform URL analyzer
+│   └── requirements.txt      # Python dependencies
+├── crawlers/                 # Periodic data collection
+│   ├── youtube/              # YouTube Data API crawler
+│   ├── dcinside/             # DCInside gallery scraper
+│   └── common/               # Shared utilities
+├── frontend/                 # React 18 dashboard
+│   └── src/components/
+│       ├── URLAnalyzer.jsx   # URL analysis UI
+│       ├── Dashboard.jsx     # Main dashboard
+│       └── *Detail.jsx       # Creator detail pages
+├── docker/                   # Dockerfiles
+├── helm/                     # Kubernetes Helm chart (optional)
+├── terraform/                # AWS infrastructure (optional)
+└── docker-compose.yml        # Local development
+```
+
 ### Key Components
 
-**Backend** (`lambda/api-backend/`):
+**Backend** (`backend/`):
 - `app.py` - Flask application entry point
 - `platform_analyzer.py` - Multi-platform URL analyzer (YouTube, DCInside, Reddit, Telegram, Kakao)
-- `lambda_function.py` - Legacy API handlers (dashboard, members, galleries)
+- `api_handlers.py` - API handlers (dashboard, members, galleries)
 
 **Frontend** (`frontend/src/components/`):
 - `URLAnalyzer.jsx` - URL input and analysis results with sentiment charts

@@ -1,19 +1,14 @@
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 WORKDIR /app
 
-# Python 의존성 설치
-COPY lambda/youtube-crawler/requirements.txt .
+# Install dependencies
+COPY crawlers/youtube/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-
-# Flask 추가
 RUN pip install --no-cache-dir flask requests
 
-# 애플리케이션 코드 복사
-COPY lambda/youtube-crawler/*.py .
+# Application code
+COPY crawlers/youtube/*.py .
+COPY crawlers/common/ ./common/
 
-# CLI 실행 스크립트 복사 (CronJob용)
-COPY docker/scripts/run_youtube_crawler.py run_crawler.py
-
-# 실행 (CronJob에서 직접 크롤링 실행)
 CMD ["python", "run_crawler.py"]

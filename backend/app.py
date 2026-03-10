@@ -15,8 +15,8 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app)
 
-# Import the existing lambda handler
-import lambda_function
+# Import API route handlers (legacy monolith)
+import api_handlers
 
 # Lazy import for platform analyzer
 _platform_analyzer = None
@@ -85,7 +85,7 @@ def api_proxy(path):
     }
 
     try:
-        result = lambda_function.lambda_handler(event, {})
+        result = api_handlers.lambda_handler(event, {})
         status_code = result.get('statusCode', 200)
         body = result.get('body', '{}')
         headers = result.get('headers', {})
