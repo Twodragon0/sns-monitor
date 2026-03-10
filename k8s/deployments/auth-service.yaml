@@ -1,0 +1,152 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  namespace: sns-monitor
+  labels:
+    app: auth-service
+    component: auth
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: auth-service
+  template:
+    metadata:
+      labels:
+        app: auth-service
+        component: auth
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: auth-service
+        image: sns-monitoring-system-auth-service:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+              - ALL
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            configMapKeyRef:
+              name: sns-monitor-config
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: sns-monitor-secrets
+              key: AWS_SECRET_ACCESS_KEY
+        - name: AWS_DEFAULT_REGION
+          valueFrom:
+            configMapKeyRef:
+              name: sns-monitor-config
+              key: AWS_DEFAULT_REGION
+        - name: AUTH_TABLE
+          valueFrom:
+            configMapKeyRef:
+              name: sns-monitor-config
+              key: AUTH_TABLE
+        - name: DYNAMODB_ENDPOINT
+          valueFrom:
+            configMapKeyRef:
+              name: sns-monitor-config
+              key: DYNAMODB_ENDPOINT
+        - name: CLAUDE_OAUTH_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: sns-monitor-secrets
+              key: CLAUDE_OAUTH_CLIENT_ID
+        - name: CLAUDE_OAUTH_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: sns-monitor-secrets
+              key: CLAUDE_OAUTH_CLIENT_SECRET
+        - name: OPENAI_OAUTH_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: sns-monitor-secrets
+              key: OPENAI_OAUTH_CLIENT_ID
+        - name: OPENAI_OAUTH_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: sns-monitor-secrets
+              key: OPENAI_OAUTH_CLIENT_SECRET
+        - name: REDIRECT_URI
+          valueFrom:
+            configMapKeyRef:
+              name: sns-monitor-config
+              key: REDIRECT_URI
+        - name: OKTA_ISSUER
+          valueFrom:
+            configMapKeyRef:
+              name: sns-monitor-config
+              key: OKTA_ISSUER
+        - name: OKTA_CLIENT_ID
+          valueFrom:
+            configMapKeyRef:
+              name: sns-monitor-config
+              key: OKTA_CLIENT_ID
+        - name: OKTA_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: sns-monitor-secrets
+              key: OKTA_CLIENT_SECRET
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+      volumes:
+      - name: tmp
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+  namespace: sns-monitor
+  labels:
+    app: auth-service
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  selector:
+    app: auth-service

@@ -1,0 +1,174 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-backend
+  namespace: sns-monitor
+  labels:
+    app: api-backend
+    component: api
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: api-backend
+  template:
+    metadata:
+      labels:
+        app: api-backend
+        component: api
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: api-backend
+        image: sns-monitoring-system-api-backend:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        # ⚠️ 보안 경고: Pod Identity를 사용하는 경우 아래 AWS 자격 증명은 불필요합니다.
+        # Pod Identity가 자동으로 AWS 자격 증명을 주입하므로 제거하는 것을 권장합니다.
+        # 제거 시: 이 두 환경 변수 블록을 삭제하세요.
+        # - name: AWS_ACCESS_KEY_ID
+        #   valueFrom:
+        #     configMapKeyRef:
+        #       name: sns-monitor-config
+        #       key: AWS_ACCESS_KEY_ID
+        # - name: AWS_SECRET_ACCESS_KEY
+        #   valueFrom:
+        #     secretKeyRef:
+        #       name: sns-monitor-secrets
+        #       key: AWS_SECRET_ACCESS_KEY
+        - name: AWS_DEFAULT_REGION
+          valueFrom:
+            configMapKeyRef:
+              name: sns-monitor-config
+              key: AWS_DEFAULT_REGION
+        - name: DYNAMODB_TABLE
+          valueFrom:
+            configMapKeyRef:
+              name: sns-monitor-config
+              key: DYNAMODB_TABLE
+        - name: DYNAMODB_ENDPOINT
+          valueFrom:
+            configMapKeyRef:
+              name: sns-monitor-config
+              key: DYNAMODB_ENDPOINT
+        - name: S3_BUCKET
+          valueFrom:
+            configMapKeyRef:
+              name: sns-monitor-config
+              key: S3_BUCKET
+        - name: S3_ENDPOINT
+          valueFrom:
+            configMapKeyRef:
+              name: sns-monitor-config
+              key: S3_ENDPOINT
+        - name: REDIS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: sns-monitor-config
+              key: REDIS_HOST
+        - name: REDIS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: sns-monitor-config
+              key: REDIS_PORT
+        - name: AUTH_SERVICE_ENDPOINT
+          valueFrom:
+            configMapKeyRef:
+              name: sns-monitor-config
+              key: AUTH_SERVICE_ENDPOINT
+        - name: LOCAL_MODE
+          valueFrom:
+            configMapKeyRef:
+              name: sns-monitor-config
+              key: LOCAL_MODE
+        - name: LOCAL_DATA_DIR
+          valueFrom:
+            configMapKeyRef:
+              name: sns-monitor-config
+              key: LOCAL_DATA_DIR
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        volumeMounts:
+        - name: local-data
+          mountPath: /app/local-data
+        - name: tmp
+          mountPath: /tmp
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+      volumes:
+      - name: local-data
+        persistentVolumeClaim:
+          claimName: local-data-pvc
+      - name: tmp
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-backend
+  namespace: sns-monitor
+  labels:
+    app: api-backend
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  selector:
+    app: api-backend
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: local-data-pvc
+  namespace: sns-monitor
+spec:
+  # ReadWriteOnce: 표준 스토리지 클래스 지원 (단일 Pod 접근)
+  # ReadWriteMany: NFS 기반 스토리지 필요 (다중 Pod 접근)
+  # 프로덕션 환경에서는 S3 직접 사용 권장 (LOCAL_MODE=false)
+  accessModes:
+    - ReadWriteOnce  # 표준 스토리지 클래스와 호환
+  resources:
+    requests:
+      storage: 20Gi
+  # 표준 스토리지 클래스 사용
+  # NFS가 필요한 경우: storageClassName: nfs-client
+  storageClassName: standard

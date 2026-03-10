@@ -1,0 +1,73 @@
+{{- if .Values.apiBackend.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sns-monitor.fullname" . }}-api-backend
+  labels:
+    {{- include "sns-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api-backend
+spec:
+  replicas: {{ .Values.apiBackend.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "sns-monitor.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: api-backend
+  template:
+    metadata:
+      labels:
+        {{- include "sns-monitor.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: api-backend
+    spec:
+      # Pod Identity를 사용하므로 ServiceAccount 명시 필요
+      serviceAccountName: {{ .Values.serviceAccount.name | default (include "sns-monitor.fullname" .) }}
+      {{- with .Values.appImages.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- include "sns-monitor.podSecurityContext" . | nindent 8 }}
+      containers:
+        - name: api-backend
+          image: "{{ .Values.appImages.registry }}/{{ .Values.apiBackend.image.repository }}:{{ .Values.apiBackend.image.tag }}"
+          imagePullPolicy: {{ .Values.apiBackend.image.pullPolicy }}
+          securityContext:
+            {{- include "sns-monitor.containerSecurityContext" . | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: LOCAL_MODE
+              value: "{{ .Values.apiBackend.env.LOCAL_MODE }}"
+            - name: LOCAL_DATA_DIR
+              value: "{{ .Values.apiBackend.env.LOCAL_DATA_DIR }}"
+            - name: REDIS_HOST
+              value: "{{ include "sns-monitor.fullname" . }}-redis-master"
+            - name: REDIS_PORT
+              value: "6379"
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.apiBackend.resources | nindent 12 }}
+          volumeMounts:
+            - name: local-data
+              mountPath: /app/local-data
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: local-data
+          persistentVolumeClaim:
+            claimName: {{ include "sns-monitor.fullname" . }}-local-data
+        - name: tmp
+          emptyDir: {}
+{{- end }}

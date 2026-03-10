@@ -1,0 +1,54 @@
+{{- if .Values.llmAnalyzer.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sns-monitor.fullname" . }}-llm-analyzer
+  labels:
+    {{- include "sns-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: llm-analyzer
+spec:
+  replicas: {{ .Values.llmAnalyzer.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "sns-monitor.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: llm-analyzer
+  template:
+    metadata:
+      labels:
+        {{- include "sns-monitor.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: llm-analyzer
+    spec:
+      securityContext:
+        {{- include "sns-monitor.podSecurityContext" . | nindent 8 }}
+      containers:
+        - name: llm-analyzer
+          image: "{{ .Values.llmAnalyzer.image.repository }}:{{ .Values.llmAnalyzer.image.tag }}"
+          securityContext:
+            {{- include "sns-monitor.containerSecurityContext" . | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 5000
+              protocol: TCP
+          env:
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "sns-monitor.fullname" . }}-secrets
+                  key: openai-api-key
+                  optional: true
+            - name: LOCAL_MODE
+              value: "true"
+          resources:
+            {{- toYaml .Values.llmAnalyzer.resources | nindent 12 }}
+          volumeMounts:
+            - name: local-data
+              mountPath: /app/local-data
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: local-data
+          persistentVolumeClaim:
+            claimName: {{ include "sns-monitor.fullname" . }}-local-data
+        - name: tmp
+          emptyDir: {}
+{{- end }}

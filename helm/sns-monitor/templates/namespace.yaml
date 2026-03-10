@@ -1,0 +1,38 @@
+{{- if .Values.namespace.create }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Release.Namespace }}
+  labels:
+    name: {{ .Release.Namespace }}
+    {{- with .Values.namespace.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- end }}
+---
+{{- if .Values.limitRange.enabled }}
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: resource-limit-range
+  namespace: {{ .Release.Namespace }}
+spec:
+  limits:
+  - default:
+      memory: {{ .Values.limitRange.default.memory }}
+    defaultRequest:
+      cpu: {{ .Values.limitRange.defaultRequest.cpu }}
+      memory: {{ .Values.limitRange.defaultRequest.memory }}
+    type: Container
+{{- end }}
+---
+{{- if .Values.resourceQuota.enabled }}
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: pod-limit
+  namespace: {{ .Release.Namespace }}
+spec:
+  hard:
+    pods: {{ .Values.resourceQuota.pods | quote }}
+{{- end }}

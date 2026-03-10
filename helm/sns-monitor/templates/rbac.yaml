@@ -1,0 +1,70 @@
+{{- if .Values.rbac.create }}
+# ============================================
+# RoleBinding: Avenger (관리자급)
+# ============================================
+{{- if .Values.rbac.roles.avenger.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: oidc:namespace-avenger
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "sns-monitor.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: oidc:namespace-avenger
+subjects:
+{{- range .Values.rbac.roles.avenger.groups }}
+- kind: Group
+  name: {{ . }}
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}
+{{- end }}
+---
+# ============================================
+# RoleBinding: GOG (일반 사용자)
+# ============================================
+{{- if .Values.rbac.roles.gog.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: oidc:namespace-gog
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "sns-monitor.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: oidc:namespace-gog
+subjects:
+{{- range .Values.rbac.roles.gog.groups }}
+- kind: Group
+  name: {{ . }}
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}
+{{- end }}
+---
+# ============================================
+# RoleBinding: Readonly (읽기 전용)
+# ============================================
+{{- if .Values.rbac.roles.readonly.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: oidc:namespace-readonly
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "sns-monitor.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: oidc:namespace-readonly
+subjects:
+{{- range .Values.rbac.roles.readonly.groups }}
+- kind: Group
+  name: {{ . }}
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}
+{{- end }}
+{{- end }}

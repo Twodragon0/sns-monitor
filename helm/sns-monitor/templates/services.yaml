@@ -1,0 +1,59 @@
+{{- if .Values.frontend.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "sns-monitor.fullname" . }}-frontend
+  labels:
+    {{- include "sns-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+spec:
+  type: {{ .Values.frontend.service.type }}
+  ports:
+    - port: {{ .Values.frontend.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "sns-monitor.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+{{- end }}
+---
+{{- if .Values.apiBackend.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "sns-monitor.fullname" . }}-api-backend
+  labels:
+    {{- include "sns-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api-backend
+spec:
+  type: {{ .Values.apiBackend.service.type }}
+  ports:
+    - port: {{ .Values.apiBackend.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "sns-monitor.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: api-backend
+{{- end }}
+---
+{{- if .Values.llmAnalyzer.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "sns-monitor.fullname" . }}-llm-analyzer
+  labels:
+    {{- include "sns-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: llm-analyzer
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5000
+      targetPort: 5000
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "sns-monitor.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: llm-analyzer
+{{- end }}

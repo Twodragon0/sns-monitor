@@ -1,0 +1,6 @@
+# SNS 모니터링용 RSS 피드 예시
+
+# 기본 설정 (한국 주요 뉴스 사이트)
+RSS_FEEDS=https://news.naver.com/main/rss/section.naver?sid=105,https://news.daum.net/rss/it,https://www.bloter.net/rss,https://www.zdnet.co.kr/rss/all.xml,https://news.naver.com/main/rss/section.naver?sid=106
+
+# 전체 목록은 docs/rss-feeds.md 참조

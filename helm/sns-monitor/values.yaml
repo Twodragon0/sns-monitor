@@ -1,0 +1,316 @@
+# SNS Monitor Helm Values
+# Frontend + API Backend + Redis + YouTube Crawler + DCInside Crawler
+# namespace: platform
+# registry: ghcr.io/your-org
+
+# App-specific image registry (does not affect subcharts like Redis)
+appImages:
+  registry: "ghcr.io/your-org"
+  pullSecrets: []
+
+global:
+  storageClass: "ebs-gp3-ext4"  # EKS default storage class
+
+# ============================================
+# ServiceAccount Configuration (Pod Identity)
+# ============================================
+serviceAccount:
+  create: true
+  name: sns-monitoring
+  # Pod Identity를 사용하는 경우 annotations는 필요 없음
+  # IRSA를 사용하는 경우 아래 주석 해제
+  annotations: {}
+    # eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/ROLE_NAME
+
+# ============================================
+# Namespace Configuration
+# ============================================
+namespace:
+  create: false
+  name: platform
+  labels:
+    environment: dev
+
+# ============================================
+# RBAC Configuration
+# ============================================
+rbac:
+  create: true
+  roles:
+    avenger:
+      enabled: false
+    gog:
+      enabled: false
+    readonly:
+      enabled: false
+
+# ============================================
+# Resource Limits
+# ============================================
+limitRange:
+  enabled: false  # platform namespace에 이미 존재
+  default:
+    memory: "256Mi"
+  defaultRequest:
+    cpu: "25m"
+    memory: "32Mi"
+
+resourceQuota:
+  enabled: false  # platform namespace에 이미 존재
+  pods: "15"
+
+# ============================================
+# Security Settings
+# ============================================
+security:
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    capabilities:
+      drop:
+        - ALL
+
+  networkPolicies:
+    enabled: true  # 보안 강화: 네트워크 정책 활성화
+
+# ============================================
+# Cost Optimization Settings
+# ============================================
+costOptimization:
+  # 야간 스케일 다운 (22:00-07:00 KST)
+  # 주말(토/일)에는 종일 스케일 다운 유지 (비용 절감)
+  enabled: true
+  scaleDown:
+    schedule: "0 22 * * *"  # 22:00 KST (매일)
+  scaleUp:
+    schedule: "0 7 * * 1-5"   # 07:00 KST (평일만: 월-금)
+
+  hpa:
+    enabled: false  # 초기 배포 시 비활성화
+    minReplicas: 1
+    maxReplicas: 2  # 비용 절감: 3 → 2
+    targetCPUUtilization: 80  # 더 효율적인 활용
+
+  pdb:
+    enabled: false  # 단일 replica에서는 불필요
+
+# ============================================
+# Frontend (Port: 3000)
+# ============================================
+frontend:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: sns-monitor-frontend
+    tag: latest
+    pullPolicy: Always  # latest 태그는 항상 최신 이미지 pull
+  service:
+    type: ClusterIP
+    port: 3000
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi  # Node.js 앱에 충분한 메모리
+  env:
+    NODE_ENV: "production"
+  # Frontend 보안 설정 (정적 파일만 서빙하므로 readOnlyRootFilesystem 활성화 가능)
+  securityContext:
+    readOnlyRootFilesystem: true  # 보안 강화: 루트 파일시스템 읽기 전용
+
+# ============================================
+# API Backend (Port: 8080)
+# ============================================
+apiBackend:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: sns-monitor-api-backend
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8080
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  env:
+    LOCAL_MODE: "true"
+    LOCAL_DATA_DIR: "/app/local-data"
+
+# ============================================
+# 비활성화된 서비스들
+# ============================================
+authService:
+  enabled: false
+
+oauth2Proxy:
+  enabled: false
+
+llmAnalyzer:
+  enabled: false
+
+dynamodbLocal:
+  enabled: false
+
+# ============================================
+# Crawlers (CronJob - 실행 시에만 리소스 사용)
+# ============================================
+crawlers:
+  youtube:
+    enabled: true
+    image:
+      repository: sns-monitor-youtube-crawler
+      tag: latest
+    resources:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+    schedule: "10 */2 * * *"  # 매 2시간 10분마다 실행 (댓글 지속 수집)
+    # 채널 목록: 한결(@hangyeol8008), 비몽(@beemong_), 샤르망(@owo_zzzz) 포함
+    # PSY_CHORD 멤버 추가: 루이쨘, 감제이, 연이, 하루토, 늦잠
+    channels: "@akaivstudioofficial,@Yeorumi,@beemong_,@u32S2,@hangyeol8008,@owo_zzzz,@IVNITOFFICIAL,@irocloud_,@NIN0SUNDAY,@KoyoTempest,@otorainy,@RoboFroster,@BARABARA_KR,@aoseijun,@AkazuneKatsuki,@Shironeharu,@NeruKuroming,@sinichocoreito,@mizuiroSyu,@louiszzan,@9jayaj9,@yeon2vt,@psy_haruto,@oversleepZzz"
+    maxVideos: 15
+    maxComments: 50
+
+  dcinside:
+    enabled: true
+    image:
+      repository: sns-monitor-dcinside-crawler
+      tag: latest
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 150m
+        memory: 256Mi
+    schedule: "10 */2 * * *"  # 매 2시간 10분 (YouTube와 동일)
+    galleries: "ivnit,akaiv,skoshism,soopvirtualstreamer,spv,soopstreaming"
+    maxPages: 3
+
+  twitter:
+    enabled: false
+
+  # JSON 업데이트 크론잡 - YouTube 크롤러 완료 후 실행 (크롤러가 약 10-20분 소요되므로 30분 후 실행)
+  # 한결, 비몽, 샤르망의 댓글 데이터를 포함하여 업데이트
+  jsonUpdate:
+    enabled: true
+    schedule: "40 */2 * * *"  # 매 2시간 40분 (YouTube 크롤러 완료 후 약 30분 뒤)
+
+# ============================================
+# Redis (Port: 6379) - Standalone deployment
+# ============================================
+redis:
+  enabled: true
+  image:
+    repository: redis
+    tag: 7-alpine
+    pullPolicy: IfNotPresent
+  master:
+    resources:
+      requests:
+        cpu: 25m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+    persistence:
+      size: 1Gi
+      storageClass: "ebs-gp3-ext4"
+
+# ============================================
+# Ingress (AWS ALB - Internal)
+# ============================================
+ingress:
+  enabled: true
+  className: alb
+  # Ingress Controller 네임스페이스 (NetworkPolicy용)
+  # AWS ALB Ingress Controller는 보통 kube-system 또는 별도 네임스페이스에 배포됨
+  namespace: kube-system  # 필요시 수정 가능
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internal
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/group.name: internal-access
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80,"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/actions.ssl-redirect: '{"Type": "redirect", "RedirectConfig": { "Protocol": "HTTPS", "Port": "443", "StatusCode": "HTTP_301"}}'
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-northeast-2:123456789012:certificate/your-certificate-id
+    alb.ingress.kubernetes.io/security-groups: sg-your-security-group-1,sg-your-security-group-2
+    alb.ingress.kubernetes.io/subnets: subnet-your-subnet-1,subnet-your-subnet-2,subnet-your-subnet-3
+    alb.ingress.kubernetes.io/healthcheck-path: /
+    external-dns.alpha.kubernetes.io/access: private
+    external-dns.alpha.kubernetes.io/hostname: sns-monitor.example.com
+  hosts:
+    - host: sns-monitor.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: frontend
+        - path: /api
+          pathType: Prefix
+          service: api-backend
+  tls: []
+
+# ============================================
+# Persistence
+# ============================================
+persistence:
+  enabled: true
+  localData:
+    accessMode: ReadWriteOnce  # EBS - API backend only (crawlers use API)
+    size: 5Gi
+    storageClass: "ebs-gp3-ext4"
+
+# ============================================
+# ConfigMap
+# ============================================
+config:
+  redisHost: "sns-monitor-redis-master"
+  redisPort: "6379"
+  apiBackendEndpoint: "http://sns-monitor-api-backend:8080"
+  localMode: "true"
+  localDataDir: "/app/local-data"
+  searchKeywords: "Levvels,levvels,LEVVELS,레벨스,Vuddy,vuddy,VUDDY,버디,굿즈"
+  # S3 설정 (데이터 백업용)
+  s3Bucket: "sns-monitor-data"
+  s3Prefix: "data"
+  awsRegion: "ap-northeast-2"
+
+# ============================================
+# S3 Sync Job (데이터 백업)
+# ============================================
+s3Sync:
+  enabled: true
+  schedule: "0 */6 * * *"  # 6시간마다 백업
+  maxAgeDays: 30           # 30일 이후 자동 삭제
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+# ============================================
+# Secrets (set via --set or external secrets)
+# ============================================
+secrets:
+  youtubeApiKey: ""
+  redisPassword: ""

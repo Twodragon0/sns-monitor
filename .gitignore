@@ -1,0 +1,73 @@
+# 로컬 테스트 데이터
+local-data/
+docker-data/
+
+# 환경 변수 파일
+.env
+.env.local
+.env.bak
+*.enc.yaml
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Helm
+*.tgz
+helm/sns-monitor/charts/*.tgz
+
+# Secrets
+**/secrets/*.yaml
+!**/secrets/*.example.yaml
+
+# Analysis files (local)
+*_analysis.json
+*_data.json
+*_stats.json
+
+# Claude
+.claude/
+
+# Editor configs
+.cursor.md
+.cursorrules
+.mcp.json
+
+# Frontend build
+frontend/build/
+
+# Terraform sensitive files
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/.envrc
+terraform/.terraform.lock.hcl
+terraform/tfplan
+.playwright-mcp/

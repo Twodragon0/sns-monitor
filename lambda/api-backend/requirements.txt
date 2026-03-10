@@ -1,0 +1,6 @@
+boto3==1.34.14
+# CVE-2024-35195 fix: requests 2.32.0+ required to fix Session verify=False security issue
+# Version 2.32.0+ ensures verify parameter is respected for each request in Session objects
+# CVE-2024-47081 fix: requests 2.32.4+ required to fix .netrc credentials leak via malicious URLs
+# Pinned to 2.32.4+ for security (fixes CVE-2024-35195, CVE-2024-47081 and other vulnerabilities)
+requests>=2.32.4,<3.0.0

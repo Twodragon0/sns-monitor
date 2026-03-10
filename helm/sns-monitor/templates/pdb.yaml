@@ -1,0 +1,31 @@
+{{- if .Values.costOptimization.pdb.enabled }}
+{{- if .Values.frontend.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "sns-monitor.fullname" . }}-frontend
+  labels:
+    {{- include "sns-monitor.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.costOptimization.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "sns-monitor.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: frontend
+{{- end }}
+---
+{{- if .Values.apiBackend.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "sns-monitor.fullname" . }}-api-backend
+  labels:
+    {{- include "sns-monitor.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.costOptimization.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "sns-monitor.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: api-backend
+{{- end }}
+{{- end }}

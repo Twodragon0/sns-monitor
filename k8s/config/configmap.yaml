@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sns-monitor-config
+  namespace: sns-monitor
+data:
+  # AWS Configuration
+  AWS_DEFAULT_REGION: "ap-northeast-2"
+  AWS_ACCESS_KEY_ID: "test"
+
+  # Service Endpoints (Internal Cluster DNS)
+  DYNAMODB_ENDPOINT: "http://dynamodb-local:8000"
+  S3_ENDPOINT: "http://localstack:4566"
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+
+  # API Endpoints
+  API_BACKEND_ENDPOINT: "http://api-backend:8080"
+  AUTH_SERVICE_ENDPOINT: "http://auth-service:8080"
+  LLM_ANALYZER_ENDPOINT: "http://llm-analyzer:5000"
+  YOUTUBE_CRAWLER_ENDPOINT: "http://youtube-crawler:5000"
+  TELEGRAM_CRAWLER_ENDPOINT: "http://telegram-crawler:5000"
+  RSS_CRAWLER_ENDPOINT: "http://rss-crawler:5000"
+  TWITTER_CRAWLER_ENDPOINT: "http://twitter-crawler:5000"
+  INSTAGRAM_CRAWLER_ENDPOINT: "http://instagram-crawler:5000"
+  FACEBOOK_CRAWLER_ENDPOINT: "http://facebook-crawler:5000"
+  THREADS_CRAWLER_ENDPOINT: "http://threads-crawler:5000"
+  VUDDY_CRAWLER_ENDPOINT: "http://vuddy-crawler:5000"
+
+  # DynamoDB Configuration
+  DYNAMODB_TABLE: "sns-monitor-results"
+  AUTH_TABLE: "sns-monitor-auth"
+
+  # S3 Configuration
+  S3_BUCKET: "sns-monitor-data"
+
+  # Application Configuration
+  LOCAL_MODE: "false"
+  LOCAL_DATA_DIR: "/app/local-data"
+
+  # Crawler Configuration
+  CRAWL_SCHEDULE: "*/30 * * * *"  # Every 30 minutes
+  SEARCH_KEYWORDS: "Levvels,Vuddy,굿즈"
+
+  # Frontend Configuration
+  REACT_APP_API_URL: "http://api-backend:8080"
+
+  # Okta OIDC Configuration (public values)
+  REDIRECT_URI: "https://your-domain.com/auth/callback"
+  OKTA_ISSUER: "https://your-okta-domain.okta.com"
+  OKTA_CLIENT_ID: "your-okta-client-id"  # Override in secrets

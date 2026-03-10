@@ -1,0 +1,89 @@
+{{- if .Values.security.networkPolicies.enabled }}
+# Default deny all ingress
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "sns-monitor.fullname" . }}-default-deny
+  labels:
+    {{- include "sns-monitor.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "sns-monitor.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+---
+# Allow ingress to frontend
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "sns-monitor.fullname" . }}-allow-frontend
+  labels:
+    {{- include "sns-monitor.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "sns-monitor.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: frontend
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        # ALB (IP target type)는 VPC 내부에서 직접 Pod IP로 트래픽 전송
+        # VPC CIDR 허용 (10.0.0.0/8 - 내부 네트워크)
+        - ipBlock:
+            cidr: 10.0.0.0/8
+      ports:
+        - protocol: TCP
+          port: 3000
+---
+# Allow frontend to api-backend
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "sns-monitor.fullname" . }}-allow-api-backend
+  labels:
+    {{- include "sns-monitor.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "sns-monitor.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: api-backend
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        # Frontend Pod에서 접근 허용
+        - podSelector:
+            matchLabels:
+              {{- include "sns-monitor.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: frontend
+        # ALB (IP target type)에서 직접 접근 허용 (/api/* 라우팅)
+        - ipBlock:
+            cidr: 10.0.0.0/8
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# Allow api-backend to redis
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "sns-monitor.fullname" . }}-allow-redis
+  labels:
+    {{- include "sns-monitor.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: redis
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "sns-monitor.selectorLabels" . | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: 6379
+{{- end }}

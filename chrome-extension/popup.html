@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SNS 모니터링 수집기</title>
+  <style>
+    body {
+      width: 350px;
+      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .container {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 12px;
+      padding: 20px;
+      color: #333;
+    }
+
+    h1 {
+      margin: 0 0 16px 0;
+      font-size: 20px;
+      color: #667eea;
+    }
+
+    .status {
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      font-size: 14px;
+      background: #f0f0f0;
+    }
+
+    .status.success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+
+    .status.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+
+    .info {
+      font-size: 13px;
+      margin-bottom: 16px;
+      color: #666;
+      line-height: 1.6;
+    }
+
+    .keyword-input {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 6px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+
+    .keyword-input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s;
+      margin-bottom: 8px;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #e0e0e0;
+    }
+
+    .stat-item {
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #667eea;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: #666;
+      margin-top: 4px;
+    }
+
+    .settings-btn {
+      background: #f0f0f0;
+      color: #333;
+      font-size: 13px;
+      padding: 8px;
+      margin-top: 8px;
+    }
+
+    .loading {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 3px solid rgba(255,255,255,.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>SNS 데이터 수집기</h1>
+
+    <div id="status" class="status" style="display: none;"></div>
+
+    <div class="info">
+      현재 페이지: <strong id="platform">감지 중...</strong><br>
+      수집 가능한 항목: <strong id="items-count">0</strong>개
+    </div>
+
+    <input
+      type="text"
+      id="keyword-input"
+      class="keyword-input"
+      placeholder="키워드 입력 (예: Levvels, Vuddy)"
+      value=""
+    />
+
+    <button id="collect-btn">
+      데이터 수집 시작
+    </button>
+
+    <button id="settings-btn" class="settings-btn">
+      API 설정
+    </button>
+
+    <div class="stats">
+      <div class="stat-item">
+        <div class="stat-value" id="total-collected">0</div>
+        <div class="stat-label">총 수집</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value" id="today-collected">0</div>
+        <div class="stat-label">오늘 수집</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

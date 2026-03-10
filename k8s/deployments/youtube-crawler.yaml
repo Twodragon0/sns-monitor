@@ -1,0 +1,130 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: youtube-crawler
+  namespace: sns-monitor
+  labels:
+    app: youtube-crawler
+    component: crawler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: youtube-crawler
+  template:
+    metadata:
+      labels:
+        app: youtube-crawler
+        component: crawler
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: youtube-crawler
+        image: sns-monitoring-system-youtube-crawler:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5000
+          name: http
+        env:
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            configMapKeyRef:
+              name: sns-monitor-config
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: sns-monitor-secrets
+              key: AWS_SECRET_ACCESS_KEY
+        - name: AWS_DEFAULT_REGION
+          valueFrom:
+            configMapKeyRef:
+              name: sns-monitor-config
+              key: AWS_DEFAULT_REGION
+        - name: S3_BUCKET
+          valueFrom:
+            configMapKeyRef:
+              name: sns-monitor-config
+              key: S3_BUCKET
+        - name: DYNAMODB_TABLE
+          valueFrom:
+            configMapKeyRef:
+              name: sns-monitor-config
+              key: DYNAMODB_TABLE
+        - name: DYNAMODB_ENDPOINT
+          valueFrom:
+            configMapKeyRef:
+              name: sns-monitor-config
+              key: DYNAMODB_ENDPOINT
+        - name: S3_ENDPOINT
+          valueFrom:
+            configMapKeyRef:
+              name: sns-monitor-config
+              key: S3_ENDPOINT
+        - name: YOUTUBE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: sns-monitor-secrets
+              key: YOUTUBE_API_KEY
+        - name: SEARCH_KEYWORDS
+          valueFrom:
+            configMapKeyRef:
+              name: sns-monitor-config
+              key: SEARCH_KEYWORDS
+        - name: LLM_ANALYZER_ENDPOINT
+          valueFrom:
+            configMapKeyRef:
+              name: sns-monitor-config
+              key: LLM_ANALYZER_ENDPOINT
+        - name: REDIS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: sns-monitor-config
+              key: REDIS_HOST
+        - name: REDIS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: sns-monitor-config
+              key: REDIS_PORT
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        volumeMounts:
+        - name: local-data
+          mountPath: /app/local-data
+      volumes:
+      - name: local-data
+        persistentVolumeClaim:
+          claimName: local-data-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: youtube-crawler
+  namespace: sns-monitor
+  labels:
+    app: youtube-crawler
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5000
+    targetPort: 5000
+    protocol: TCP
+    name: http
+  selector:
+    app: youtube-crawler

@@ -1,0 +1,111 @@
+{{- if .Values.dynamodbLocal.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sns-monitor.fullname" . }}-dynamodb-local
+  labels:
+    {{- include "sns-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: dynamodb-local
+spec:
+  replicas: {{ .Values.dynamodbLocal.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "sns-monitor.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: dynamodb-local
+  template:
+    metadata:
+      labels:
+        {{- include "sns-monitor.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: dynamodb-local
+    spec:
+      # DynamoDB Local은 Java 기반이라 보안 컨텍스트 완화 필요
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: dynamodb
+          image: "{{ .Values.dynamodbLocal.image.repository }}:{{ .Values.dynamodbLocal.image.tag }}"
+          imagePullPolicy: {{ .Values.dynamodbLocal.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          command:
+            - java
+            - -jar
+            - DynamoDBLocal.jar
+            - -sharedDb
+            - -dbPath
+            - ./data
+          workingDir: /home/dynamodblocal
+          ports:
+            - name: dynamodb
+              containerPort: 8000
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: dynamodb
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: dynamodb
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.dynamodbLocal.resources | nindent 12 }}
+          volumeMounts:
+            - name: dynamodb-data
+              mountPath: /home/dynamodblocal/data
+      volumes:
+        - name: dynamodb-data
+          {{- if .Values.dynamodbLocal.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "sns-monitor.fullname" . }}-dynamodb-data
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "sns-monitor.fullname" . }}-dynamodb-local
+  labels:
+    {{- include "sns-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: dynamodb-local
+spec:
+  type: {{ .Values.dynamodbLocal.service.type }}
+  ports:
+    - port: {{ .Values.dynamodbLocal.service.port }}
+      targetPort: dynamodb
+      protocol: TCP
+      name: dynamodb
+  selector:
+    {{- include "sns-monitor.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: dynamodb-local
+---
+{{- if .Values.dynamodbLocal.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "sns-monitor.fullname" . }}-dynamodb-data
+  labels:
+    {{- include "sns-monitor.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- if .Values.global.storageClass }}
+  storageClassName: {{ .Values.global.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.dynamodbLocal.persistence.size }}
+{{- end }}
+{{- end }}

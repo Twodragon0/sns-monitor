@@ -1,0 +1,94 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-backend-policy
+  namespace: sns-monitor
+spec:
+  podSelector:
+    matchLabels:
+      app: api-backend
+  policyTypes:
+  - Ingress
+  - Egress
+  
+  # 인바운드 규칙: Frontend에서만 접근 허용
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: frontend
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx  # Ingress Controller
+    ports:
+    - protocol: TCP
+      port: 8080
+  
+  # 아웃바운드 규칙: 필요한 서비스만 접근 허용
+  egress:
+  # DynamoDB 접근
+  - to:
+    - podSelector:
+        matchLabels:
+          app: dynamodb-local
+    ports:
+    - protocol: TCP
+      port: 8000
+  # Redis 접근
+  - to:
+    - podSelector:
+        matchLabels:
+          app: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  # Auth Service 접근
+  - to:
+    - podSelector:
+        matchLabels:
+          app: auth-service
+    ports:
+    - protocol: TCP
+      port: 8080
+  # 외부 API 접근 (AWS, YouTube 등)
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 443  # HTTPS
+    - protocol: TCP
+      port: 80   # HTTP
+  # DNS
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    ports:
+    - protocol: UDP
+      port: 53
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

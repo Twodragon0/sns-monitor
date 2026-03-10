@@ -1,0 +1,30 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Python dependencies
+RUN pip install --no-cache-dir \
+    flask \
+    flask-cors \
+    redis \
+    requests>=2.32.4 \
+    beautifulsoup4 \
+    lxml
+
+# Application code
+COPY lambda/api-backend/lambda_function.py .
+COPY lambda/api-backend/platform_analyzer.py .
+COPY lambda/api-backend/app.py .
+
+# JSON update script
+COPY scripts/update_all_members_json.py .
+
+# Create local-data directory structure
+RUN mkdir -p /app/local-data/youtube/channels \
+             /app/local-data/dcinside \
+             /app/local-data/vuddy/comprehensive_analysis \
+             /app/local-data/analysis
+
+EXPOSE 8080
+
+CMD ["python", "app.py"]

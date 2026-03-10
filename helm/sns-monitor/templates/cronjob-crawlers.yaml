@@ -1,0 +1,290 @@
+{{- if .Values.crawlers.youtube.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "sns-monitor.fullname" . }}-youtube-crawler
+  labels:
+    {{- include "sns-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: youtube-crawler
+spec:
+  schedule: "{{ .Values.crawlers.youtube.schedule }}"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 1800
+      template:
+        spec:
+          # Pod Identity를 사용하므로 ServiceAccount 명시 필요
+          serviceAccountName: {{ .Values.serviceAccount.name | default (include "sns-monitor.fullname" .) }}
+          {{- with .Values.appImages.pullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            {{- include "sns-monitor.podSecurityContext" . | nindent 12 }}
+          restartPolicy: OnFailure
+          # Tolerations for ARM nodes
+          tolerations:
+            - key: "low-priority-arm-al2023"
+              operator: "Exists"
+              effect: "NoSchedule"
+            - key: "high-priority-arm-al2023"
+              operator: "Exists"
+              effect: "NoSchedule"
+          # Pod Affinity: Prefer same node as API backend (not required - allows running during scale-down)
+          affinity:
+            podAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                podAffinityTerm:
+                  labelSelector:
+                    matchLabels:
+                      app.kubernetes.io/name: {{ include "sns-monitor.name" . }}
+                      app.kubernetes.io/component: api-backend
+                  topologyKey: kubernetes.io/hostname
+          containers:
+            - name: youtube-crawler
+              image: "{{ .Values.appImages.registry }}/{{ .Values.crawlers.youtube.image.repository }}:{{ .Values.crawlers.youtube.image.tag }}"
+              securityContext:
+                {{- include "sns-monitor.containerSecurityContext" . | nindent 16 }}
+              env:
+                - name: YOUTUBE_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "sns-monitor.fullname" . }}-secrets
+                      key: youtube-api-key
+                - name: LOCAL_MODE
+                  value: "true"
+                - name: LOCAL_DATA_DIR
+                  value: "/app/local-data"
+                - name: AWS_DEFAULT_REGION
+                  value: "ap-northeast-2"
+                - name: API_ENDPOINT
+                  value: "http://{{ include "sns-monitor.fullname" . }}-api-backend:8080"
+                - name: CHANNELS
+                  value: "{{ .Values.crawlers.youtube.channels | default "@AkaivStudioOfficial,@BARABARA_KR" }}"
+                - name: MAX_VIDEOS
+                  value: "{{ .Values.crawlers.youtube.maxVideos | default "5" }}"
+                - name: MAX_COMMENTS
+                  value: "{{ .Values.crawlers.youtube.maxComments | default "50" }}"
+              resources:
+                {{- toYaml .Values.crawlers.youtube.resources | nindent 16 }}
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+                - name: local-data
+                  mountPath: /app/local-data
+          volumes:
+            - name: tmp
+              emptyDir: {}
+            - name: local-data
+              persistentVolumeClaim:
+                claimName: {{ include "sns-monitor.fullname" . }}-local-data
+{{- end }}
+---
+{{- if .Values.crawlers.dcinside.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "sns-monitor.fullname" . }}-dcinside-crawler
+  labels:
+    {{- include "sns-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: dcinside-crawler
+spec:
+  schedule: "{{ .Values.crawlers.dcinside.schedule }}"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 1800
+      template:
+        spec:
+          # Pod Identity를 사용하므로 ServiceAccount 명시 필요
+          serviceAccountName: {{ .Values.serviceAccount.name | default (include "sns-monitor.fullname" .) }}
+          {{- with .Values.appImages.pullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            {{- include "sns-monitor.podSecurityContext" . | nindent 12 }}
+          restartPolicy: OnFailure
+          # Tolerations for ARM nodes
+          tolerations:
+            - key: "low-priority-arm-al2023"
+              operator: "Exists"
+              effect: "NoSchedule"
+            - key: "high-priority-arm-al2023"
+              operator: "Exists"
+              effect: "NoSchedule"
+          # Pod Affinity: Prefer same node as API backend (not required - allows running during scale-down)
+          affinity:
+            podAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                podAffinityTerm:
+                  labelSelector:
+                    matchLabels:
+                      app.kubernetes.io/name: {{ include "sns-monitor.name" . }}
+                      app.kubernetes.io/component: api-backend
+                  topologyKey: kubernetes.io/hostname
+          containers:
+            - name: dcinside-crawler
+              image: "{{ .Values.appImages.registry }}/{{ .Values.crawlers.dcinside.image.repository }}:{{ .Values.crawlers.dcinside.image.tag }}"
+              securityContext:
+                {{- include "sns-monitor.containerSecurityContext" . | nindent 16 }}
+              env:
+                - name: LOCAL_MODE
+                  value: "true"
+                - name: LOCAL_DATA_DIR
+                  value: "/app/local-data"
+                - name: API_ENDPOINT
+                  value: "http://{{ include "sns-monitor.fullname" . }}-api-backend:8080"
+                - name: GALLERIES
+                  value: "{{ .Values.crawlers.dcinside.galleries | default "ivnit,akaiv,skoshism" }}"
+                - name: MAX_PAGES
+                  value: "{{ .Values.crawlers.dcinside.maxPages | default "3" }}"
+              resources:
+                {{- toYaml .Values.crawlers.dcinside.resources | nindent 16 }}
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+                - name: local-data
+                  mountPath: /app/local-data
+          volumes:
+            - name: tmp
+              emptyDir: {}
+            - name: local-data
+              persistentVolumeClaim:
+                claimName: {{ include "sns-monitor.fullname" . }}-local-data
+{{- end }}
+---
+{{- if .Values.crawlers.jsonUpdate.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "sns-monitor.fullname" . }}-json-update
+  labels:
+    {{- include "sns-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: json-update
+spec:
+  schedule: "{{ .Values.crawlers.jsonUpdate.schedule }}"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 300
+      template:
+        spec:
+          # Pod Identity를 사용하므로 ServiceAccount 명시 필요
+          serviceAccountName: {{ .Values.serviceAccount.name | default (include "sns-monitor.fullname" .) }}
+          {{- with .Values.appImages.pullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            {{- include "sns-monitor.podSecurityContext" . | nindent 12 }}
+          restartPolicy: OnFailure
+          tolerations:
+            - key: "low-priority-arm-al2023"
+              operator: "Exists"
+              effect: "NoSchedule"
+            - key: "high-priority-arm-al2023"
+              operator: "Exists"
+              effect: "NoSchedule"
+          affinity:
+            podAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                podAffinityTerm:
+                  labelSelector:
+                    matchLabels:
+                      app.kubernetes.io/name: {{ include "sns-monitor.name" . }}
+                      app.kubernetes.io/component: api-backend
+                  topologyKey: kubernetes.io/hostname
+          containers:
+            - name: json-update
+              image: "{{ .Values.appImages.registry }}/{{ .Values.apiBackend.image.repository }}:{{ .Values.apiBackend.image.tag }}"
+              command: ["python", "update_all_members_json.py"]
+              securityContext:
+                {{- include "sns-monitor.containerSecurityContext" . | nindent 16 }}
+              env:
+                - name: LOCAL_MODE
+                  value: "true"
+                - name: LOCAL_DATA_DIR
+                  value: "/app/local-data"
+              resources:
+                limits:
+                  cpu: 100m
+                  memory: 128Mi
+                requests:
+                  cpu: 25m
+                  memory: 64Mi
+              volumeMounts:
+                - name: local-data
+                  mountPath: /app/local-data
+          volumes:
+            - name: local-data
+              persistentVolumeClaim:
+                claimName: {{ include "sns-monitor.fullname" . }}-local-data
+{{- end }}
+---
+{{- if .Values.crawlers.twitter.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "sns-monitor.fullname" . }}-twitter-crawler
+  labels:
+    {{- include "sns-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: twitter-crawler
+spec:
+  schedule: "{{ .Values.crawlers.twitter.schedule }}"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 900
+      template:
+        spec:
+          # Pod Identity를 사용하므로 ServiceAccount 명시 필요
+          serviceAccountName: {{ .Values.serviceAccount.name | default (include "sns-monitor.fullname" .) }}
+          {{- with .Values.appImages.pullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            {{- include "sns-monitor.podSecurityContext" . | nindent 12 }}
+          restartPolicy: OnFailure
+          containers:
+            - name: twitter-crawler
+              image: "{{ .Values.appImages.registry }}/{{ .Values.crawlers.twitter.image.repository }}:{{ .Values.crawlers.twitter.image.tag }}"
+              securityContext:
+                {{- include "sns-monitor.containerSecurityContext" . | nindent 16 }}
+              env:
+                - name: TWITTER_BEARER_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "sns-monitor.fullname" . }}-secrets
+                      key: twitter-bearer-token
+                      optional: true
+                - name: LOCAL_MODE
+                  value: "false"
+                - name: API_ENDPOINT
+                  value: "http://{{ include "sns-monitor.fullname" . }}-api-backend:8080"
+              resources:
+                {{- toYaml .Values.crawlers.twitter.resources | nindent 16 }}
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+{{- end }}

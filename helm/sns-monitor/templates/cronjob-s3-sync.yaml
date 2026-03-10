@@ -1,0 +1,192 @@
+{{- if .Values.s3Sync.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "sns-monitor.fullname" . }}-s3-sync-script
+  labels:
+    {{- include "sns-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: s3-sync
+data:
+  s3_sync.py: |
+    #!/usr/bin/env python3
+    """S3 데이터 동기화 스크립트 (비용 최적화)"""
+    import json, os, sys, boto3, hashlib
+    from datetime import datetime, timedelta
+
+    LOCAL_DATA_DIR = os.environ.get('LOCAL_DATA_DIR', '/app/local-data')
+    S3_BUCKET = os.environ.get('S3_BUCKET', '')
+    AWS_REGION = os.environ.get('AWS_DEFAULT_REGION', 'ap-northeast-2')
+    S3_PREFIX = os.environ.get('S3_PREFIX', 'data')
+    MAX_AGE_DAYS = int(os.environ.get('MAX_AGE_DAYS', '30'))
+    SYNC_DIRS = ['vuddy', 'dcinside', 'youtube', 'metadata']
+
+    def init_s3():
+        return boto3.client('s3', region_name=AWS_REGION)
+
+    def get_md5(fp):
+        h = hashlib.md5()
+        with open(fp, "rb") as f:
+            for chunk in iter(lambda: f.read(4096), b""):
+                h.update(chunk)
+        return h.hexdigest()
+
+    def get_etag(s3, key):
+        try:
+            return s3.head_object(Bucket=S3_BUCKET, Key=key)['ETag'].strip('"')
+        except:
+            return None
+
+    def sync_to_s3(s3, local_path, s3_key):
+        if not os.path.exists(local_path):
+            return 'error'
+        md5 = get_md5(local_path)
+        if get_etag(s3, s3_key) == md5:
+            return 'skip'
+        try:
+            with open(local_path, 'rb') as f:
+                s3.put_object(Bucket=S3_BUCKET, Key=s3_key, Body=f,
+                    StorageClass='INTELLIGENT_TIERING', ServerSideEncryption='AES256',
+                    ContentType='application/json')
+            return 'ok'
+        except Exception as e:
+            print(f"Error: {e}")
+            return 'error'
+
+    def backup():
+        print(f"📤 {LOCAL_DATA_DIR} → s3://{S3_BUCKET}/{S3_PREFIX}/")
+        stats = {'ok': 0, 'skip': 0, 'error': 0}
+        s3 = init_s3()
+        for d in SYNC_DIRS:
+            dp = os.path.join(LOCAL_DATA_DIR, d)
+            if not os.path.exists(dp):
+                continue
+            print(f"📁 {d}")
+            for root, _, files in os.walk(dp):
+                for fn in files:
+                    if not fn.endswith('.json'):
+                        continue
+                    lp = os.path.join(root, fn)
+                    rp = os.path.relpath(lp, LOCAL_DATA_DIR)
+                    r = sync_to_s3(s3, lp, f"{S3_PREFIX}/{rp}")
+                    stats[r] = stats.get(r, 0) + 1
+                    if r == 'ok':
+                        print(f"  ✅ {rp}")
+        return stats
+
+    def cleanup(s3):
+        if MAX_AGE_DAYS <= 0:
+            return 0
+        cutoff = datetime.utcnow() - timedelta(days=MAX_AGE_DAYS)
+        deleted = 0
+        pag = s3.get_paginator('list_objects_v2')
+        for page in pag.paginate(Bucket=S3_BUCKET, Prefix=S3_PREFIX):
+            for obj in page.get('Contents', []):
+                if obj['LastModified'].replace(tzinfo=None) < cutoff:
+                    s3.delete_object(Bucket=S3_BUCKET, Key=obj['Key'])
+                    deleted += 1
+        return deleted
+
+    def main():
+        if not S3_BUCKET:
+            print("❌ S3_BUCKET not set")
+            sys.exit(1)
+        print("=" * 50)
+        print("🔄 SNS Monitor S3 Sync")
+        try:
+            s3 = init_s3()
+            s3.head_bucket(Bucket=S3_BUCKET)
+        except Exception as e:
+            print(f"❌ S3 error: {e}")
+            sys.exit(1)
+        stats = backup()
+        deleted = cleanup(s3)
+        print(f"\n📊 ok={stats.get('ok',0)} skip={stats.get('skip',0)} err={stats.get('error',0)} cleaned={deleted}")
+        print("✅ Done")
+
+    if __name__ == '__main__':
+        main()
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "sns-monitor.fullname" . }}-s3-sync
+  labels:
+    {{- include "sns-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: s3-sync
+spec:
+  schedule: "{{ .Values.s3Sync.schedule | default "0 */6 * * *" }}"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 1
+  startingDeadlineSeconds: 600
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 1800
+      template:
+        spec:
+          # Pod Identity를 사용하므로 ServiceAccount 명시 필요
+          serviceAccountName: {{ .Values.serviceAccount.name | default (include "sns-monitor.fullname" .) }}
+          restartPolicy: OnFailure
+          securityContext:
+            {{- include "sns-monitor.podSecurityContext" . | nindent 12 }}
+          # Tolerations for ARM nodes
+          tolerations:
+            - key: "low-priority-arm-al2023"
+              operator: "Exists"
+              effect: "NoSchedule"
+            - key: "high-priority-arm-al2023"
+              operator: "Exists"
+              effect: "NoSchedule"
+          # API Backend와 같은 노드에서 실행 (PVC 접근) - preferred로 변경하여 스케일 다운 시에도 실행 가능
+          affinity:
+            podAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                podAffinityTerm:
+                  labelSelector:
+                    matchLabels:
+                      app.kubernetes.io/name: {{ include "sns-monitor.name" . }}
+                      app.kubernetes.io/component: api-backend
+                  topologyKey: kubernetes.io/hostname
+          containers:
+            - name: s3-sync
+              image: python:3.11-slim
+              imagePullPolicy: IfNotPresent
+              securityContext:
+                {{- include "sns-monitor.containerSecurityContext" . | nindent 16 }}
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  pip install -q boto3 && python /scripts/s3_sync.py
+              env:
+                - name: S3_BUCKET
+                  value: "{{ .Values.config.s3Bucket }}"
+                - name: S3_PREFIX
+                  value: "{{ .Values.config.s3Prefix | default "data" }}"
+                - name: LOCAL_DATA_DIR
+                  value: "{{ .Values.config.localDataDir | default "/app/local-data" }}"
+                - name: MAX_AGE_DAYS
+                  value: "{{ .Values.s3Sync.maxAgeDays | default "30" }}"
+                - name: AWS_DEFAULT_REGION
+                  value: "{{ .Values.config.awsRegion | default "ap-northeast-2" }}"
+                # Pod Identity를 사용하므로 AWS 자격증명 환경 변수 불필요
+                # Pod Identity Agent가 자동으로 AWS 자격 증명을 주입합니다
+              resources:
+                {{- toYaml .Values.s3Sync.resources | nindent 16 }}
+              volumeMounts:
+                - name: local-data
+                  mountPath: /app/local-data
+                  readOnly: true
+                - name: sync-script
+                  mountPath: /scripts
+          volumes:
+            - name: local-data
+              persistentVolumeClaim:
+                claimName: {{ include "sns-monitor.fullname" . }}-local-data
+            - name: sync-script
+              configMap:
+                name: {{ include "sns-monitor.fullname" . }}-s3-sync-script
+                defaultMode: 0755
+{{- end }}

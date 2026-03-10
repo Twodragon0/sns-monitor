@@ -1,0 +1,17 @@
+{{- if .Values.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "sns-monitor.fullname" . }}-local-data
+  labels:
+    {{- include "sns-monitor.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.persistence.localData.accessMode }}
+  {{- if .Values.persistence.localData.storageClass }}
+  storageClassName: {{ .Values.persistence.localData.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.localData.size }}
+{{- end }}

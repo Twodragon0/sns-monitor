@@ -1,0 +1,7 @@
+aws_account_id = "123456789012"
+github_org = "your-org"
+github_repo = "sns-monitor"
+eks_cluster_name = "your-cluster"
+kubernetes_namespace = "platform"
+s3_bucket_name = "sns-monitor-data"
+sns_monitor_service_account_name = "sns-monitoring"

@@ -1,0 +1,22 @@
+FROM python:3.11-alpine
+
+# 작업 디렉토리 설정
+WORKDIR /app
+
+# curl 설치 (dcron 제거 - Docker에서 권한 문제 발생)
+RUN apk add --no-cache curl
+
+# Python 패키지
+RUN pip install --no-cache-dir requests
+
+# 스크립트 복사
+COPY scheduler/scheduler.sh /app/scheduler.sh
+COPY scheduler/run_crawlers.sh /app/run_crawlers.sh
+
+# 실행 권한 부여
+RUN chmod +x /app/scheduler.sh /app/run_crawlers.sh
+
+# 로그 디렉토리 생성
+RUN mkdir -p /var/log && touch /var/log/scheduler.log
+
+CMD ["/bin/sh", "/app/scheduler.sh"]

@@ -1,0 +1,159 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: youtube-crawler-schedule
+  namespace: sns-monitor
+  labels:
+    app: youtube-crawler
+    component: crawler
+spec:
+  # 30분마다 실행
+  schedule: "*/30 * * * *"
+  # 동시 실행 방지
+  concurrencyPolicy: Forbid
+  # 실패한 Job 보관 기간
+  failedJobsHistoryLimit: 3
+  # 성공한 Job 보관 기간
+  successfulJobsHistoryLimit: 1
+  # Job 시작 시간 제한 (선택사항)
+  startingDeadlineSeconds: 300
+  jobTemplate:
+    spec:
+      # Job 타임아웃 (1시간)
+      activeDeadlineSeconds: 3600
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app: youtube-crawler
+            component: crawler
+            job-type: scheduled
+        spec:
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+          - name: youtube-crawler
+            image: sns-monitoring-system-youtube-crawler:latest
+            imagePullPolicy: IfNotPresent
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop:
+                  - ALL
+            command:
+            - python
+            - /app/lambda_function.py
+            args:
+            - '{"type": "comprehensive", "max_creators": 20}'
+            env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: sns-monitor-config
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: sns-monitor-secrets
+                  key: AWS_SECRET_ACCESS_KEY
+            - name: AWS_DEFAULT_REGION
+              valueFrom:
+                configMapKeyRef:
+                  name: sns-monitor-config
+                  key: AWS_DEFAULT_REGION
+            - name: S3_BUCKET
+              valueFrom:
+                configMapKeyRef:
+                  name: sns-monitor-config
+                  key: S3_BUCKET
+            - name: DYNAMODB_TABLE
+              valueFrom:
+                configMapKeyRef:
+                  name: sns-monitor-config
+                  key: DYNAMODB_TABLE
+            - name: DYNAMODB_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: sns-monitor-config
+                  key: DYNAMODB_ENDPOINT
+            - name: S3_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: sns-monitor-config
+                  key: S3_ENDPOINT
+            - name: YOUTUBE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: sns-monitor-secrets
+                  key: YOUTUBE_API_KEY
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: sns-monitor-config
+                  key: REDIS_HOST
+            - name: REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: sns-monitor-config
+                  key: REDIS_PORT
+            - name: LLM_ANALYZER_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: sns-monitor-config
+                  key: LLM_ANALYZER_ENDPOINT
+            - name: LOCAL_MODE
+              valueFrom:
+                configMapKeyRef:
+                  name: sns-monitor-config
+                  key: LOCAL_MODE
+            - name: LOCAL_DATA_DIR
+              valueFrom:
+                configMapKeyRef:
+                  name: sns-monitor-config
+                  key: LOCAL_DATA_DIR
+            resources:
+              requests:
+                memory: "512Mi"
+                cpu: "250m"
+              limits:
+                memory: "2Gi"
+                cpu: "1000m"
+            volumeMounts:
+            - name: local-data
+              mountPath: /app/local-data
+          volumes:
+          - name: local-data
+            persistentVolumeClaim:
+              claimName: local-data-pvc
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
