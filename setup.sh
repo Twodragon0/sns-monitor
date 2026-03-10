@@ -57,7 +57,7 @@ YOUTUBE_CHANNELS=@YourChannelHandle1,@YourChannelHandle2
 RSS_FEEDS=https://news.naver.com/main/rss/section.naver?sid=105,https://news.daum.net/rss/it,https://www.bloter.net/rss,https://www.zdnet.co.kr/rss/all.xml,https://news.naver.com/main/rss/section.naver?sid=106
 
 # Vuddy 설정
-VUDDY_URL=https://example.com
+VUDDY_URL=https://vuddy.io
 
 # Google 검색 설정 (선택사항)
 # Google Custom Search API 키가 있으면 설정 (무료 할당량: 일일 100회)
