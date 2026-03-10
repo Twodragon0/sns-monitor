@@ -108,7 +108,7 @@ The following table lists the configurable parameters and their default values.
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `config.searchKeywords` | Keywords to monitor | `Levvels,Vuddy,굿즈` |
+| `config.searchKeywords` | Keywords to monitor | `ExampleCorp,CreatorBrand,goods` |
 | `config.localMode` | Enable local mode | `false` |
 | `config.s3Bucket` | S3 bucket name | `sns-monitor-data` |
 

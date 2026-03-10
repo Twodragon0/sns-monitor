@@ -50,14 +50,14 @@ TELEGRAM_CHANNELS=
 SEARCH_KEYWORDS=ExampleCorp,CreatorBrand,굿즈
 
 # YouTube 채널 (인수한 회사 및 주요 크리에이터)
-YOUTUBE_CHANNELS=@IVNITOFFICIAL,@BARABARA_KR
+YOUTUBE_CHANNELS=@YourChannelHandle1,@YourChannelHandle2
 
 # RSS 피드 (선택사항)
 # 한국 주요 뉴스 사이트 RSS 피드 (기본값)
 RSS_FEEDS=https://news.naver.com/main/rss/section.naver?sid=105,https://news.daum.net/rss/it,https://www.bloter.net/rss,https://www.zdnet.co.kr/rss/all.xml,https://news.naver.com/main/rss/section.naver?sid=106
 
 # Vuddy 설정
-VUDDY_URL=https://vuddy.io
+VUDDY_URL=https://example.com
 
 # Google 검색 설정 (선택사항)
 # Google Custom Search API 키가 있으면 설정 (무료 할당량: 일일 100회)

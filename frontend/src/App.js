@@ -1,10 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import './App.css';
 import Dashboard from './components/Dashboard';
-import ArchiveStudioDetail from './components/ArchiveStudioDetail';
-import SkoshismDetail from './components/SkoshismDetail';
-import BarabaraDetail from './components/BarabaraDetail';
-import PsyChordDetail from './components/PsyChordDetail';
+import CreatorDetail from './components/CreatorDetail';
 import URLAnalyzer from './components/URLAnalyzer';
 import { ToastContainer, useToast } from './components/Toast';
 
@@ -116,25 +113,11 @@ function App() {
     const path = currentPath || window.location.pathname;
     console.log('🔍 renderMainContent - path:', path, 'currentPath:', currentPath, 'window.location.pathname:', window.location.pathname);
 
-    // /akaiv-studio 경로 체크 (정확한 매칭 또는 포함)
-    if (path === '/akaiv-studio' || path.startsWith('/akaiv-studio')) {
-      console.log('✅ Rendering ArchiveStudioDetail for path:', path);
-      return <ArchiveStudioDetail />;
-    }
-    // /skoshism 경로 체크
-    if (path === '/skoshism' || path.startsWith('/skoshism')) {
-      console.log('✅ Rendering SkoshismDetail for path:', path);
-      return <SkoshismDetail />;
-    }
-    // /barabara 경로 체크
-    if (path === '/barabara' || path.startsWith('/barabara')) {
-      console.log('✅ Rendering BarabaraDetail for path:', path);
-      return <BarabaraDetail />;
-    }
-    // /psy-chord 경로 체크
-    if (path === '/psy-chord' || path.startsWith('/psy-chord')) {
-      console.log('✅ Rendering PsyChordDetail for path:', path);
-      return <PsyChordDetail />;
+    // /creator/:id route
+    if (path.startsWith('/creator/')) {
+      const creatorId = path.split('/creator/')[1];
+      console.log('✅ Rendering CreatorDetail for path:', path);
+      return <CreatorDetail creatorId={creatorId} />;
     }
     // /analyze 경로 체크
     if (path === '/analyze' || path.startsWith('/analyze')) {
@@ -146,10 +129,7 @@ function App() {
 
   // 현재 경로 확인
   const path = currentPath || window.location.pathname;
-  const isDetailPage = (path === '/akaiv-studio' || path.startsWith('/akaiv-studio')) ||
-                       (path === '/skoshism' || path.startsWith('/skoshism')) ||
-                       (path === '/barabara' || path.startsWith('/barabara')) ||
-                       (path === '/psy-chord' || path.startsWith('/psy-chord')) ||
+  const isDetailPage = path.startsWith('/creator/') ||
                        (path === '/analyze' || path.startsWith('/analyze'));
 
   return (

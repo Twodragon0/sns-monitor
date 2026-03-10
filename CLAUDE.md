@@ -100,7 +100,7 @@ User → Frontend (React :3000)
 **Frontend** (`frontend/src/components/`):
 - `URLAnalyzer.jsx` - URL input and analysis results with sentiment charts
 - `Dashboard.jsx` - Main monitoring dashboard
-- Detail pages: `ArchiveStudioDetail`, `BarabaraDetail`, `PsyChordDetail`, `SkoshismDetail`
+- `*Detail.jsx` - Creator detail pages (one per monitored creator)
 
 **API Endpoints:**
 - `POST /api/analyze/url` - Analyze any supported URL `{"url": "https://..."}`
