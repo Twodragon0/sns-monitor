@@ -1072,7 +1072,17 @@ function Dashboard() {
                     {PLATFORM_INFO[analyzeResult.platform]?.name || analyzeResult.platform}
                   </span>
                   <h3 style={{ fontSize: '18px', margin: 0, flex: 1, color: '#1a1a2e' }}>
-                    {analyzeResult.title || analyzeResult.gallery_id || analyzeResult.subreddit || 'Analysis Result'}
+                    {analyzeResult.url || analyzeUrl ? (
+                      <a href={analyzeResult.url || analyzeUrl} target="_blank" rel="noopener noreferrer"
+                        style={{ color: '#1a1a2e', textDecoration: 'none' }}
+                        onMouseEnter={(e) => e.target.style.color = '#1a73e8'}
+                        onMouseLeave={(e) => e.target.style.color = '#1a1a2e'}
+                      >
+                        {analyzeResult.title || analyzeResult.gallery_id || analyzeResult.subreddit || 'Analysis Result'} ↗
+                      </a>
+                    ) : (
+                      analyzeResult.title || analyzeResult.gallery_id || analyzeResult.subreddit || 'Analysis Result'
+                    )}
                   </h3>
                   {analyzeResult.analyzed_at && (
                     <span style={{ fontSize: '12px', color: '#999' }}>
@@ -1179,38 +1189,136 @@ function Dashboard() {
                   </div>
                 )}
 
-                {/* Items (comments/posts/videos) */}
-                {(() => {
-                  const items = analyzeResult.comments || analyzeResult.posts || analyzeResult.recent_videos || [];
-                  if (items.length === 0) return null;
-                  const label = analyzeResult.comments ? 'Comments' : analyzeResult.recent_videos ? 'Recent Videos' : 'Posts';
-                  return (
-                    <div style={{ padding: '16px 20px' }}>
-                      <h4 style={{ margin: '0 0 12px', fontSize: '15px', color: '#1a1a2e' }}>
-                        {label} ({items.length})
-                      </h4>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {items.slice(0, 15).map((item, idx) => (
-                          <div key={idx} style={{
-                            padding: '10px 14px', border: '1px solid #eee',
-                            borderRadius: '8px', background: '#fff',
-                          }}>
-                            <div style={{ marginBottom: '4px', lineHeight: 1.4, color: '#333', wordBreak: 'break-word', fontSize: '14px' }}>
-                              {item.text || item.title || item.selftext || ''}
-                            </div>
-                            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', fontSize: '12px', color: '#888' }}>
-                              {item.author && <span style={{ fontWeight: 600, color: '#555' }}>{item.author}</span>}
-                              {item.like_count != null && <span>👍 {formatAnalyzeNumber(item.like_count)}</span>}
-                              {item.view_count != null && <span>👁 {formatAnalyzeNumber(item.view_count)}</span>}
-                              {item.recommend != null && <span>👍 {item.recommend}</span>}
-                              {(item.published_at || item.date) && <span>{item.published_at || item.date}</span>}
+                {/* YouTube Comments */}
+                {analyzeResult.comments && analyzeResult.comments.length > 0 && (
+                  <div style={{ padding: '16px 20px' }}>
+                    <h4 style={{ margin: '0 0 12px', fontSize: '15px', color: '#1a1a2e' }}>
+                      💬 댓글 ({analyzeResult.comments.length})
+                    </h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {analyzeResult.comments.slice(0, 30).map((comment, idx) => (
+                        <div key={idx} style={{
+                          padding: '10px 14px', border: '1px solid #eee',
+                          borderRadius: '8px', background: '#fff',
+                        }}>
+                          <div style={{ marginBottom: '4px', lineHeight: 1.5, color: '#333', wordBreak: 'break-word', fontSize: '14px' }}
+                            dangerouslySetInnerHTML={{ __html: comment.text || '' }}
+                          />
+                          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', fontSize: '12px', color: '#888' }}>
+                            {comment.author && <span style={{ fontWeight: 600, color: '#555' }}>{comment.author}</span>}
+                            {comment.like_count != null && <span>👍 {formatAnalyzeNumber(comment.like_count)}</span>}
+                            {comment.published_at && <span>{new Date(comment.published_at).toLocaleDateString('ko-KR')}</span>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Recent Videos */}
+                {analyzeResult.recent_videos && analyzeResult.recent_videos.length > 0 && (
+                  <div style={{ padding: '16px 20px' }}>
+                    <h4 style={{ margin: '0 0 12px', fontSize: '15px', color: '#1a1a2e' }}>
+                      🎬 최근 동영상 ({analyzeResult.recent_videos.length})
+                    </h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {analyzeResult.recent_videos.slice(0, 15).map((video, idx) => (
+                        <div key={idx} style={{
+                          padding: '10px 14px', border: '1px solid #eee',
+                          borderRadius: '8px', background: '#fff',
+                        }}>
+                          <a href={video.url || `https://www.youtube.com/watch?v=${video.video_id}`}
+                            target="_blank" rel="noopener noreferrer"
+                            style={{ color: '#1a73e8', textDecoration: 'none', fontWeight: 600, fontSize: '14px', lineHeight: 1.4 }}
+                          >
+                            {video.title || video.video_id}
+                          </a>
+                          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', fontSize: '12px', color: '#888', marginTop: '4px' }}>
+                            {video.view_count != null && <span>👁 {formatAnalyzeNumber(video.view_count)}</span>}
+                            {video.likes != null && <span>👍 {formatAnalyzeNumber(video.likes)}</span>}
+                            {video.published_at && <span>{new Date(video.published_at).toLocaleDateString('ko-KR')}</span>}
+                            {video.description && <span style={{ color: '#999' }}>{video.description.substring(0, 80)}...</span>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* DC/Twitter Posts with Comments */}
+                {analyzeResult.posts && analyzeResult.posts.length > 0 && (
+                  <div style={{ padding: '16px 20px' }}>
+                    <h4 style={{ margin: '0 0 12px', fontSize: '15px', color: '#1a1a2e' }}>
+                      📝 게시글 ({analyzeResult.posts.length})
+                    </h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {analyzeResult.posts.slice(0, 20).map((post, idx) => (
+                        <div key={idx} style={{
+                          border: '1px solid #e0e0e0', borderRadius: '10px', background: '#fff', overflow: 'hidden',
+                        }}>
+                          {/* Post header */}
+                          <div style={{ padding: '12px 14px', borderBottom: (post.comments && post.comments.length > 0) ? '1px solid #f0f0f0' : 'none' }}>
+                            {post.url ? (
+                              <a href={post.url} target="_blank" rel="noopener noreferrer"
+                                style={{ color: '#1a73e8', textDecoration: 'none', fontWeight: 600, fontSize: '14px', lineHeight: 1.4 }}
+                              >
+                                {post.title || post.text || '(제목 없음)'}
+                              </a>
+                            ) : (
+                              <div style={{ fontWeight: 600, fontSize: '14px', color: '#333', lineHeight: 1.4 }}>
+                                {post.title || post.text || '(제목 없음)'}
+                              </div>
+                            )}
+                            {post.content && (
+                              <div style={{ marginTop: '6px', fontSize: '13px', color: '#555', lineHeight: 1.5, wordBreak: 'break-word' }}>
+                                {post.content.length > 200 ? post.content.substring(0, 200) + '...' : post.content}
+                              </div>
+                            )}
+                            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', fontSize: '12px', color: '#888', marginTop: '6px' }}>
+                              {post.author && <span style={{ fontWeight: 600, color: '#555' }}>{post.author}</span>}
+                              {post.date && <span>{post.date}</span>}
+                              {post.view_count != null && <span>👁 {post.view_count}</span>}
+                              {post.recommend_count != null && <span>👍 {post.recommend_count}</span>}
+                              {post.comment_count != null && <span>💬 {post.comment_count}</span>}
+                              {post.like_count != null && <span>👍 {formatAnalyzeNumber(post.like_count)}</span>}
+                              {post.retweet_count != null && <span>🔄 {post.retweet_count}</span>}
                             </div>
                           </div>
-                        ))}
-                      </div>
+                          {/* Comments within this post */}
+                          {post.comments && post.comments.length > 0 && (
+                            <div style={{ padding: '8px 14px 12px', background: '#fafafa' }}>
+                              <div style={{ fontSize: '12px', fontWeight: 600, color: '#666', marginBottom: '6px' }}>
+                                💬 댓글 ({post.comments.length}개)
+                              </div>
+                              {post.comments.slice(0, 10).map((comment, cidx) => {
+                                const commentText = comment.text || comment.content || '';
+                                return (
+                                  <div key={cidx} style={{
+                                    padding: '6px 10px', marginBottom: '4px', borderRadius: '6px',
+                                    background: '#fff', border: '1px solid #eee', fontSize: '13px',
+                                  }}>
+                                    <div style={{ color: '#333', lineHeight: 1.4, wordBreak: 'break-word' }}>
+                                      {commentText || '(내용 없음)'}
+                                    </div>
+                                    <div style={{ fontSize: '11px', color: '#999', marginTop: '3px' }}>
+                                      {comment.author || '익명'}
+                                      {comment.date ? ` · ${comment.date}` : ''}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                              {post.comments.length > 10 && (
+                                <div style={{ fontSize: '12px', color: '#999', textAlign: 'center', marginTop: '4px' }}>
+                                  +{post.comments.length - 10}개 더 있음
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
-                  );
-                })()}
+                  </div>
+                )}
               </div>
             )}
 

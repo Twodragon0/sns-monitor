@@ -3544,6 +3544,7 @@ def _analyze_youtube_url(url):
                         if comments:
                             result['comments'] = comments[:20]
                             result['analysis'] = _simple_sentiment_analysis(comments)
+                        result['url'] = f'https://www.youtube.com/watch?v={video_id}'
                         return result
 
             elif channel_handle:
@@ -3627,11 +3628,13 @@ def _fetch_channel_recent_videos(channel_id, api_key):
             data = resp.json()
             videos = []
             for item in data.get('items', []):
+                vid = item['id'].get('videoId', '')
                 videos.append({
                     'title': item['snippet'].get('title', ''),
-                    'video_id': item['id'].get('videoId', ''),
+                    'video_id': vid,
                     'published_at': item['snippet'].get('publishedAt', ''),
                     'description': item['snippet'].get('description', '')[:200],
+                    'url': f'https://www.youtube.com/watch?v={vid}' if vid else '',
                 })
             return videos
     except Exception as e:
@@ -3735,11 +3738,21 @@ def _analyze_dcinside_url(url):
 
             posts = data.get('posts', [])
             if posts:
-                result['posts'] = posts[:20]
-                # Build analysis from posts
+                # Include comments for each post and add URL
+                enriched_posts = []
+                for p in posts[:20]:
+                    post_data = dict(p)
+                    # Add direct URL if not present
+                    if not post_data.get('url') and gallery_id and post_data.get('post_id'):
+                        post_data['url'] = f'https://gall.dcinside.com/mgallery/board/view/?id={gallery_id}&no={post_data["post_id"]}'
+                    enriched_posts.append(post_data)
+                result['posts'] = enriched_posts
+                # Build analysis from posts and comments
                 all_texts = []
                 for p in posts:
                     all_texts.append({'text': p.get('title', '') + ' ' + p.get('content', '')})
+                    for c in p.get('comments', []):
+                        all_texts.append({'text': c.get('text', '') or c.get('content', '')})
                 result['analysis'] = _simple_sentiment_analysis(all_texts)
             return result
         except Exception:
