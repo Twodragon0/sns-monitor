@@ -30,6 +30,8 @@ services:
       - LOCAL_DATA_DIR=/app/local-data
       - FLASK_DEBUG=${FLASK_DEBUG:-false}
       - MIROFISH_ENDPOINT=http://mirofish:5001
+      - DISABLE_SSL_VERIFY=${DISABLE_SSL_VERIFY:-true}
+      - TWITTER_BEARER_TOKEN=${TWITTER_BEARER_TOKEN:-}
     volumes:
       - ./local-data:/app/local-data:rw
     depends_on:

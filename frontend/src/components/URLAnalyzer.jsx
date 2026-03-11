@@ -9,6 +9,7 @@ const PLATFORM_INFO = {
   reddit: { name: 'Reddit', color: '#FF4500', icon: '🔗' },
   telegram: { name: 'Telegram', color: '#0088cc', icon: '✈' },
   kakao: { name: 'Kakao', color: '#FEE500', icon: '💬' },
+  twitter: { name: 'X (Twitter)', color: '#000000', icon: '𝕏' },
 };
 
 const SENTIMENT_COLORS = {
@@ -27,6 +28,7 @@ function detectPlatform(url) {
   if (lower.includes('reddit.com')) return 'reddit';
   if (lower.includes('t.me/')) return 'telegram';
   if (lower.includes('kakao.com')) return 'kakao';
+  if (lower.includes('x.com') || lower.includes('twitter.com')) return 'twitter';
   return null;
 }
 
@@ -148,6 +150,22 @@ function AnalysisResult({ result }) {
   const platform = PLATFORM_INFO[result.platform] || { name: result.platform, color: '#666' };
   const analysis = result.analysis;
   const items = result.comments || result.posts || result.recent_videos || [];
+  const [summary, setSummary] = useState(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState(null);
+
+  const handleSummarize = async () => {
+    setSummaryLoading(true);
+    setSummaryError(null);
+    try {
+      const resp = await axios.post(`${API_BASE}/api/analyze/summarize`, { result });
+      setSummary(resp.data);
+    } catch (err) {
+      setSummaryError(err.response?.data?.error || err.message || 'Summarization failed');
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
 
   const sentimentData = analysis ? [
     { name: 'Positive', value: analysis.sentiment.positive, color: SENTIMENT_COLORS.positive },
@@ -163,7 +181,7 @@ function AnalysisResult({ result }) {
         <div className="result-platform" style={{ backgroundColor: platform.color }}>
           {platform.name}
         </div>
-        <h2>{result.title || result.gallery_id || result.subreddit || result.channel_name || 'Analysis Result'}</h2>
+        <h2>{result.title || result.gallery_id || result.subreddit || result.channel_name || result.username || 'Analysis Result'}</h2>
         {result.analyzed_at && (
           <span className="result-time">
             {new Date(result.analyzed_at).toLocaleString('ko-KR')}
@@ -182,6 +200,30 @@ function AnalysisResult({ result }) {
         {result.total_posts != null && <StatCard label="Posts" value={formatNumber(result.total_posts)} />}
         {result.total_messages != null && <StatCard label="Messages" value={formatNumber(result.total_messages)} />}
         {result.score != null && <StatCard label="Score" value={formatNumber(result.score)} />}
+        {result.follower_count != null && <StatCard label="Followers" value={formatNumber(result.follower_count)} />}
+        {result.following_count != null && <StatCard label="Following" value={formatNumber(result.following_count)} />}
+        {result.tweet_count != null && <StatCard label="Tweets" value={formatNumber(result.tweet_count)} />}
+        {result.retweet_count != null && <StatCard label="Retweets" value={formatNumber(result.retweet_count)} />}
+        {result.reply_count != null && <StatCard label="Replies" value={formatNumber(result.reply_count)} />}
+      </div>
+
+      <div className="ai-summary-section">
+        <button
+          className="summarize-button"
+          onClick={handleSummarize}
+          disabled={summaryLoading}
+        >
+          {summaryLoading ? '🤖 분석 중...' : '🤖 AI 요약'}
+        </button>
+        {summaryError && <div className="error-message">{summaryError}</div>}
+        {summary && (
+          <div className="summary-content">
+            <div className="summary-source">
+              {summary.source === 'mirofish' ? '🐟 MiroFish AI' : '📊 로컬 분석'}
+            </div>
+            <div className="summary-text">{summary.summary}</div>
+          </div>
+        )}
       </div>
 
       {result.description && (

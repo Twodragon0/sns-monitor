@@ -207,6 +207,57 @@
   text-transform: uppercase;
 }
 
+/* AI Summary */
+.ai-summary-section {
+  padding: 16px 24px;
+  border-bottom: 1px solid #eee;
+}
+
+.summarize-button {
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+}
+
+.summarize-button:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.summarize-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.summary-content {
+  margin-top: 12px;
+  padding: 16px;
+  background: #f8f9ff;
+  border-radius: 8px;
+  border: 1px solid #e0e4f5;
+}
+
+.summary-source {
+  font-size: 12px;
+  color: #667eea;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.summary-text {
+  color: #333;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 14px;
+}
+
 .result-description {
   padding: 16px 24px;
   border-bottom: 1px solid #eee;

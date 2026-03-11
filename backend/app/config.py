@@ -26,6 +26,12 @@ class Config:
     # YouTube
     YOUTUBE_API_KEY = os.environ.get('YOUTUBE_API_KEY', '')
 
+    # X (Twitter) API v2
+    TWITTER_BEARER_TOKEN = os.environ.get('TWITTER_BEARER_TOKEN', '')
+
+    # MiroFish AI
+    MIROFISH_ENDPOINT = os.environ.get('MIROFISH_ENDPOINT', 'http://mirofish:5001')
+
     # AWS (only used when LOCAL_MODE=false)
     S3_BUCKET = os.environ.get('S3_BUCKET', '')
     DYNAMODB_TABLE = os.environ.get('DYNAMODB_TABLE', '')
