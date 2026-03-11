@@ -135,3 +135,10 @@ User → Frontend (React :3000)
 - Validate all external input (whitelist approach)
 - Use `logging` module instead of `print()` in Python
 - No `eval()`, `exec()`, `pickle`
+
+## Centralized Hourly Automation
+
+- Central scheduler and pull runner: `/Users/namyongkim/Desktop/.twodragon0/bin/hourly-opencode-git-pull.sh`
+- Central OpenClaw cron registration: `/Users/namyongkim/Desktop/.twodragon0/bin/setup-openclaw-cron.sh`
+- Central prompt: `/Users/namyongkim/Desktop/.twodragon0/openclaw_ultrawork_prompt.md`
+- Per-repo OpenClaw/OpenCode cron scripts are not used.
