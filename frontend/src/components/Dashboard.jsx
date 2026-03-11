@@ -862,25 +862,6 @@ function Dashboard() {
 
   return (
     <div className="dashboard">
-      {/* URL 분석 바로가기 */}
-      <div className="url-analyze-banner" style={{
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        borderRadius: '12px',
-        padding: '16px 24px',
-        marginBottom: '20px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        cursor: 'pointer',
-        color: 'white',
-      }} onClick={() => { window.history.pushState({}, '', '/analyze'); window.dispatchEvent(new PopStateEvent('popstate')); }}>
-        <div>
-          <h3 style={{ margin: '0 0 4px', fontSize: '16px' }}>URL Analyzer</h3>
-          <p style={{ margin: 0, fontSize: '13px', opacity: 0.85 }}>YouTube, DCInside, Reddit, Telegram, Kakao URL을 붙여넣어 분석하세요</p>
-        </div>
-        <span style={{ fontSize: '24px' }}>→</span>
-      </div>
-
       {/* 통계 카드 */}
       <div className="stats-section">
         <h2>📊 통계</h2>
