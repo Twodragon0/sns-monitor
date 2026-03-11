@@ -3,6 +3,7 @@ import './App.css';
 import Dashboard from './components/Dashboard';
 import CreatorDetail from './components/CreatorDetail';
 import URLAnalyzer from './components/URLAnalyzer';
+import AnalysisTab from './components/AnalysisTab';
 import { ToastContainer, useToast } from './components/Toast';
 
 function App() {
@@ -123,6 +124,10 @@ function App() {
     if (path === '/analyze' || path.startsWith('/analyze')) {
       return <URLAnalyzer />;
     }
+    // /analysis 경로 체크
+    if (path === '/analysis' || path.startsWith('/analysis')) {
+      return <AnalysisTab />;
+    }
     console.log('📊 Rendering Dashboard for path:', path);
     return <Dashboard />;
   };
@@ -130,7 +135,8 @@ function App() {
   // 현재 경로 확인
   const path = currentPath || window.location.pathname;
   const isDetailPage = path.startsWith('/creator/') ||
-                       (path === '/analyze' || path.startsWith('/analyze'));
+                       (path === '/analyze' || path.startsWith('/analyze')) ||
+                       (path === '/analysis' || path.startsWith('/analysis'));
 
   return (
     <div className="App">
