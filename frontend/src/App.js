@@ -120,30 +120,31 @@ function App() {
       console.log('✅ Rendering CreatorDetail for path:', path);
       return <CreatorDetail creatorId={creatorId} />;
     }
-    // /analyze 경로 체크
-    if (path === '/analyze' || path.startsWith('/analyze')) {
-      return <URLAnalyzer />;
+    // /dashboard 경로 체크
+    if (path === '/dashboard' || path.startsWith('/dashboard')) {
+      console.log('📊 Rendering Dashboard for path:', path);
+      return <Dashboard />;
     }
     // /analysis 경로 체크
     if (path === '/analysis' || path.startsWith('/analysis')) {
       return <AnalysisTab />;
     }
-    console.log('📊 Rendering Dashboard for path:', path);
-    return <Dashboard />;
+    // 홈(/) 및 /analyze 모두 URLAnalyzer
+    return <URLAnalyzer />;
   };
 
   // 현재 경로 확인
   const path = currentPath || window.location.pathname;
+  const isDashboard = path === '/dashboard' || path.startsWith('/dashboard');
   const isDetailPage = path.startsWith('/creator/') ||
-                       (path === '/analyze' || path.startsWith('/analyze')) ||
                        (path === '/analysis' || path.startsWith('/analysis'));
 
   return (
     <div className="App">
       {!isDetailPage && (
         <header className="App-header">
-          <h1>📊 SNS 모니터링 시스템</h1>
-          <p>YouTube, Twitter/X, DC인사이드, Vuddy 크리에이터 실시간 모니터링 & AI 분석</p>
+          <h1 style={{ cursor: 'pointer' }} onClick={() => { window.history.pushState({}, '', '/'); }}>🔍 SNS URL Analyzer</h1>
+          <p>YouTube, DCInside, Reddit, Telegram, Kakao, X(Twitter) URL을 붙여넣어 즉시 분석</p>
           <div className="header-status">
             {Object.entries(servicesStatus).map(([name, status]) => (
               <span key={name} className={`service-status-badge ${status}`}>
@@ -152,6 +153,46 @@ function App() {
             ))}
           </div>
         </header>
+      )}
+
+      {!isDetailPage && !isDashboard && (
+        <div className="url-analyze-banner" style={{
+          background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+          borderRadius: '12px',
+          padding: '16px 24px',
+          margin: '0 24px 20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          cursor: 'pointer',
+          color: 'white',
+        }} onClick={() => { window.history.pushState({}, '', '/dashboard'); }}>
+          <div>
+            <h3 style={{ margin: '0 0 4px', fontSize: '16px' }}>📊 모니터링 대시보드</h3>
+            <p style={{ margin: 0, fontSize: '13px', opacity: 0.85 }}>YouTube, Twitter/X, DC인사이드 크리에이터 실시간 모니터링 보기</p>
+          </div>
+          <span style={{ fontSize: '24px' }}>→</span>
+        </div>
+      )}
+
+      {isDashboard && (
+        <div className="url-analyze-banner" style={{
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          borderRadius: '12px',
+          padding: '16px 24px',
+          margin: '0 24px 20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          cursor: 'pointer',
+          color: 'white',
+        }} onClick={() => { window.history.pushState({}, '', '/'); }}>
+          <div>
+            <h3 style={{ margin: '0 0 4px', fontSize: '16px' }}>🔍 URL Analyzer</h3>
+            <p style={{ margin: 0, fontSize: '13px', opacity: 0.85 }}>YouTube, DCInside, Reddit, Telegram, Kakao, X(Twitter) URL을 붙여넣어 분석하세요</p>
+          </div>
+          <span style={{ fontSize: '24px' }}>→</span>
+        </div>
       )}
 
       <main className="App-main">
