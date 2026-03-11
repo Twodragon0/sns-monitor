@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import axios from 'axios';
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import './Dashboard.css';
 
 // Monitoring keywords (generic example for public release)
@@ -169,7 +171,72 @@ function Dashboard() {
   // eslint-disable-next-line no-unused-vars
   const [twitterMonitoringResults, setTwitterMonitoringResults] = useState({}); // 키워드별 모니터링 결과
 
-  // Twitter auto-monitoring keywords (generic example)
+  // URL Analyzer state
+  const [analyzeUrl, setAnalyzeUrl] = useState('');
+  const [analyzeLoading, setAnalyzeLoading] = useState(false);
+  const [analyzeResult, setAnalyzeResult] = useState(null);
+  const [analyzeError, setAnalyzeError] = useState(null);
+  const [analyzeHistory, setAnalyzeHistory] = useState([]);
+  const [showAnalyzer, setShowAnalyzer] = useState(false);
+
+  const API_BASE = process.env.REACT_APP_API_URL || '';
+
+  const detectPlatform = (inputUrl) => {
+    if (!inputUrl) return null;
+    const lower = inputUrl.toLowerCase();
+    if (lower.includes('youtube.com') || lower.includes('youtu.be')) return 'youtube';
+    if (lower.includes('dcinside.com')) return 'dcinside';
+    if (lower.includes('reddit.com')) return 'reddit';
+    if (lower.includes('twitter.com') || lower.includes('x.com')) return 'twitter';
+    if (lower.includes('t.me/')) return 'telegram';
+    return null;
+  };
+
+  const PLATFORM_INFO = {
+    youtube: { name: 'YouTube', color: '#FF0000', icon: '▶' },
+    dcinside: { name: 'DCInside', color: '#2B65EC', icon: '📋' },
+    reddit: { name: 'Reddit', color: '#FF4500', icon: '🔗' },
+    twitter: { name: 'Twitter/X', color: '#1DA1F2', icon: '🐦' },
+    telegram: { name: 'Telegram', color: '#0088cc', icon: '✈' },
+  };
+
+  const SENTIMENT_COLORS = {
+    positive: '#4CAF50',
+    neutral: '#9E9E9E',
+    negative: '#F44336',
+  };
+
+  const handleAnalyzeUrl = useCallback(async (e) => {
+    e.preventDefault();
+    if (!analyzeUrl.trim()) return;
+    setAnalyzeLoading(true);
+    setAnalyzeError(null);
+    setAnalyzeResult(null);
+    try {
+      const response = await axios.post(`${API_BASE}/api/analyze/url`, { url: analyzeUrl.trim() });
+      setAnalyzeResult(response.data);
+      setAnalyzeHistory(prev => [{
+        url: analyzeUrl.trim(),
+        platform: response.data.platform,
+        title: response.data.title || response.data.gallery_id || analyzeUrl.trim(),
+        analyzed_at: response.data.analyzed_at,
+      }, ...prev.slice(0, 9)]);
+    } catch (err) {
+      setAnalyzeError(err.response?.data?.error || err.message || 'Analysis failed');
+    } finally {
+      setAnalyzeLoading(false);
+    }
+  }, [analyzeUrl, API_BASE]);
+
+  const formatAnalyzeNumber = (num) => {
+    if (typeof num === 'string') num = parseInt(num.replace(/[,\s]/g, ''), 10);
+    if (isNaN(num)) return '0';
+    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
+    if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
+    return num.toLocaleString();
+  };
+
+  // Twitter auto-monitoring keywords
   const TWITTER_AUTO_MONITOR_KEYWORDS = [
     'CreatorBrand', 'ExampleCorp', 'ExampleCreator',
     'Creator1', 'Creator2', 'Creator3', 'Creator4',
@@ -890,6 +957,296 @@ function Dashboard() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* URL 분석 섹션 */}
+      <div className="url-analyze-section" style={{ marginBottom: '30px' }}>
+        <div
+          className="url-analyze-toggle"
+          onClick={() => setShowAnalyzer(!showAnalyzer)}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            cursor: 'pointer', padding: '16px 20px',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            borderRadius: showAnalyzer ? '12px 12px 0 0' : '12px',
+            color: 'white', fontWeight: 'bold', fontSize: '16px',
+          }}
+        >
+          <span>🔍 URL 분석 - SNS URL을 붙여넣어 바로 분석</span>
+          <span style={{ fontSize: '20px' }}>{showAnalyzer ? '▲' : '▼'}</span>
+        </div>
+
+        {showAnalyzer && (
+          <div style={{
+            background: '#fff', border: '2px solid #764ba2', borderTop: 'none',
+            borderRadius: '0 0 12px 12px', padding: '20px',
+          }}>
+            <form onSubmit={handleAnalyzeUrl} style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
+              <div style={{ flex: 1, position: 'relative' }}>
+                <input
+                  type="url"
+                  value={analyzeUrl}
+                  onChange={(e) => setAnalyzeUrl(e.target.value)}
+                  placeholder="https://www.youtube.com/watch?v=... or any SNS URL"
+                  disabled={analyzeLoading}
+                  style={{
+                    width: '100%', padding: '12px 16px', fontSize: '15px',
+                    border: '2px solid #e0e0e0', borderRadius: '10px', outline: 'none',
+                    boxSizing: 'border-box', transition: 'border-color 0.2s',
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = '#667eea'}
+                  onBlur={(e) => e.target.style.borderColor = '#e0e0e0'}
+                />
+                {detectPlatform(analyzeUrl) && (
+                  <span style={{
+                    position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
+                    padding: '4px 10px', borderRadius: '12px', color: 'white', fontSize: '12px',
+                    fontWeight: 600, backgroundColor: PLATFORM_INFO[detectPlatform(analyzeUrl)]?.color || '#666',
+                  }}>
+                    {PLATFORM_INFO[detectPlatform(analyzeUrl)]?.icon} {PLATFORM_INFO[detectPlatform(analyzeUrl)]?.name}
+                  </span>
+                )}
+              </div>
+              <button
+                type="submit"
+                disabled={analyzeLoading || !analyzeUrl.trim()}
+                style={{
+                  padding: '12px 28px',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: 'white', border: 'none', borderRadius: '10px',
+                  fontSize: '15px', fontWeight: 600, cursor: 'pointer',
+                  opacity: (analyzeLoading || !analyzeUrl.trim()) ? 0.5 : 1,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {analyzeLoading ? '분석 중...' : '분석'}
+              </button>
+            </form>
+
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
+              {Object.entries(PLATFORM_INFO).map(([key, info]) => (
+                <span key={key} style={{
+                  padding: '4px 10px', border: `1px solid ${info.color}`,
+                  borderRadius: '16px', fontSize: '12px', color: '#555',
+                }}>
+                  {info.icon} {info.name}
+                </span>
+              ))}
+            </div>
+
+            {analyzeError && (
+              <div style={{
+                background: '#fff3f3', border: '1px solid #ffcdd2',
+                borderRadius: '8px', padding: '12px 16px', color: '#c62828', marginBottom: '16px',
+              }}>
+                {analyzeError}
+              </div>
+            )}
+
+            {analyzeLoading && (
+              <div style={{ textAlign: 'center', padding: '32px', color: '#666' }}>
+                <div style={{
+                  width: '36px', height: '36px', border: '3px solid #e0e0e0',
+                  borderTopColor: '#667eea', borderRadius: '50%',
+                  animation: 'spin 0.8s linear infinite', margin: '0 auto 12px',
+                }} />
+                <p>콘텐츠 분석 중...</p>
+              </div>
+            )}
+
+            {analyzeResult && (
+              <div style={{
+                background: '#fafafa', border: '1px solid #e0e0e0',
+                borderRadius: '12px', overflow: 'hidden', marginBottom: '16px',
+              }}>
+                {/* Result Header */}
+                <div style={{
+                  padding: '16px 20px', borderBottom: '1px solid #eee',
+                  display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap',
+                }}>
+                  <span style={{
+                    padding: '4px 12px', borderRadius: '6px', color: 'white',
+                    fontSize: '12px', fontWeight: 700, textTransform: 'uppercase',
+                    backgroundColor: PLATFORM_INFO[analyzeResult.platform]?.color || '#666',
+                  }}>
+                    {PLATFORM_INFO[analyzeResult.platform]?.name || analyzeResult.platform}
+                  </span>
+                  <h3 style={{ fontSize: '18px', margin: 0, flex: 1, color: '#1a1a2e' }}>
+                    {analyzeResult.title || analyzeResult.gallery_id || analyzeResult.subreddit || 'Analysis Result'}
+                  </h3>
+                  {analyzeResult.analyzed_at && (
+                    <span style={{ fontSize: '12px', color: '#999' }}>
+                      {new Date(analyzeResult.analyzed_at).toLocaleString('ko-KR')}
+                    </span>
+                  )}
+                </div>
+
+                {/* Stats */}
+                <div style={{
+                  display: 'flex', gap: '16px', padding: '16px 20px', flexWrap: 'wrap',
+                  background: '#fff', borderBottom: '1px solid #eee',
+                }}>
+                  {analyzeResult.view_count != null && (
+                    <div style={{ textAlign: 'center', minWidth: '70px' }}>
+                      <div style={{ fontSize: '22px', fontWeight: 700, color: '#1a1a2e' }}>{formatAnalyzeNumber(analyzeResult.view_count)}</div>
+                      <div style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase' }}>Views</div>
+                    </div>
+                  )}
+                  {analyzeResult.like_count != null && (
+                    <div style={{ textAlign: 'center', minWidth: '70px' }}>
+                      <div style={{ fontSize: '22px', fontWeight: 700, color: '#1a1a2e' }}>{formatAnalyzeNumber(analyzeResult.like_count)}</div>
+                      <div style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase' }}>Likes</div>
+                    </div>
+                  )}
+                  {analyzeResult.comment_count != null && (
+                    <div style={{ textAlign: 'center', minWidth: '70px' }}>
+                      <div style={{ fontSize: '22px', fontWeight: 700, color: '#1a1a2e' }}>{formatAnalyzeNumber(analyzeResult.comment_count)}</div>
+                      <div style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase' }}>Comments</div>
+                    </div>
+                  )}
+                  {analyzeResult.subscriber_count != null && (
+                    <div style={{ textAlign: 'center', minWidth: '70px' }}>
+                      <div style={{ fontSize: '22px', fontWeight: 700, color: '#1a1a2e' }}>{formatAnalyzeNumber(analyzeResult.subscriber_count)}</div>
+                      <div style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase' }}>Subscribers</div>
+                    </div>
+                  )}
+                  {analyzeResult.total_posts != null && (
+                    <div style={{ textAlign: 'center', minWidth: '70px' }}>
+                      <div style={{ fontSize: '22px', fontWeight: 700, color: '#1a1a2e' }}>{formatAnalyzeNumber(analyzeResult.total_posts)}</div>
+                      <div style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase' }}>Posts</div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Description */}
+                {analyzeResult.description && (
+                  <div style={{ padding: '12px 20px', borderBottom: '1px solid #eee' }}>
+                    <p style={{ margin: 0, color: '#333', lineHeight: 1.5, fontSize: '14px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                      {analyzeResult.description}
+                    </p>
+                  </div>
+                )}
+
+                {/* Sentiment Charts */}
+                {analyzeResult.analysis && (
+                  <div style={{ padding: '16px 20px', borderBottom: '1px solid #eee' }}>
+                    <h4 style={{ margin: '0 0 12px', fontSize: '15px', color: '#1a1a2e' }}>
+                      감성 분석 ({analyzeResult.analysis.total} items)
+                    </h4>
+                    <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+                      <div style={{ flex: 1, minWidth: '250px' }}>
+                        <ResponsiveContainer width="100%" height={200}>
+                          <PieChart>
+                            <Pie
+                              data={[
+                                { name: 'Positive', value: analyzeResult.analysis.sentiment.positive, color: SENTIMENT_COLORS.positive },
+                                { name: 'Neutral', value: analyzeResult.analysis.sentiment.neutral, color: SENTIMENT_COLORS.neutral },
+                                { name: 'Negative', value: analyzeResult.analysis.sentiment.negative, color: SENTIMENT_COLORS.negative },
+                              ].filter(d => d.value > 0)}
+                              cx="50%" cy="50%" outerRadius={70} dataKey="value"
+                              label={({ name, value }) => `${name}: ${value}`}
+                            >
+                              {[SENTIMENT_COLORS.positive, SENTIMENT_COLORS.neutral, SENTIMENT_COLORS.negative].map((color, i) => (
+                                <Cell key={i} fill={color} />
+                              ))}
+                            </Pie>
+                            <Legend />
+                            <Tooltip />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                      {analyzeResult.analysis.top_keywords?.length > 0 && (
+                        <div style={{ flex: 1, minWidth: '250px' }}>
+                          <h5 style={{ margin: '0 0 8px', fontSize: '13px', color: '#666' }}>Top Keywords</h5>
+                          <ResponsiveContainer width="100%" height={200}>
+                            <BarChart data={analyzeResult.analysis.top_keywords.slice(0, 8)} layout="vertical">
+                              <XAxis type="number" />
+                              <YAxis type="category" dataKey="word" width={80} fontSize={12} />
+                              <Tooltip />
+                              <Bar dataKey="count" fill="#667eea" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ marginTop: '8px', fontSize: '14px', color: '#666' }}>
+                      Overall: <span style={{
+                        fontWeight: 600,
+                        color: analyzeResult.analysis.overall === 'positive' ? '#4CAF50' :
+                               analyzeResult.analysis.overall === 'negative' ? '#F44336' : '#9E9E9E'
+                      }}>{analyzeResult.analysis.overall}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Items (comments/posts/videos) */}
+                {(() => {
+                  const items = analyzeResult.comments || analyzeResult.posts || analyzeResult.recent_videos || [];
+                  if (items.length === 0) return null;
+                  const label = analyzeResult.comments ? 'Comments' : analyzeResult.recent_videos ? 'Recent Videos' : 'Posts';
+                  return (
+                    <div style={{ padding: '16px 20px' }}>
+                      <h4 style={{ margin: '0 0 12px', fontSize: '15px', color: '#1a1a2e' }}>
+                        {label} ({items.length})
+                      </h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {items.slice(0, 15).map((item, idx) => (
+                          <div key={idx} style={{
+                            padding: '10px 14px', border: '1px solid #eee',
+                            borderRadius: '8px', background: '#fff',
+                          }}>
+                            <div style={{ marginBottom: '4px', lineHeight: 1.4, color: '#333', wordBreak: 'break-word', fontSize: '14px' }}>
+                              {item.text || item.title || item.selftext || ''}
+                            </div>
+                            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', fontSize: '12px', color: '#888' }}>
+                              {item.author && <span style={{ fontWeight: 600, color: '#555' }}>{item.author}</span>}
+                              {item.like_count != null && <span>👍 {formatAnalyzeNumber(item.like_count)}</span>}
+                              {item.view_count != null && <span>👁 {formatAnalyzeNumber(item.view_count)}</span>}
+                              {item.recommend != null && <span>👍 {item.recommend}</span>}
+                              {(item.published_at || item.date) && <span>{item.published_at || item.date}</span>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+            {/* Recent analysis history */}
+            {analyzeHistory.length > 0 && (
+              <div style={{ marginTop: '12px' }}>
+                <h4 style={{ fontSize: '13px', color: '#666', marginBottom: '8px' }}>최근 분석 기록</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {analyzeHistory.map((item, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => setAnalyzeUrl(item.url)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '8px',
+                        padding: '8px 12px', borderRadius: '6px', cursor: 'pointer',
+                        transition: 'background 0.15s',
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = '#f5f5f5'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <span style={{ fontSize: '16px', color: PLATFORM_INFO[item.platform]?.color || '#666' }}>
+                        {PLATFORM_INFO[item.platform]?.icon}
+                      </span>
+                      <span style={{ flex: 1, fontSize: '13px', color: '#333', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {item.title}
+                      </span>
+                      <span style={{ fontSize: '11px', color: '#999' }}>
+                        {new Date(item.analyzed_at).toLocaleTimeString('ko-KR')}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* DC인사이드 갤러리 */}

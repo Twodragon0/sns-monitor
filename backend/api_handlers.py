@@ -3431,6 +3431,426 @@ def _handle_crawler_results(event):
         }
 
 
+def _handle_analyze_url(event):
+    """URL 분석 엔드포인트 - YouTube, DCInside 등 SNS URL을 분석"""
+    try:
+        try:
+            body = json.loads(event.get('body', '{}'))
+        except json.JSONDecodeError:
+            return {
+                'statusCode': 400,
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps({'error': 'Invalid JSON format'})
+            }
+
+        url = body.get('url', '').strip()
+        if not url:
+            return {
+                'statusCode': 400,
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps({'error': 'URL is required'})
+            }
+
+        # URL validation (allowlist approach)
+        import re as re_mod
+        url_pattern = re_mod.compile(
+            r'^https?://(www\.)?(youtube\.com|youtu\.be|m\.youtube\.com|'
+            r'gall\.dcinside\.com|dcinside\.com|'
+            r'reddit\.com|old\.reddit\.com|'
+            r't\.me|twitter\.com|x\.com)'
+        )
+        if not url_pattern.match(url):
+            return {
+                'statusCode': 400,
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps({'error': 'Unsupported URL. Supported: YouTube, DCInside, Reddit, Twitter/X, Telegram'})
+            }
+
+        lower_url = url.lower()
+        result = {'url': url, 'analyzed_at': datetime.now().isoformat()}
+
+        if 'youtube.com' in lower_url or 'youtu.be' in lower_url:
+            result.update(_analyze_youtube_url(url))
+        elif 'dcinside.com' in lower_url:
+            result.update(_analyze_dcinside_url(url))
+        elif 'twitter.com' in lower_url or 'x.com' in lower_url:
+            result.update(_analyze_twitter_url(url))
+        elif 'reddit.com' in lower_url:
+            result.update(_analyze_reddit_url(url))
+        elif 't.me' in lower_url:
+            result.update({'platform': 'telegram', 'title': 'Telegram', 'description': 'Telegram URL analysis is not yet supported'})
+
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+            'body': json.dumps(result, ensure_ascii=False, default=decimal_default)
+        }
+    except Exception as e:
+        logger.error(f"Error in _handle_analyze_url: {e}", exc_info=True)
+        return {
+            'statusCode': 500,
+            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+            'body': json.dumps({'error': str(e)})
+        }
+
+
+def _analyze_youtube_url(url):
+    """YouTube URL 분석 - YouTube Data API 또는 로컬 데이터 활용"""
+    import re as re_mod
+
+    result = {'platform': 'youtube'}
+
+    # Extract video ID
+    video_id = None
+    video_match = re_mod.search(r'(?:v=|youtu\.be/|embed/|shorts/)([a-zA-Z0-9_-]{11})', url)
+    if video_match:
+        video_id = video_match.group(1)
+
+    # Extract channel handle
+    channel_handle = None
+    handle_match = re_mod.search(r'youtube\.com/(@[\w.-]+)', url)
+    if handle_match:
+        channel_handle = handle_match.group(1)
+
+    # Try YouTube Data API
+    youtube_api_key = os.environ.get('YOUTUBE_API_KEY', '')
+    if youtube_api_key and requests:
+        try:
+            if video_id:
+                api_url = (
+                    f'https://www.googleapis.com/youtube/v3/videos'
+                    f'?part=snippet,statistics&id={video_id}&key={youtube_api_key}'
+                )
+                resp = requests.get(api_url, timeout=10)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if data.get('items'):
+                        item = data['items'][0]
+                        snippet = item['snippet']
+                        stats = item.get('statistics', {})
+                        result.update({
+                            'title': snippet.get('title', ''),
+                            'description': snippet.get('description', '')[:500],
+                            'channel_name': snippet.get('channelTitle', ''),
+                            'published_at': snippet.get('publishedAt', ''),
+                            'view_count': int(stats.get('viewCount', 0)),
+                            'like_count': int(stats.get('likeCount', 0)),
+                            'comment_count': int(stats.get('commentCount', 0)),
+                            'video_id': video_id,
+                        })
+
+                        # Fetch comments
+                        comments = _fetch_youtube_comments(video_id, youtube_api_key)
+                        if comments:
+                            result['comments'] = comments[:20]
+                            result['analysis'] = _simple_sentiment_analysis(comments)
+                        return result
+
+            elif channel_handle:
+                handle_clean = channel_handle.lstrip('@')
+                api_url = (
+                    f'https://www.googleapis.com/youtube/v3/search'
+                    f'?part=snippet&q={quote(handle_clean)}&type=channel&key={youtube_api_key}'
+                )
+                resp = requests.get(api_url, timeout=10)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if data.get('items'):
+                        channel_id = data['items'][0]['snippet']['channelId']
+                        ch_url = (
+                            f'https://www.googleapis.com/youtube/v3/channels'
+                            f'?part=snippet,statistics&id={channel_id}&key={youtube_api_key}'
+                        )
+                        ch_resp = requests.get(ch_url, timeout=10)
+                        if ch_resp.status_code == 200:
+                            ch_data = ch_resp.json()
+                            if ch_data.get('items'):
+                                ch_item = ch_data['items'][0]
+                                ch_snippet = ch_item['snippet']
+                                ch_stats = ch_item.get('statistics', {})
+                                result.update({
+                                    'title': ch_snippet.get('title', ''),
+                                    'description': ch_snippet.get('description', '')[:500],
+                                    'channel_name': ch_snippet.get('title', ''),
+                                    'subscriber_count': int(ch_stats.get('subscriberCount', 0)),
+                                    'video_count': int(ch_stats.get('videoCount', 0)),
+                                    'view_count': int(ch_stats.get('viewCount', 0)),
+                                })
+
+                                # Fetch recent videos
+                                videos = _fetch_channel_recent_videos(channel_id, youtube_api_key)
+                                if videos:
+                                    result['recent_videos'] = videos[:10]
+                                return result
+        except Exception as e:
+            logger.warning(f"YouTube API error: {e}")
+
+    # Fallback: search local data
+    result.update(_search_local_youtube_data(video_id, channel_handle))
+    return result
+
+
+def _fetch_youtube_comments(video_id, api_key):
+    """YouTube 동영상 댓글 가져오기"""
+    try:
+        api_url = (
+            f'https://www.googleapis.com/youtube/v3/commentThreads'
+            f'?part=snippet&videoId={video_id}&maxResults=50&order=relevance&key={api_key}'
+        )
+        resp = requests.get(api_url, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            comments = []
+            for item in data.get('items', []):
+                snippet = item['snippet']['topLevelComment']['snippet']
+                comments.append({
+                    'text': snippet.get('textDisplay', ''),
+                    'author': snippet.get('authorDisplayName', ''),
+                    'like_count': snippet.get('likeCount', 0),
+                    'published_at': snippet.get('publishedAt', ''),
+                })
+            return comments
+    except Exception as e:
+        logger.warning(f"Error fetching comments: {e}")
+    return []
+
+
+def _fetch_channel_recent_videos(channel_id, api_key):
+    """채널 최근 동영상 목록"""
+    try:
+        api_url = (
+            f'https://www.googleapis.com/youtube/v3/search'
+            f'?part=snippet&channelId={channel_id}&maxResults=10&order=date&type=video&key={api_key}'
+        )
+        resp = requests.get(api_url, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            videos = []
+            for item in data.get('items', []):
+                videos.append({
+                    'title': item['snippet'].get('title', ''),
+                    'video_id': item['id'].get('videoId', ''),
+                    'published_at': item['snippet'].get('publishedAt', ''),
+                    'description': item['snippet'].get('description', '')[:200],
+                })
+            return videos
+    except Exception as e:
+        logger.warning(f"Error fetching channel videos: {e}")
+    return []
+
+
+def _search_local_youtube_data(video_id, channel_handle):
+    """로컬 데이터에서 YouTube 정보 검색"""
+    result = {}
+    local_data_dir = os.environ.get('LOCAL_DATA_DIR', '/app/local-data')
+    youtube_dir = os.path.join(local_data_dir, 'youtube', 'channels')
+
+    if not os.path.exists(youtube_dir):
+        result['title'] = 'YouTube'
+        result['description'] = 'No local data available. Set YOUTUBE_API_KEY for live analysis.'
+        return result
+
+    # Search through channel files
+    for file_path in glob.glob(os.path.join(youtube_dir, '**', '*.json'), recursive=True):
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            if video_id:
+                # Search for matching video
+                for video in data.get('videos', []):
+                    if video.get('video_id') == video_id:
+                        result.update({
+                            'title': video.get('title', ''),
+                            'view_count': video.get('views', 0),
+                            'like_count': video.get('likes', 0),
+                            'comment_count': video.get('comments', 0),
+                            'video_id': video_id,
+                        })
+                        comments = video.get('comment_samples', [])
+                        if comments:
+                            result['comments'] = comments[:20]
+                            result['analysis'] = _simple_sentiment_analysis(comments)
+                        return result
+
+            if channel_handle:
+                handle_clean = channel_handle.lstrip('@').lower()
+                ch_handle = (data.get('channel_handle', '') or '').lstrip('@').lower()
+                if handle_clean == ch_handle:
+                    result.update({
+                        'title': data.get('channel_title', ''),
+                        'channel_name': data.get('channel_title', ''),
+                        'description': data.get('description', '')[:500],
+                        'subscriber_count': data.get('subscriber_count', 0),
+                        'video_count': data.get('video_count', 0),
+                    })
+                    if data.get('videos'):
+                        result['recent_videos'] = data['videos'][:10]
+                    return result
+        except Exception:
+            continue
+
+    result['title'] = channel_handle or video_id or 'YouTube'
+    result['description'] = 'No matching data found in local storage.'
+    return result
+
+
+def _analyze_dcinside_url(url):
+    """DCInside URL 분석 - 로컬 데이터에서 검색"""
+    import re as re_mod
+    result = {'platform': 'dcinside'}
+
+    # Extract gallery ID from URL
+    gallery_match = re_mod.search(r'[?&]id=([^&]+)', url)
+    gallery_id = gallery_match.group(1) if gallery_match else None
+
+    if not gallery_id:
+        # Try path-based: /board/lists/?id=xxx or /mini/board/lists/?id=xxx
+        path_match = re_mod.search(r'/(?:mini|mgallery)/board/lists/?\?id=([^&]+)', url)
+        if path_match:
+            gallery_id = path_match.group(1)
+
+    if not gallery_id:
+        result['title'] = 'DCInside'
+        result['description'] = 'Could not extract gallery ID from URL.'
+        return result
+
+    result['gallery_id'] = gallery_id
+
+    # Search local data
+    local_data_dir = os.environ.get('LOCAL_DATA_DIR', '/app/local-data')
+    dcinside_dir = os.path.join(local_data_dir, 'dcinside')
+
+    for file_path in glob.glob(os.path.join(dcinside_dir, f'{gallery_id}', '*.json')) + \
+                      glob.glob(os.path.join(dcinside_dir, f'{gallery_id}.json')):
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            result.update({
+                'title': data.get('gallery_name', gallery_id),
+                'total_posts': data.get('total_posts', len(data.get('posts', []))),
+                'total_comments': data.get('total_comments', 0),
+            })
+
+            posts = data.get('posts', [])
+            if posts:
+                result['posts'] = posts[:20]
+                # Build analysis from posts
+                all_texts = []
+                for p in posts:
+                    all_texts.append({'text': p.get('title', '') + ' ' + p.get('content', '')})
+                result['analysis'] = _simple_sentiment_analysis(all_texts)
+            return result
+        except Exception:
+            continue
+
+    result['title'] = gallery_id
+    result['description'] = f'Gallery "{gallery_id}" not found in local data. Run crawler first.'
+    return result
+
+
+def _analyze_twitter_url(url):
+    """Twitter/X URL 분석"""
+    import re as re_mod
+    result = {'platform': 'twitter'}
+
+    # Extract username
+    user_match = re_mod.search(r'(?:twitter\.com|x\.com)/(@?[\w]+)', url)
+    username = user_match.group(1) if user_match else None
+
+    if username:
+        result['title'] = f'@{username.lstrip("@")}'
+
+    # Search local twitter data
+    local_data_dir = os.environ.get('LOCAL_DATA_DIR', '/app/local-data')
+    twitter_dir = os.path.join(local_data_dir, 'twitter')
+
+    if os.path.exists(twitter_dir):
+        for file_path in glob.glob(os.path.join(twitter_dir, '**', '*.json'), recursive=True):
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                tweets = data.get('tweets', [])
+                if tweets:
+                    result['posts'] = tweets[:20]
+                    result['total_posts'] = len(tweets)
+                    result['analysis'] = _simple_sentiment_analysis(
+                        [{'text': t.get('text', '')} for t in tweets]
+                    )
+                    return result
+            except Exception:
+                continue
+
+    result['description'] = 'Twitter data analysis requires crawler data. Run the Twitter crawler first.'
+    return result
+
+
+def _analyze_reddit_url(url):
+    """Reddit URL 분석"""
+    import re as re_mod
+    result = {'platform': 'reddit'}
+
+    sub_match = re_mod.search(r'reddit\.com/r/([\w]+)', url)
+    if sub_match:
+        result['subreddit'] = sub_match.group(1)
+        result['title'] = f'r/{sub_match.group(1)}'
+    else:
+        result['title'] = 'Reddit'
+
+    result['description'] = 'Reddit analysis requires crawler data.'
+    return result
+
+
+def _simple_sentiment_analysis(items):
+    """간단한 감성 분석 (키워드 기반)"""
+    positive_words = ['좋아', '최고', '감사', '사랑', '대박', '멋지', '예쁘', '귀엽',
+                      '응원', '화이팅', 'love', 'great', 'amazing', 'awesome', 'best',
+                      '좋다', '재밌', '웃기', '감동', '완벽', '훌륭', '행복']
+    negative_words = ['싫어', '나쁘', '최악', '실망', '별로', '짜증', '혐오',
+                      'hate', 'worst', 'bad', 'terrible', 'awful',
+                      '쓰레기', '망했', '노잼']
+
+    total = len(items)
+    if total == 0:
+        return None
+
+    pos = 0
+    neg = 0
+    top_keywords = {}
+
+    for item in items:
+        text = (item.get('text', '') or '').lower()
+        is_pos = any(w in text for w in positive_words)
+        is_neg = any(w in text for w in negative_words)
+        if is_pos and not is_neg:
+            pos += 1
+        elif is_neg and not is_pos:
+            neg += 1
+
+        # Extract keywords
+        for word in text.split():
+            word = word.strip('.,!?()[]{}"\':;')
+            if len(word) >= 2 and word not in ('the', 'and', 'for', 'that', 'this', 'with', 'are', 'was', 'has'):
+                top_keywords[word] = top_keywords.get(word, 0) + 1
+
+    neu = total - pos - neg
+    overall = 'positive' if pos > neg else ('negative' if neg > pos else 'neutral')
+
+    sorted_keywords = sorted(top_keywords.items(), key=lambda x: x[1], reverse=True)[:15]
+
+    return {
+        'total': total,
+        'sentiment': {
+            'positive': pos,
+            'neutral': neu,
+            'negative': neg,
+        },
+        'overall': overall,
+        'top_keywords': [{'word': w, 'count': c} for w, c in sorted_keywords],
+    }
+
+
 def lambda_handler(event, context):
     """
     Lambda 핸들러
@@ -3507,6 +3927,10 @@ def lambda_handler(event, context):
         # GET /api/data/{s3_key}
         elif path.startswith('/api/data/'):
             return _handle_data_s3_key(path)
+
+        # POST /api/analyze/url - URL 분석
+        elif path.endswith('/analyze/url') and http_method == 'POST':
+            return _handle_analyze_url(event)
 
         # POST /api/crawler/results - 크롤러 결과 저장 (DCInside + YouTube)
         elif path.endswith('/crawler/results') and http_method == 'POST':
