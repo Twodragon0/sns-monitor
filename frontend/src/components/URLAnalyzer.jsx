@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import axios from 'axios';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import './URLAnalyzer.css';
@@ -37,7 +37,15 @@ function URLAnalyzer() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
-  const [history, setHistory] = useState([]);
+  const [history, setHistory] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('sns-analyzer-history') || '[]');
+    } catch { return []; }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('sns-analyzer-history', JSON.stringify(history));
+  }, [history]);
 
   const detectedPlatform = detectPlatform(url);
 
@@ -66,15 +74,13 @@ function URLAnalyzer() {
     }
   }, [url]);
 
-  const goBack = () => {
-    window.history.pushState({}, '', '/');
-    window.dispatchEvent(new PopStateEvent('popstate'));
+  const clearHistory = () => {
+    setHistory([]);
   };
 
   return (
     <div className="url-analyzer">
       <div className="analyzer-header">
-        <button className="back-button" onClick={goBack}>← Dashboard</button>
         <h1>SNS URL Analyzer</h1>
         <p>Paste any supported URL to analyze content and sentiment</p>
       </div>
@@ -124,7 +130,10 @@ function URLAnalyzer() {
 
       {history.length > 0 && (
         <div className="analysis-history">
-          <h3>Recent Analyses</h3>
+          <div className="history-header">
+            <h3>Recent Analyses</h3>
+            <button className="clear-history-button" onClick={clearHistory}>Clear</button>
+          </div>
           <ul>
             {history.map((item, idx) => (
               <li key={idx} onClick={() => setUrl(item.url)}>
