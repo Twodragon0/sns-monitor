@@ -1,4 +1,4 @@
-.PHONY: help build push deploy test lint clean all
+.PHONY: help build push deploy test lint clean all dev dev-down dev-up dev-logs
 
 # ============================================
 # Variables
@@ -55,7 +55,7 @@ build-api-backend:
 
 build-frontend:
 	@echo "🔨 Building frontend..."
-	docker build -t $(REGISTRY)/$(IMAGE_PREFIX)-frontend:$(VERSION) -f docker/Dockerfile.frontend ./frontend
+	docker build -t $(REGISTRY)/$(IMAGE_PREFIX)-frontend:$(VERSION) -f docker/Dockerfile.frontend .
 	docker tag $(REGISTRY)/$(IMAGE_PREFIX)-frontend:$(VERSION) $(REGISTRY)/$(IMAGE_PREFIX)-frontend:latest
 
 build-youtube-crawler:
@@ -202,6 +202,24 @@ clean:
 	docker rmi $(REGISTRY)/$(IMAGE_PREFIX)-dcinside-crawler:$(VERSION) 2>/dev/null || true
 	docker rmi $(REGISTRY)/$(IMAGE_PREFIX)-llm-analyzer:$(VERSION) 2>/dev/null || true
 	@echo "✅ Cleaned!"
+
+# ============================================
+# Local Development
+# ============================================
+dev:
+	@echo "Starting development environment..."
+	docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+
+dev-down:
+	@echo "Stopping development environment..."
+	docker-compose -f docker-compose.yml -f docker-compose.dev.yml down
+
+dev-up:
+	@echo "Starting development environment (detached)..."
+	docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+
+dev-logs:
+	docker-compose -f docker-compose.yml -f docker-compose.dev.yml logs -f
 
 # ============================================
 # All
