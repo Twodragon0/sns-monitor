@@ -1,81 +1,56 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import axios from 'axios';
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import './Dashboard.css';
 
-// 모니터링 키워드 정의 (크리에이터브랜드/예시기업/크리에이터 중심)
+// Monitoring keywords (generic example for public release)
 const MONITORING_KEYWORDS = [
-  // ★★★ 최우선순위: 보안/해킹 관련 ★★★
-  '해킹', '해킹당함', '해킹됨', 'hack', 'hacked', 'hacking',
-  '보안', 'security', '유출', 'leak', 'leaked', '정보유출',
-  '계정탈취', '계정해킹', '비밀번호', 'password', '피싱', 'phishing',
-  '사기', 'scam', '개인정보', '침해', 'DDoS', '악성코드', 'malware',
-  // ★★★ 최우선순위: 크리에이터브랜드 및 예시기업 ★★★
-  '크리에이터브랜드', 'creatorbrand', 'CreatorBrand', 'CREATORBRAND',
-  '예시기업', 'examplecorp', 'ExampleCorp', 'EXAMPLECORP',
-  // ★★★ 최우선순위: 크리에이터 이름 ★★★
-  '이브닛', 'IVNIT', 'ivnit',
-  '아카이브', 'AkaiV', 'akaiv', '아카이브스튜디오',
-  '스코시즘', 'SKOSHISM', 'skoshism',
-  '쭈쭈', '여루미', 'yeorumi',
-  '벌몽', '비몽', 'bee_mong',
-  '옐루', 'yell_u',
-  '한결', 'hangyeol',
-  '오오즈', 'owo_zzzz',
-  '이로', 'irocloud',
-  '니노', 'NIN0SUNDAY',
-  '코요', 'KoyoTempest',
-  '오토', 'otorainy',
-  '로보', 'RoboFroster',
-  '바라바라', 'BARABARA',
-  // ★★★ 최우선순위: 굿즈/상품 ★★★
-  '굿즈', '포토카드', '포카', '아크릴', '키링', '스티커', '포스터', '엽서',
-  '앨범', '음반', '한정판', '시즌그리팅', '캘린더', '머치', '공식굿즈',
-  // ★★ 높은 우선순위: 판매/구매 ★★
-  '구매', '판매', '주문', '예약', '결제', '배송', '품절', '재입고', '가격', '할인', '이벤트', '특전',
-  // ★★ 높은 우선순위: 팬 활동 ★★
-  '팬싸', '영통팬싸', '응모', '당첨', '럭드', '포토타임', '생일카페', '서포트', '조공',
-  // ★★ 높은 우선순위: 디지털 상품 ★★
-  '음원', '다운로드', '디지털싱글', '뮤직비디오', 'MV', '티저', '커버곡', '오리지널곡',
-  '멤버십', '후원', '슈퍼챗', '보이스팩', '월페이퍼', '보팩', '펀딩',
-  // 활동 관련
-  '버튜버', 'vtuber', '크리에이터', '유튜버', '숲', 'soop',
-  // 콘텐츠 관련
-  '노래', '커버', '방송', '영상', '브이로그', 'vlog', 'ASMR', '라이브', '스트리밍',
-  // 반응 관련
-  '좋아요', '구독', '최고', '대박', '감동', '응원', '팬', '힐링',
-  // 품질 관련
-  '감성', '편집', '퀄리티', '목소리', '실력'
+  // Security/hacking keywords
+  'hack', 'hacked', 'hacking', 'security', 'leak', 'leaked',
+  'scam', 'phishing', 'malware', 'DDoS', 'password',
+  // Creator/brand keywords
+  'ExampleCreator', 'examplecreator',
+  'CreatorBrand', 'creatorbrand',
+  'ExampleCorp', 'examplecorp',
+  // Creator members (generic)
+  'Creator1', 'creator1',
+  'Creator2', 'creator2',
+  'Creator3', 'creator3',
+  'Creator4', 'creator4',
+  // Merchandise/goods
+  'merch', 'goods', 'photocard', 'album', 'keyring', 'sticker', 'poster',
+  // Commerce
+  'purchase', 'order', 'shipping', 'sold out', 'restock', 'discount', 'event',
+  // Fan activities
+  'fansign', 'fan meet', 'birthday cafe', 'support',
+  // Digital goods
+  'digital single', 'music video', 'MV', 'teaser', 'cover song', 'original song',
+  'membership', 'donation', 'superchat', 'voicepack', 'wallpaper', 'funding',
+  // Activity
+  'vtuber', 'creator', 'streamer', 'soop',
+  // Content
+  'song', 'cover', 'stream', 'video', 'vlog', 'ASMR', 'live', 'streaming',
+  // Reactions
+  'like', 'subscribe', 'best', 'amazing', 'emotion', 'cheer', 'fan', 'healing',
+  // Quality
+  'aesthetic', 'edit', 'quality', 'voice', 'skill',
 ];
 
-// 키워드 카테고리 (우선순위 순)
+// Keyword categories (generic example for public release)
 const KEYWORD_CATEGORIES = {
-  // ★★★ 최우선순위: 보안 ★★★
-  '🚨보안/해킹': ['해킹', '해킹당함', '해킹됨', 'hack', 'hacked', 'hacking', '보안', 'security', '유출', 'leak', 'leaked', '정보유출', '계정탈취', '계정해킹', '비밀번호', 'password', '피싱', 'phishing', '사기', 'scam', '개인정보', '침해', 'DDoS', '악성코드', 'malware'],
-  '크리에이터브랜드/CreatorBrand': ['크리에이터브랜드', 'creatorbrand', 'CreatorBrand', 'CREATORBRAND'],
-  '예시기업/ExampleCorp': ['예시기업', 'examplecorp', 'ExampleCorp', 'EXAMPLECORP'],
-  '크리에이터': [
-    '이브닛', 'IVNIT', 'ivnit',
-    '아카이브', 'AkaiV', 'akaiv', '아카이브스튜디오',
-    '스코시즘', 'SKOSHISM', 'skoshism',
-    '쭈쭈', '여루미', 'yeorumi',
-    '벌몽', '비몽', 'bee_mong',
-    '옐루', 'yell_u',
-    '한결', 'hangyeol',
-    '오오즈', 'owo_zzzz',
-    '이로', 'irocloud',
-    '니노', 'NIN0SUNDAY',
-    '코요', 'KoyoTempest',
-    '오토', 'otorainy',
-    '로보', 'RoboFroster',
-    '바라바라', 'BARABARA'
-  ],
-  '굿즈/상품': ['굿즈', '포토카드', '포카', '아크릴', '키링', '스티커', '포스터', '엽서', '앨범', '음반', '한정판', '시즌그리팅', '캘린더', '머치', '공식굿즈'],
-  '판매/구매': ['구매', '판매', '주문', '예약', '결제', '배송', '품절', '재입고', '가격', '할인', '이벤트', '특전'],
-  '팬활동': ['팬싸', '영통팬싸', '응모', '당첨', '럭드', '포토타임', '생일카페', '서포트', '조공'],
-  '디지털상품': ['음원', '다운로드', '디지털싱글', '뮤직비디오', 'MV', '티저', '커버곡', '오리지널곡', '멤버십', '후원', '슈퍼챗', '보이스팩', '월페이퍼', '보팩', '펀딩'],
-  '활동': ['버튜버', 'vtuber', '크리에이터', '유튜버', '숲', 'soop'],
-  '콘텐츠': ['노래', '커버', '방송', '영상', '브이로그', 'vlog', 'ASMR', '라이브', '스트리밍'],
-  '반응': ['좋아요', '구독', '최고', '대박', '감동', '응원', '팬', '힐링'],
-  '품질': ['감성', '편집', '퀄리티', '목소리', '실력']
+  'Security': ['hack', 'hacked', 'hacking', 'security', 'leak', 'leaked', 'scam', 'phishing', 'malware', 'DDoS', 'password'],
+  'Creator/ExampleCreator': ['ExampleCreator', 'examplecreator'],
+  'Brand/CreatorBrand': ['CreatorBrand', 'creatorbrand'],
+  'Company/ExampleCorp': ['ExampleCorp', 'examplecorp'],
+  'Creators': ['Creator1', 'creator1', 'Creator2', 'creator2', 'Creator3', 'creator3', 'Creator4', 'creator4'],
+  'Merchandise': ['merch', 'goods', 'photocard', 'album', 'keyring', 'sticker', 'poster'],
+  'Commerce': ['purchase', 'order', 'shipping', 'sold out', 'restock', 'discount', 'event'],
+  'Fan Activity': ['fansign', 'fan meet', 'birthday cafe', 'support'],
+  'Digital Goods': ['digital single', 'music video', 'MV', 'teaser', 'cover song', 'original song', 'membership', 'donation', 'superchat', 'voicepack', 'wallpaper', 'funding'],
+  'Activity': ['vtuber', 'creator', 'streamer', 'soop'],
+  'Content': ['song', 'cover', 'stream', 'video', 'vlog', 'ASMR', 'live', 'streaming'],
+  'Reactions': ['like', 'subscribe', 'best', 'amazing', 'emotion', 'cheer', 'fan', 'healing'],
+  'Quality': ['aesthetic', 'edit', 'quality', 'voice', 'skill'],
 };
 
 // 댓글에서 매칭되는 키워드 찾기
@@ -196,10 +171,75 @@ function Dashboard() {
   // eslint-disable-next-line no-unused-vars
   const [twitterMonitoringResults, setTwitterMonitoringResults] = useState({}); // 키워드별 모니터링 결과
 
-  // 트위터 자동 모니터링용 크리에이터 키워드
+  // URL Analyzer state
+  const [analyzeUrl, setAnalyzeUrl] = useState('');
+  const [analyzeLoading, setAnalyzeLoading] = useState(false);
+  const [analyzeResult, setAnalyzeResult] = useState(null);
+  const [analyzeError, setAnalyzeError] = useState(null);
+  const [analyzeHistory, setAnalyzeHistory] = useState([]);
+  const [showAnalyzer, setShowAnalyzer] = useState(false);
+
+  const API_BASE = process.env.REACT_APP_API_URL || '';
+
+  const detectPlatform = (inputUrl) => {
+    if (!inputUrl) return null;
+    const lower = inputUrl.toLowerCase();
+    if (lower.includes('youtube.com') || lower.includes('youtu.be')) return 'youtube';
+    if (lower.includes('dcinside.com')) return 'dcinside';
+    if (lower.includes('reddit.com')) return 'reddit';
+    if (lower.includes('twitter.com') || lower.includes('x.com')) return 'twitter';
+    if (lower.includes('t.me/')) return 'telegram';
+    return null;
+  };
+
+  const PLATFORM_INFO = {
+    youtube: { name: 'YouTube', color: '#FF0000', icon: '▶' },
+    dcinside: { name: 'DCInside', color: '#2B65EC', icon: '📋' },
+    reddit: { name: 'Reddit', color: '#FF4500', icon: '🔗' },
+    twitter: { name: 'Twitter/X', color: '#1DA1F2', icon: '🐦' },
+    telegram: { name: 'Telegram', color: '#0088cc', icon: '✈' },
+  };
+
+  const SENTIMENT_COLORS = {
+    positive: '#4CAF50',
+    neutral: '#9E9E9E',
+    negative: '#F44336',
+  };
+
+  const handleAnalyzeUrl = useCallback(async (e) => {
+    e.preventDefault();
+    if (!analyzeUrl.trim()) return;
+    setAnalyzeLoading(true);
+    setAnalyzeError(null);
+    setAnalyzeResult(null);
+    try {
+      const response = await axios.post(`${API_BASE}/api/analyze/url`, { url: analyzeUrl.trim() });
+      setAnalyzeResult(response.data);
+      setAnalyzeHistory(prev => [{
+        url: analyzeUrl.trim(),
+        platform: response.data.platform,
+        title: response.data.title || response.data.gallery_id || analyzeUrl.trim(),
+        analyzed_at: response.data.analyzed_at,
+      }, ...prev.slice(0, 9)]);
+    } catch (err) {
+      setAnalyzeError(err.response?.data?.error || err.message || 'Analysis failed');
+    } finally {
+      setAnalyzeLoading(false);
+    }
+  }, [analyzeUrl, API_BASE]);
+
+  const formatAnalyzeNumber = (num) => {
+    if (typeof num === 'string') num = parseInt(num.replace(/[,\s]/g, ''), 10);
+    if (isNaN(num)) return '0';
+    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
+    if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
+    return num.toLocaleString();
+  };
+
+  // Twitter auto-monitoring keywords
   const TWITTER_AUTO_MONITOR_KEYWORDS = [
-    '크리에이터브랜드', '예시기업', '스코시즘', '아카이브', '바라바라', '이브닛',
-    'u32', '여르미', '한결', '비몽', '샤르망', '나나문'
+    'CreatorBrand', 'ExampleCorp', 'ExampleCreator',
+    'Creator1', 'Creator2', 'Creator3', 'Creator4',
   ];
 
   useEffect(() => {
@@ -249,8 +289,7 @@ function Dashboard() {
             if (showArchiveStudioCreators) {
               const filtered = creators.filter(c => {
                 const name = (c.name || '').toLowerCase();
-                return name.includes('u32') || name.includes('여르미') || name.includes('한결') || 
-                       name.includes('비몽') || name.includes('샤르망') || name.includes('akaiv');
+                return name.includes('creator1') || name.includes('creator2') || name.includes('example');
               });
               setVuddyCreators(filtered);
             } else {
@@ -263,8 +302,7 @@ function Dashboard() {
             if (showArchiveStudioCreators) {
               const filtered = testData.filter(c => {
                 const name = (c.name || '').toLowerCase();
-                return name.includes('u32') || name.includes('여르미') || name.includes('한결') || 
-                       name.includes('비몽') || name.includes('샤르망') || name.includes('akaiv');
+                return name.includes('creator1') || name.includes('creator2') || name.includes('example');
               });
               setVuddyCreators(filtered);
             } else {
@@ -277,8 +315,7 @@ function Dashboard() {
           if (showArchiveStudioCreators) {
             const filtered = testData.filter(c => {
               const name = (c.name || '').toLowerCase();
-              return name.includes('u32') || name.includes('여르미') || name.includes('한결') || 
-                     name.includes('비몽') || name.includes('샤르망') || name.includes('akaiv');
+              return name.includes('creator1') || name.includes('creator2') || name.includes('example');
             });
             setVuddyCreators(filtered);
           } else {
@@ -291,8 +328,7 @@ function Dashboard() {
         if (showArchiveStudioCreators) {
           const filtered = testData.filter(c => {
             const name = (c.name || '').toLowerCase();
-            return name.includes('u32') || name.includes('여르미') || name.includes('한결') || 
-                   name.includes('비몽') || name.includes('샤르망') || name.includes('akaiv');
+            return name.includes('creator1') || name.includes('creator2') || name.includes('example');
           });
           setVuddyCreators(filtered);
         } else {
@@ -542,11 +578,11 @@ function Dashboard() {
     }
   };
 
-  // 트위터 키워드 모니터링용 키워드 목록
+  // Twitter keyword monitoring list (generic example)
   const TWITTER_MONITORING_KEYWORDS = [
-    '아카이브', 'archive', '바라바라', 'barabara', '이브닛', 'ivnit', '스코시즘', 'skoshism',
-    'u32', '사미', '우사미', '여르미', '엶', '한결', '결', '비몽', '몽', '샤르망', '쭈쭈', '나나문', '쿠우',
-    '크리에이터브랜드', 'creatorbrand', '예시기업', 'examplecorp', 'ExampleCorp',
+    'ExampleCreator', 'examplecreator', 'Creator1', 'creator1', 'Creator2', 'creator2',
+    'Creator3', 'creator3', 'Creator4', 'creator4',
+    'CreatorBrand', 'creatorbrand', 'ExampleCorp', 'examplecorp',
     '굿즈', '포토카드', '포카', '아크릴', '키링', '스티커', '포스터', '앨범', '음반', '한정판',
     '구매', '판매', '주문', '예약', '결제', '배송', '품절', '재입고', '가격', '할인', '이벤트', '특전',
     '팬싸', '영통팬싸', '응모', '당첨', '생일카페', '서포트', '조공',
@@ -563,153 +599,153 @@ function Dashboard() {
     return TWITTER_MONITORING_KEYWORDS.filter(keyword => lowerText.includes(keyword.toLowerCase()));
   };
 
-  // 로컬 테스트 데이터
+  // Local example test data (generic placeholders for public release)
   const getLocalTestData = () => {
     return [
       {
-        name: "AkaiV Studio (@AkaivStudioOfficial)",
-        channel_id: "UCxxxxArchiveStudio",
-        youtube_channel: "@AkaivStudioOfficial",
-        vuddy_channel: "https://vuddy.io/channels/akaivstudio/home",
+        name: "ExampleCreator (@example-creator-1)",
+        channel_id: "UCxxxxExampleCreator1",
+        youtube_channel: "@example-creator-1",
+        vuddy_channel: "https://vuddy.io/channels/example-creator/home",
         total_comments: 8,
         total_likes: 141,
         overall_score: 85,
         sentiment_distribution: { positive: 0.88, neutral: 0.12, negative: 0.0 },
         country_stats: {
-          KR: { comment_count: 6, total_likes: 98 },
-          US: { comment_count: 1, total_likes: 28 },
+          US: { comment_count: 4, total_likes: 98 },
+          KR: { comment_count: 3, total_likes: 28 },
           JP: { comment_count: 1, total_likes: 15 }
         },
         comments: [
-          { text: "AkaiV Studio 영상 너무 좋아요! 감성 최고", likes: 42, sentiment: "positive", country: "KR", video_title: "AkaiV Studio - 추억의 영상 모음" },
-          { text: "이런 감성적인 영상 처음 봐요. 구독했습니다!", likes: 35, sentiment: "positive", country: "KR", video_title: "AkaiV Studio - 추억의 영상 모음" },
-          { text: "Love the nostalgic vibes! Amazing content", likes: 28, sentiment: "positive", country: "US", video_title: "AkaiV Studio - Memory Lane" },
-          { text: "편집 스타일이 정말 독특하네요", likes: 18, sentiment: "positive", country: "KR", video_title: "감성 영상 모음집" },
-          { text: "とても素敵な動画です！", likes: 15, sentiment: "positive", country: "JP", video_title: "AkaiV Studio - Memory Lane" },
-          { text: "매주 기다려지는 채널이에요", likes: 2, sentiment: "positive", country: "KR", video_title: "AkaiV Studio - 추억의 영상 모음" },
-          { text: "잘 보고 갑니다", likes: 1, sentiment: "neutral", country: "KR", video_title: "감성 영상 모음집" },
-          { text: "다음 영상도 기대됩니다!", likes: 0, sentiment: "positive", country: "KR", video_title: "감성 영상 모음집" }
+          { text: "ExampleCreator content is really great! Amazing quality", likes: 42, sentiment: "positive", country: "US", video_title: "ExampleCreator - Debut Video" },
+          { text: "Love the editing style, subscribed!", likes: 35, sentiment: "positive", country: "KR", video_title: "ExampleCreator - Debut Video" },
+          { text: "Love the nostalgic vibes! Amazing content", likes: 28, sentiment: "positive", country: "US", video_title: "ExampleCreator - Memory Lane" },
+          { text: "The production quality is really unique", likes: 18, sentiment: "positive", country: "KR", video_title: "Video Collection" },
+          { text: "Great video as always!", likes: 15, sentiment: "positive", country: "JP", video_title: "ExampleCreator - Memory Lane" },
+          { text: "Looking forward to each new upload", likes: 2, sentiment: "positive", country: "US", video_title: "ExampleCreator - Debut Video" },
+          { text: "Good content", likes: 1, sentiment: "neutral", country: "KR", video_title: "Video Collection" },
+          { text: "Can't wait for the next video!", likes: 0, sentiment: "positive", country: "US", video_title: "Video Collection" }
         ],
         videos: [
-          { title: "AkaiV Studio - 추억의 영상 모음", video_id: "archive_video_001", views: 125000, likes: 8500, comments: 342 },
-          { title: "감성 영상 모음집", video_id: "archive_video_002", views: 89000, likes: 6200, comments: 198 },
-          { title: "AkaiV Studio - Memory Lane", video_id: "archive_video_003", views: 67000, likes: 4800, comments: 156 }
+          { title: "ExampleCreator - Debut Video", video_id: "example_video_001", views: 125000, likes: 8500, comments: 342 },
+          { title: "Video Collection", video_id: "example_video_002", views: 89000, likes: 6200, comments: 198 },
+          { title: "ExampleCreator - Memory Lane", video_id: "example_video_003", views: 67000, likes: 4800, comments: 156 }
         ],
         google_links: [
-          { title: "AkaiV Studio Official YouTube Channel", url: "https://www.youtube.com/@AkaivStudioOfficial", snippet: "감성적인 영상으로 추억을 되살리는 AkaiV Studio 공식 유튜브 채널" },
-          { title: "AkaiV Studio - 인기 영상 모음", url: "https://example.com/archive-studio-top", snippet: "AkaiV Studio의 가장 인기 있는 감성 영상들을 모아봤습니다" },
-          { title: "AkaiV Studio 팬 커뮤니티", url: "https://example.com/archive-studio-community", snippet: "AkaiV Studio 팬들의 소통 공간. 최신 영상과 리뷰 공유" }
+          { title: "ExampleCreator Official YouTube Channel", url: "https://www.youtube.com/@example-creator-1", snippet: "Official YouTube channel of ExampleCreator" },
+          { title: "ExampleCreator - Top Videos", url: "https://example.com/example-creator-top", snippet: "Best videos from ExampleCreator" },
+          { title: "ExampleCreator Fan Community", url: "https://example.com/example-creator-community", snippet: "Fan community for ExampleCreator" }
         ],
         analysis: {
-          keywords: ["감성", "추억", "Archive", "영상", "편집", "nostalgic", "memory"],
+          keywords: ["aesthetic", "nostalgia", "ExampleCreator", "video", "edit", "memory"],
           insights: [
-            "감성적인 영상 스타일로 높은 시청자 만족도",
-            "독특한 편집 스타일에 대한 긍정적 피드백",
-            "추억과 향수를 테마로 한 콘텐츠 선호",
-            "해외 시청자층도 꾸준히 증가 중"
+            "High viewer satisfaction from aesthetic video style",
+            "Positive feedback on unique editing style",
+            "Nostalgia-themed content preferred by audience",
+            "Growing international viewership"
           ],
           trends: [
-            "레트로 감성과 추억 콘텐츠 인기 증가",
-            "정기적인 업로드로 충성 구독자 확보",
-            "영상 미학과 스토리텔링에 대한 관심 증가"
+            "Retro-aesthetic content gaining popularity",
+            "Regular uploads securing loyal subscriber base",
+            "Growing interest in visual storytelling"
           ]
         }
       },
       {
-        name: "바라바라 (BARABARA)",
-        channel_id: "UCxxxxBARABARA",
-        youtube_channel: "@barabara_official",
-        vuddy_channel: "https://vuddy.io/channels/barabara/home",
+        name: "Creator2 (@example-creator-2)",
+        channel_id: "UCxxxxCreator2",
+        youtube_channel: "@example-creator-2",
+        vuddy_channel: "https://vuddy.io/channels/creator2/home",
         total_comments: 12,
         total_likes: 238,
         overall_score: 92,
         sentiment_distribution: { positive: 0.83, neutral: 0.17, negative: 0.0 },
         country_stats: {
-          KR: { comment_count: 9, total_likes: 189 },
-          US: { comment_count: 2, total_likes: 35 },
-          JP: { comment_count: 1, total_likes: 14 }
+          US: { comment_count: 6, total_likes: 189 },
+          KR: { comment_count: 4, total_likes: 35 },
+          JP: { comment_count: 2, total_likes: 14 }
         },
         comments: [
-          { text: "바라바라님 영상 너무 재미있어요! 매일 기다려집니다 ㅎㅎ", likes: 45, sentiment: "positive", country: "KR", video_title: "바라바라의 일상 브이로그 #23" },
-          { text: "편집 퀄리티가 정말 좋네요. 구독했습니다!", likes: 38, sentiment: "positive", country: "KR", video_title: "바라바라의 일상 브이로그 #23" },
-          { text: "BARABARA's content is so unique and entertaining!", likes: 28, sentiment: "positive", country: "US", video_title: "Daily Vlog with BARABARA" },
-          { text: "이런 컨텐츠 너무 좋아요. 앞으로도 계속 올려주세요~", likes: 32, sentiment: "positive", country: "KR", video_title: "바라바라의 일상 브이로그 #23" },
-          { text: "색감이랑 분위기가 정말 좋아요", likes: 24, sentiment: "positive", country: "KR", video_title: "감성 카페 투어" }
+          { text: "Creator2's videos are so entertaining! Watching daily", likes: 45, sentiment: "positive", country: "US", video_title: "Creator2 Daily Vlog #23" },
+          { text: "The editing quality is really good. Subscribed!", likes: 38, sentiment: "positive", country: "KR", video_title: "Creator2 Daily Vlog #23" },
+          { text: "Creator2's content is so unique and entertaining!", likes: 28, sentiment: "positive", country: "US", video_title: "Daily Vlog with Creator2" },
+          { text: "Love this content, please keep uploading!", likes: 32, sentiment: "positive", country: "US", video_title: "Creator2 Daily Vlog #23" },
+          { text: "The color grading and atmosphere are really nice", likes: 24, sentiment: "positive", country: "KR", video_title: "Cafe Tour" }
         ],
         videos: [
-          { title: "바라바라의 일상 브이로그 #23", video_id: "bara_video_001", views: 45200, likes: 2840, comments: 156 },
-          { title: "감성 카페 투어", video_id: "bara_video_002", views: 38500, likes: 2150, comments: 98 },
-          { title: "Daily Vlog with BARABARA", video_id: "bara_video_003", views: 29800, likes: 1680, comments: 72 },
-          { title: "홈카페 만들기 🍰", video_id: "bara_video_004", views: 52100, likes: 3240, comments: 189 }
+          { title: "Creator2 Daily Vlog #23", video_id: "creator2_video_001", views: 45200, likes: 2840, comments: 156 },
+          { title: "Cafe Tour", video_id: "creator2_video_002", views: 38500, likes: 2150, comments: 98 },
+          { title: "Daily Vlog with Creator2", video_id: "creator2_video_003", views: 29800, likes: 1680, comments: 72 },
+          { title: "Home Cooking Tutorial", video_id: "creator2_video_004", views: 52100, likes: 3240, comments: 189 }
         ],
         google_links: [
-          { title: "바라바라 (BARABARA) - 인기 브이로거", url: "https://example.com/barabara-profile", snippet: "감성적인 일상 브이로그로 유명한 크리에이터 바라바라의 공식 페이지" },
-          { title: "BARABARA 최신 영상 모음", url: "https://example.com/barabara-videos", snippet: "바라바라의 인기 영상과 최신 업로드를 한눈에 확인하세요" },
-          { title: "바라바라 팬카페 커뮤니티", url: "https://example.com/barabara-community", snippet: "바라바라 팬들의 소통 공간. 최신 소식과 영상 리뷰 공유" },
-          { title: "BARABARA Instagram Official", url: "https://instagram.com/barabara_official", snippet: "바라바라의 공식 인스타그램. 일상과 비하인드 스토리" }
+          { title: "Creator2 - Popular Vlogger", url: "https://example.com/creator2-profile", snippet: "Official page of Creator2, known for lifestyle vlogs" },
+          { title: "Creator2 Latest Videos", url: "https://example.com/creator2-videos", snippet: "Browse Creator2's latest uploads" },
+          { title: "Creator2 Fan Community", url: "https://example.com/creator2-community", snippet: "Fan community for Creator2" },
+          { title: "Creator2 Instagram Official", url: "https://instagram.com/example-creator-2", snippet: "Creator2 official Instagram" }
         ],
         analysis: {
-          keywords: ["브이로그", "일상", "감성", "카페", "편집", "vlog", "lifestyle", "aesthetic"],
+          keywords: ["vlog", "lifestyle", "aesthetic", "cafe", "edit", "daily"],
           insights: [
-            "감성적인 영상 스타일로 높은 시청자 만족도 확보",
-            "편집 퀄리티에 대한 긍정적 피드백이 많음",
-            "일상 브이로그 컨텐츠가 주요 콘텐츠로 자리잡음",
-            "한국 시청자 중심이지만 해외 시청자도 꾸준히 증가 중"
+            "High viewer satisfaction from aesthetic video style",
+            "Lots of positive feedback on editing quality",
+            "Daily vlog content becoming main content format",
+            "Growing international audience alongside domestic"
           ],
           trends: [
-            "홈카페, 감성 카페 투어 등 라이프스타일 콘텐츠 인기",
-            "정기적인 업로드 일정으로 충성도 높은 구독자층 형성",
-            "영상 편집과 색감에 대한 관심도가 높음"
+            "Lifestyle and cafe content gaining popularity",
+            "Regular upload schedule building loyal subscriber base",
+            "High interest in video editing and color grading"
           ]
         }
       },
       {
-        name: "이브닛 (IVNIT)",
-        channel_id: "UCxxxxIVNIT",
-        youtube_channel: "@ivnit_official",
+        name: "Creator3 (@example-creator-3)",
+        channel_id: "UCxxxxCreator3",
+        youtube_channel: "@example-creator-3",
         total_comments: 15,
         total_likes: 312,
         overall_score: 89,
         sentiment_distribution: { positive: 0.87, neutral: 0.07, negative: 0.07 },
         country_stats: {
-          KR: { comment_count: 11, total_likes: 256 },
-          US: { comment_count: 3, total_likes: 42 },
-          JP: { comment_count: 1, total_likes: 14 }
+          US: { comment_count: 8, total_likes: 256 },
+          KR: { comment_count: 5, total_likes: 42 },
+          JP: { comment_count: 2, total_likes: 14 }
         },
         comments: [
-          { text: "이브닛님 목소리 너무 좋아요! ASMR 최고 ㅠㅠ", likes: 52, sentiment: "positive", country: "KR", video_title: "밤의 힐링 ASMR 🌙" },
-          { text: "매일 자기 전에 듣고 자요. 불면증에 진짜 도움돼요", likes: 48, sentiment: "positive", country: "KR", video_title: "밤의 힐링 ASMR 🌙" },
+          { text: "Creator3's voice is amazing! Best ASMR content", likes: 52, sentiment: "positive", country: "US", video_title: "Night Healing ASMR" },
+          { text: "Listen to this every night before sleep. Really helps!", likes: 48, sentiment: "positive", country: "KR", video_title: "Night Healing ASMR" },
           { text: "Your ASMR content is absolutely perfect for relaxation", likes: 35, sentiment: "positive", country: "US", video_title: "Evening Relaxation ASMR" },
-          { text: "이브닛님 영상은 퀄리티가 다르네요. 구독 박고 갑니다!", likes: 41, sentiment: "positive", country: "KR", video_title: "밤의 힐링 ASMR 🌙" },
-          { text: "소리 잡아주시는 게 정말 좋아요. 녹음 장비도 좋으신 것 같고", likes: 28, sentiment: "positive", country: "KR", video_title: "수면 유도 ASMR" }
+          { text: "Creator3's videos have such great quality!", likes: 41, sentiment: "positive", country: "US", video_title: "Night Healing ASMR" },
+          { text: "The sound recording quality is incredible", likes: 28, sentiment: "positive", country: "KR", video_title: "Sleep ASMR" }
         ],
         videos: [
-          { title: "밤의 힐링 ASMR 🌙", video_id: "ivnit_video_001", views: 78400, likes: 4250, comments: 287 },
-          { title: "수면 유도 ASMR", video_id: "ivnit_video_002", views: 62100, likes: 3680, comments: 198 },
-          { title: "Evening Relaxation ASMR", video_id: "ivnit_video_003", views: 51200, likes: 2940, comments: 156 },
-          { title: "백색소음과 함께하는 ASMR", video_id: "ivnit_video_004", views: 89500, likes: 5120, comments: 342 },
-          { title: "빗소리 ASMR 3시간", video_id: "ivnit_video_005", views: 124800, likes: 6780, comments: 421 }
+          { title: "Night Healing ASMR", video_id: "creator3_video_001", views: 78400, likes: 4250, comments: 287 },
+          { title: "Sleep ASMR", video_id: "creator3_video_002", views: 62100, likes: 3680, comments: 198 },
+          { title: "Evening Relaxation ASMR", video_id: "creator3_video_003", views: 51200, likes: 2940, comments: 156 },
+          { title: "White Noise ASMR", video_id: "creator3_video_004", views: 89500, likes: 5120, comments: 342 },
+          { title: "Rain Sounds ASMR 3 Hours", video_id: "creator3_video_005", views: 124800, likes: 6780, comments: 421 }
         ],
         google_links: [
-          { title: "이브닛 (IVNIT) - ASMR 전문 크리에이터", url: "https://example.com/ivnit-profile", snippet: "힐링과 수면 유도 ASMR 영상으로 유명한 이브닛의 공식 페이지" },
-          { title: "IVNIT ASMR 인기 영상 TOP 10", url: "https://example.com/ivnit-top-videos", snippet: "이브닛의 가장 인기 있는 ASMR 영상들을 모아봤습니다" },
-          { title: "이브닛 ASMR 후기 및 리뷰", url: "https://example.com/ivnit-reviews", snippet: "실제 시청자들이 남긴 이브닛 ASMR 영상 효과 후기" },
-          { title: "IVNIT 수면 ASMR 플레이리스트", url: "https://example.com/ivnit-playlist", snippet: "이브닛의 수면 유도 ASMR 영상 모음 플레이리스트" },
-          { title: "이브닛 장비 리뷰 - 사용하는 마이크는?", url: "https://example.com/ivnit-equipment", snippet: "이브닛이 사용하는 ASMR 녹음 장비 소개 및 리뷰" }
+          { title: "Creator3 - ASMR Creator", url: "https://example.com/creator3-profile", snippet: "Official page for Creator3, known for healing ASMR content" },
+          { title: "Creator3 ASMR Top 10", url: "https://example.com/creator3-top-videos", snippet: "Best ASMR videos from Creator3" },
+          { title: "Creator3 ASMR Reviews", url: "https://example.com/creator3-reviews", snippet: "Viewer reviews of Creator3 ASMR content" },
+          { title: "Creator3 Sleep ASMR Playlist", url: "https://example.com/creator3-playlist", snippet: "Sleep ASMR video playlist from Creator3" },
+          { title: "Creator3 Equipment Review - What mic does Creator3 use?", url: "https://example.com/creator3-equipment", snippet: "Review of ASMR recording equipment used by Creator3" }
         ],
         analysis: {
-          keywords: ["ASMR", "힐링", "수면", "relaxation", "sleep", "백색소음", "빗소리", "healing"],
+          keywords: ["ASMR", "healing", "sleep", "relaxation", "white noise", "rain sounds"],
           insights: [
-            "ASMR 콘텐츠로 높은 시청 시간과 재생 수 기록",
-            "수면 유도 효과에 대한 긍정적 피드백 다수",
-            "음질과 녹음 장비에 대한 관심도가 높음",
-            "정기적인 업로드로 충성 구독자층 확보"
+            "High watch time and views from ASMR content",
+            "Positive feedback on sleep-inducing effectiveness",
+            "High interest in audio quality and recording equipment",
+            "Regular uploads securing loyal subscriber base"
           ],
           trends: [
-            "장시간 ASMR 영상(3시간 이상)의 인기 증가",
-            "빗소리, 백색소음 등 자연 사운드 콘텐츠 선호도 높음",
-            "불면증 개선 및 스트레스 해소 목적의 시청자 증가",
-            "해외 시청자 유입이 꾸준히 증가하는 추세"
+            "Long-form ASMR videos (3+ hours) gaining popularity",
+            "Rain and white noise content preferred",
+            "Growing viewers seeking insomnia relief and stress reduction",
+            "Steady growth in international viewership"
           ]
         }
       }
@@ -720,13 +756,12 @@ function Dashboard() {
   const [selectedScan, setSelectedScan] = useState(null);
   const [platformSummary, setPlatformSummary] = useState(null);
 
-  // AkaiV Studio 필터링 효과
+  // Example creator filter effect
   useEffect(() => {
     if (showArchiveStudioCreators && allVuddyCreators.length > 0) {
       const filtered = allVuddyCreators.filter(c => {
         const name = (c.name || '').toLowerCase();
-        return name.includes('u32') || name.includes('여르미') || name.includes('한결') || 
-               name.includes('비몽') || name.includes('샤르망') || name.includes('akaiv');
+        return name.includes('creator1') || name.includes('creator2') || name.includes('example');
       });
       setVuddyCreators(filtered);
     } else if (!showArchiveStudioCreators && allVuddyCreators.length > 0) {
@@ -924,6 +959,404 @@ function Dashboard() {
         </div>
       </div>
 
+      {/* URL 분석 섹션 */}
+      <div className="url-analyze-section" style={{ marginBottom: '30px' }}>
+        <div
+          className="url-analyze-toggle"
+          onClick={() => setShowAnalyzer(!showAnalyzer)}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            cursor: 'pointer', padding: '16px 20px',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            borderRadius: showAnalyzer ? '12px 12px 0 0' : '12px',
+            color: 'white', fontWeight: 'bold', fontSize: '16px',
+          }}
+        >
+          <span>🔍 URL 분석 - SNS URL을 붙여넣어 바로 분석</span>
+          <span style={{ fontSize: '20px' }}>{showAnalyzer ? '▲' : '▼'}</span>
+        </div>
+
+        {showAnalyzer && (
+          <div style={{
+            background: '#fff', border: '2px solid #764ba2', borderTop: 'none',
+            borderRadius: '0 0 12px 12px', padding: '20px',
+          }}>
+            <form onSubmit={handleAnalyzeUrl} style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
+              <div style={{ flex: 1, position: 'relative' }}>
+                <input
+                  type="url"
+                  value={analyzeUrl}
+                  onChange={(e) => setAnalyzeUrl(e.target.value)}
+                  placeholder="https://www.youtube.com/watch?v=... or any SNS URL"
+                  disabled={analyzeLoading}
+                  style={{
+                    width: '100%', padding: '12px 16px', fontSize: '15px',
+                    border: '2px solid #e0e0e0', borderRadius: '10px', outline: 'none',
+                    boxSizing: 'border-box', transition: 'border-color 0.2s',
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = '#667eea'}
+                  onBlur={(e) => e.target.style.borderColor = '#e0e0e0'}
+                />
+                {detectPlatform(analyzeUrl) && (
+                  <span style={{
+                    position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
+                    padding: '4px 10px', borderRadius: '12px', color: 'white', fontSize: '12px',
+                    fontWeight: 600, backgroundColor: PLATFORM_INFO[detectPlatform(analyzeUrl)]?.color || '#666',
+                  }}>
+                    {PLATFORM_INFO[detectPlatform(analyzeUrl)]?.icon} {PLATFORM_INFO[detectPlatform(analyzeUrl)]?.name}
+                  </span>
+                )}
+              </div>
+              <button
+                type="submit"
+                disabled={analyzeLoading || !analyzeUrl.trim()}
+                style={{
+                  padding: '12px 28px',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: 'white', border: 'none', borderRadius: '10px',
+                  fontSize: '15px', fontWeight: 600, cursor: 'pointer',
+                  opacity: (analyzeLoading || !analyzeUrl.trim()) ? 0.5 : 1,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {analyzeLoading ? '분석 중...' : '분석'}
+              </button>
+            </form>
+
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
+              {Object.entries(PLATFORM_INFO).map(([key, info]) => (
+                <span key={key} style={{
+                  padding: '4px 10px', border: `1px solid ${info.color}`,
+                  borderRadius: '16px', fontSize: '12px', color: '#555',
+                }}>
+                  {info.icon} {info.name}
+                </span>
+              ))}
+            </div>
+
+            {analyzeError && (
+              <div style={{
+                background: '#fff3f3', border: '1px solid #ffcdd2',
+                borderRadius: '8px', padding: '12px 16px', color: '#c62828', marginBottom: '16px',
+              }}>
+                {analyzeError}
+              </div>
+            )}
+
+            {analyzeLoading && (
+              <div style={{ textAlign: 'center', padding: '32px', color: '#666' }}>
+                <div style={{
+                  width: '36px', height: '36px', border: '3px solid #e0e0e0',
+                  borderTopColor: '#667eea', borderRadius: '50%',
+                  animation: 'spin 0.8s linear infinite', margin: '0 auto 12px',
+                }} />
+                <p>콘텐츠 분석 중...</p>
+              </div>
+            )}
+
+            {analyzeResult && (
+              <div style={{
+                background: '#fafafa', border: '1px solid #e0e0e0',
+                borderRadius: '12px', overflow: 'hidden', marginBottom: '16px',
+              }}>
+                {/* Result Header */}
+                <div style={{
+                  padding: '16px 20px', borderBottom: '1px solid #eee',
+                  display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap',
+                }}>
+                  <span style={{
+                    padding: '4px 12px', borderRadius: '6px', color: 'white',
+                    fontSize: '12px', fontWeight: 700, textTransform: 'uppercase',
+                    backgroundColor: PLATFORM_INFO[analyzeResult.platform]?.color || '#666',
+                  }}>
+                    {PLATFORM_INFO[analyzeResult.platform]?.name || analyzeResult.platform}
+                  </span>
+                  <h3 style={{ fontSize: '18px', margin: 0, flex: 1, color: '#1a1a2e' }}>
+                    {analyzeResult.url || analyzeUrl ? (
+                      <a href={analyzeResult.url || analyzeUrl} target="_blank" rel="noopener noreferrer"
+                        style={{ color: '#1a1a2e', textDecoration: 'none' }}
+                        onMouseEnter={(e) => e.target.style.color = '#1a73e8'}
+                        onMouseLeave={(e) => e.target.style.color = '#1a1a2e'}
+                      >
+                        {analyzeResult.title || analyzeResult.gallery_id || analyzeResult.subreddit || 'Analysis Result'} ↗
+                      </a>
+                    ) : (
+                      analyzeResult.title || analyzeResult.gallery_id || analyzeResult.subreddit || 'Analysis Result'
+                    )}
+                  </h3>
+                  {analyzeResult.analyzed_at && (
+                    <span style={{ fontSize: '12px', color: '#999' }}>
+                      {new Date(analyzeResult.analyzed_at).toLocaleString('ko-KR')}
+                    </span>
+                  )}
+                </div>
+
+                {/* Stats */}
+                <div style={{
+                  display: 'flex', gap: '16px', padding: '16px 20px', flexWrap: 'wrap',
+                  background: '#fff', borderBottom: '1px solid #eee',
+                }}>
+                  {analyzeResult.view_count != null && (
+                    <div style={{ textAlign: 'center', minWidth: '70px' }}>
+                      <div style={{ fontSize: '22px', fontWeight: 700, color: '#1a1a2e' }}>{formatAnalyzeNumber(analyzeResult.view_count)}</div>
+                      <div style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase' }}>Views</div>
+                    </div>
+                  )}
+                  {analyzeResult.like_count != null && (
+                    <div style={{ textAlign: 'center', minWidth: '70px' }}>
+                      <div style={{ fontSize: '22px', fontWeight: 700, color: '#1a1a2e' }}>{formatAnalyzeNumber(analyzeResult.like_count)}</div>
+                      <div style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase' }}>Likes</div>
+                    </div>
+                  )}
+                  {analyzeResult.comment_count != null && (
+                    <div style={{ textAlign: 'center', minWidth: '70px' }}>
+                      <div style={{ fontSize: '22px', fontWeight: 700, color: '#1a1a2e' }}>{formatAnalyzeNumber(analyzeResult.comment_count)}</div>
+                      <div style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase' }}>Comments</div>
+                    </div>
+                  )}
+                  {analyzeResult.subscriber_count != null && (
+                    <div style={{ textAlign: 'center', minWidth: '70px' }}>
+                      <div style={{ fontSize: '22px', fontWeight: 700, color: '#1a1a2e' }}>{formatAnalyzeNumber(analyzeResult.subscriber_count)}</div>
+                      <div style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase' }}>Subscribers</div>
+                    </div>
+                  )}
+                  {analyzeResult.total_posts != null && (
+                    <div style={{ textAlign: 'center', minWidth: '70px' }}>
+                      <div style={{ fontSize: '22px', fontWeight: 700, color: '#1a1a2e' }}>{formatAnalyzeNumber(analyzeResult.total_posts)}</div>
+                      <div style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase' }}>Posts</div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Description */}
+                {analyzeResult.description && (
+                  <div style={{ padding: '12px 20px', borderBottom: '1px solid #eee' }}>
+                    <p style={{ margin: 0, color: '#333', lineHeight: 1.5, fontSize: '14px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                      {analyzeResult.description}
+                    </p>
+                  </div>
+                )}
+
+                {/* Sentiment Charts */}
+                {analyzeResult.analysis && (
+                  <div style={{ padding: '16px 20px', borderBottom: '1px solid #eee' }}>
+                    <h4 style={{ margin: '0 0 12px', fontSize: '15px', color: '#1a1a2e' }}>
+                      감성 분석 ({analyzeResult.analysis.total} items)
+                    </h4>
+                    <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+                      <div style={{ flex: 1, minWidth: '250px' }}>
+                        <ResponsiveContainer width="100%" height={200}>
+                          <PieChart>
+                            <Pie
+                              data={[
+                                { name: 'Positive', value: analyzeResult.analysis.sentiment.positive, color: SENTIMENT_COLORS.positive },
+                                { name: 'Neutral', value: analyzeResult.analysis.sentiment.neutral, color: SENTIMENT_COLORS.neutral },
+                                { name: 'Negative', value: analyzeResult.analysis.sentiment.negative, color: SENTIMENT_COLORS.negative },
+                              ].filter(d => d.value > 0)}
+                              cx="50%" cy="50%" outerRadius={70} dataKey="value"
+                              label={({ name, value }) => `${name}: ${value}`}
+                            >
+                              {[SENTIMENT_COLORS.positive, SENTIMENT_COLORS.neutral, SENTIMENT_COLORS.negative].map((color, i) => (
+                                <Cell key={i} fill={color} />
+                              ))}
+                            </Pie>
+                            <Legend />
+                            <Tooltip />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                      {analyzeResult.analysis.top_keywords?.length > 0 && (
+                        <div style={{ flex: 1, minWidth: '250px' }}>
+                          <h5 style={{ margin: '0 0 8px', fontSize: '13px', color: '#666' }}>Top Keywords</h5>
+                          <ResponsiveContainer width="100%" height={200}>
+                            <BarChart data={analyzeResult.analysis.top_keywords.slice(0, 8)} layout="vertical">
+                              <XAxis type="number" />
+                              <YAxis type="category" dataKey="word" width={80} fontSize={12} />
+                              <Tooltip />
+                              <Bar dataKey="count" fill="#667eea" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ marginTop: '8px', fontSize: '14px', color: '#666' }}>
+                      Overall: <span style={{
+                        fontWeight: 600,
+                        color: analyzeResult.analysis.overall === 'positive' ? '#4CAF50' :
+                               analyzeResult.analysis.overall === 'negative' ? '#F44336' : '#9E9E9E'
+                      }}>{analyzeResult.analysis.overall}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* YouTube Comments */}
+                {analyzeResult.comments && analyzeResult.comments.length > 0 && (
+                  <div style={{ padding: '16px 20px' }}>
+                    <h4 style={{ margin: '0 0 12px', fontSize: '15px', color: '#1a1a2e' }}>
+                      💬 댓글 ({analyzeResult.comments.length})
+                    </h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {analyzeResult.comments.slice(0, 30).map((comment, idx) => (
+                        <div key={idx} style={{
+                          padding: '10px 14px', border: '1px solid #eee',
+                          borderRadius: '8px', background: '#fff',
+                        }}>
+                          <div style={{ marginBottom: '4px', lineHeight: 1.5, color: '#333', wordBreak: 'break-word', fontSize: '14px' }}
+                            dangerouslySetInnerHTML={{ __html: comment.text || '' }}
+                          />
+                          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', fontSize: '12px', color: '#888' }}>
+                            {comment.author && <span style={{ fontWeight: 600, color: '#555' }}>{comment.author}</span>}
+                            {comment.like_count != null && <span>👍 {formatAnalyzeNumber(comment.like_count)}</span>}
+                            {comment.published_at && <span>{new Date(comment.published_at).toLocaleDateString('ko-KR')}</span>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Recent Videos */}
+                {analyzeResult.recent_videos && analyzeResult.recent_videos.length > 0 && (
+                  <div style={{ padding: '16px 20px' }}>
+                    <h4 style={{ margin: '0 0 12px', fontSize: '15px', color: '#1a1a2e' }}>
+                      🎬 최근 동영상 ({analyzeResult.recent_videos.length})
+                    </h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {analyzeResult.recent_videos.slice(0, 15).map((video, idx) => (
+                        <div key={idx} style={{
+                          padding: '10px 14px', border: '1px solid #eee',
+                          borderRadius: '8px', background: '#fff',
+                        }}>
+                          <a href={video.url || `https://www.youtube.com/watch?v=${video.video_id}`}
+                            target="_blank" rel="noopener noreferrer"
+                            style={{ color: '#1a73e8', textDecoration: 'none', fontWeight: 600, fontSize: '14px', lineHeight: 1.4 }}
+                          >
+                            {video.title || video.video_id}
+                          </a>
+                          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', fontSize: '12px', color: '#888', marginTop: '4px' }}>
+                            {video.view_count != null && <span>👁 {formatAnalyzeNumber(video.view_count)}</span>}
+                            {video.likes != null && <span>👍 {formatAnalyzeNumber(video.likes)}</span>}
+                            {video.published_at && <span>{new Date(video.published_at).toLocaleDateString('ko-KR')}</span>}
+                            {video.description && <span style={{ color: '#999' }}>{video.description.substring(0, 80)}...</span>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* DC/Twitter Posts with Comments */}
+                {analyzeResult.posts && analyzeResult.posts.length > 0 && (
+                  <div style={{ padding: '16px 20px' }}>
+                    <h4 style={{ margin: '0 0 12px', fontSize: '15px', color: '#1a1a2e' }}>
+                      📝 게시글 ({analyzeResult.posts.length})
+                    </h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {analyzeResult.posts.slice(0, 20).map((post, idx) => (
+                        <div key={idx} style={{
+                          border: '1px solid #e0e0e0', borderRadius: '10px', background: '#fff', overflow: 'hidden',
+                        }}>
+                          {/* Post header */}
+                          <div style={{ padding: '12px 14px', borderBottom: (post.comments && post.comments.length > 0) ? '1px solid #f0f0f0' : 'none' }}>
+                            {post.url ? (
+                              <a href={post.url} target="_blank" rel="noopener noreferrer"
+                                style={{ color: '#1a73e8', textDecoration: 'none', fontWeight: 600, fontSize: '14px', lineHeight: 1.4 }}
+                              >
+                                {post.title || post.text || '(제목 없음)'}
+                              </a>
+                            ) : (
+                              <div style={{ fontWeight: 600, fontSize: '14px', color: '#333', lineHeight: 1.4 }}>
+                                {post.title || post.text || '(제목 없음)'}
+                              </div>
+                            )}
+                            {post.content && (
+                              <div style={{ marginTop: '6px', fontSize: '13px', color: '#555', lineHeight: 1.5, wordBreak: 'break-word' }}>
+                                {post.content.length > 200 ? post.content.substring(0, 200) + '...' : post.content}
+                              </div>
+                            )}
+                            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', fontSize: '12px', color: '#888', marginTop: '6px' }}>
+                              {post.author && <span style={{ fontWeight: 600, color: '#555' }}>{post.author}</span>}
+                              {post.date && <span>{post.date}</span>}
+                              {post.view_count != null && <span>👁 {post.view_count}</span>}
+                              {post.recommend_count != null && <span>👍 {post.recommend_count}</span>}
+                              {post.comment_count != null && <span>💬 {post.comment_count}</span>}
+                              {post.like_count != null && <span>👍 {formatAnalyzeNumber(post.like_count)}</span>}
+                              {post.retweet_count != null && <span>🔄 {post.retweet_count}</span>}
+                            </div>
+                          </div>
+                          {/* Comments within this post */}
+                          {post.comments && post.comments.length > 0 && (
+                            <div style={{ padding: '8px 14px 12px', background: '#fafafa' }}>
+                              <div style={{ fontSize: '12px', fontWeight: 600, color: '#666', marginBottom: '6px' }}>
+                                💬 댓글 ({post.comments.length}개)
+                              </div>
+                              {post.comments.slice(0, 10).map((comment, cidx) => {
+                                const commentText = comment.text || comment.content || '';
+                                return (
+                                  <div key={cidx} style={{
+                                    padding: '6px 10px', marginBottom: '4px', borderRadius: '6px',
+                                    background: '#fff', border: '1px solid #eee', fontSize: '13px',
+                                  }}>
+                                    <div style={{ color: '#333', lineHeight: 1.4, wordBreak: 'break-word' }}>
+                                      {commentText || '(내용 없음)'}
+                                    </div>
+                                    <div style={{ fontSize: '11px', color: '#999', marginTop: '3px' }}>
+                                      {comment.author || '익명'}
+                                      {comment.date ? ` · ${comment.date}` : ''}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                              {post.comments.length > 10 && (
+                                <div style={{ fontSize: '12px', color: '#999', textAlign: 'center', marginTop: '4px' }}>
+                                  +{post.comments.length - 10}개 더 있음
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Recent analysis history */}
+            {analyzeHistory.length > 0 && (
+              <div style={{ marginTop: '12px' }}>
+                <h4 style={{ fontSize: '13px', color: '#666', marginBottom: '8px' }}>최근 분석 기록</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {analyzeHistory.map((item, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => setAnalyzeUrl(item.url)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '8px',
+                        padding: '8px 12px', borderRadius: '6px', cursor: 'pointer',
+                        transition: 'background 0.15s',
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = '#f5f5f5'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <span style={{ fontSize: '16px', color: PLATFORM_INFO[item.platform]?.color || '#666' }}>
+                        {PLATFORM_INFO[item.platform]?.icon}
+                      </span>
+                      <span style={{ flex: 1, fontSize: '13px', color: '#333', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {item.title}
+                      </span>
+                      <span style={{ fontSize: '11px', color: '#999' }}>
+                        {new Date(item.analyzed_at).toLocaleTimeString('ko-KR')}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* DC인사이드 갤러리 */}
       {dcinsideGalleries.length > 0 && (selectedPlatform === 'all' || selectedPlatform === 'dcinside') && (selectedPlatform === 'all' || selectedPlatform === 'dcinside') && (
         <div className="dcinside-section" style={{ marginBottom: '40px' }}>
@@ -993,8 +1426,8 @@ function Dashboard() {
                   </h3>
                   <a
                     href={(() => {
-                      // 미니 갤러리 ID 목록 (skoshism은 마이너갤러리)
-                      const miniGalleries = ['ivnit', 'akaiv', 'soopvirtualstreamer', 'spv', 'soopstreaming'];
+                      // Mini gallery ID list (example gallery IDs)
+                      const miniGalleries = ['example-gallery-1', 'soopvirtualstreamer', 'spv', 'soopstreaming'];
                       const galleryType = miniGalleries.includes(gallery.gallery_id) ? 'mini' : 'mgallery';
                       return `https://gall.dcinside.com/${galleryType}/board/lists/?id=${gallery.gallery_id}`;
                     })()}
@@ -1549,7 +1982,7 @@ function Dashboard() {
               🎤 크리에이터 검색
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {['크리에이터브랜드', '예시기업', '스코시즘', '아카이브', '바라바라', '이브닛', 'u32', '여르미', '한결', '비몽', '샤르망', '나나문'].map((keyword) => (
+              {['CreatorBrand', 'ExampleCorp', 'ExampleCreator', 'Creator1', 'Creator2', 'Creator3', 'Creator4'].map((keyword) => (
                 <a
                   key={keyword}
                   href={`https://twitter.com/search?q=${encodeURIComponent(keyword)}&src=typed_query&f=live`}
@@ -1584,16 +2017,12 @@ function Dashboard() {
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
               {[
-                { label: '여르미 굿즈', query: '여르미 굿즈' },
-                { label: '한결 굿즈', query: '한결 굿즈' },
-                { label: '비몽 굿즈', query: '비몽 굿즈' },
-                { label: '샤르망 굿즈', query: '샤르망 굿즈' },
-                { label: 'u32 굿즈', query: 'u32 굿즈' },
-                { label: '나나문 굿즈', query: '나나문 굿즈' },
-                { label: '스코시즘 굿즈', query: '스코시즘 굿즈' },
-                { label: '크리에이터브랜드 굿즈', query: '크리에이터브랜드 굿즈' },
-                { label: '이브닛 굿즈', query: '이브닛 굿즈' },
-                { label: '아카이브 굿즈', query: '아카이브 굿즈' },
+                { label: 'Creator1 merch', query: 'Creator1 merch' },
+                { label: 'Creator2 merch', query: 'Creator2 merch' },
+                { label: 'Creator3 merch', query: 'Creator3 merch' },
+                { label: 'Creator4 merch', query: 'Creator4 merch' },
+                { label: 'CreatorBrand merch', query: 'CreatorBrand merch' },
+                { label: 'ExampleCreator merch', query: 'ExampleCreator merch' },
               ].map((item) => (
                 <a
                   key={item.label}
@@ -1636,7 +2065,7 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* YouTube 댓글 키워드 분석 - 메인 대시보드에서 제거됨 (/skoshism, /akaiv-studio 페이지에서 확인 가능) */}
+      {/* YouTube comment keyword analysis - removed from main dashboard (available on /creator/* pages) */}
       {false && allVuddyCreators.length > 0 && allVuddyCreators.some(c => c.comments && c.comments.length > 0) && (
         <div className="youtube-comments-section" style={{ marginBottom: '40px' }}>
           <h2 style={{ color: '#ff0000', marginBottom: '20px', fontWeight: '900' }}>
@@ -1671,37 +2100,28 @@ function Dashboard() {
               // 키워드별 그룹화
               const text = (comment.text || '').toLowerCase();
               const keywords = [
-                // ★★★ 최우선순위: 크리에이터 이름 및 별명 ★★★
-                '아카이브', 'archive', '바라바라', 'barabara', '이브닛', 'ivnit', '스코시즘', 'skoshism',
-                'u32', '사미', '우사미',
-                '여르미', '엶',
-                '한결', '결',
-                '비몽', '몽',
-                '샤르망', '쭈쭈',
-                '나나문', '쿠우',
-                // ★★★ 최우선순위: 크리에이터브랜드 및 예시기업 ★★★
-                '크리에이터브랜드', 'creatorbrand', '예시기업', 'examplecorp', 'ExampleCorp',
-                // ★★★ 최우선순위: 굿즈/상품 ★★★
-                '굿즈', '포토카드', '포카', '아크릴', '키링', '스티커', '포스터', '엽서',
-                '앨범', '음반', '한정판', '시즌그리팅', '캘린더', '머치', '공식굿즈',
-                // ★★ 높은 우선순위: 판매/구매 ★★
-                '구매', '판매', '주문', '예약', '결제', '배송', '품절', '재입고', '가격', '할인', '이벤트', '특전',
-                // ★★ 높은 우선순위: 팬 활동 ★★
-                '팬싸', '영통팬싸', '응모', '당첨', '럭드', '포토타임', '생일카페', '서포트', '조공',
-                // ★★ 높은 우선순위: 디지털 상품 ★★
-                '음원', '다운로드', '디지털싱글', '뮤직비디오', 'MV', '티저', '커버곡', '오리지널곡',
-                '멤버십', '후원', '슈퍼챗', '보이스팩', '월페이퍼', '보팩', '펀딩',
-                // 활동 관련
-                '버튜버', 'vtuber', '크리에이터', '유튜버', '숲',
-                // 콘텐츠 관련
-                '노래', '커버', '방송', '영상', '브이로그', 'vlog', 'ASMR', '라이브', '스트리밍',
-                // 반응 관련
-                '좋아요', '구독', '최고', '대박', '감동', '응원', '팬', '힐링',
-                // 품질 관련
-                '감성', '편집', '퀄리티', '목소리', '실력',
-                // 성별 관련
-                '남성', '여성', '남자', '여자', '남캐', '여캐', '남버튜버', '여버튜버',
-                '오빠', '언니', '누나', '형'
+                // Creator names and aliases
+                'ExampleCreator', 'examplecreator',
+                'CreatorBrand', 'creatorbrand', 'ExampleCorp', 'examplecorp',
+                'Creator1', 'creator1', 'Creator2', 'creator2',
+                'Creator3', 'creator3', 'Creator4', 'creator4',
+                // Merchandise/goods
+                'merch', 'goods', 'photocard', 'album', 'keyring', 'sticker', 'poster',
+                // Commerce
+                'purchase', 'order', 'shipping', 'sold out', 'restock', 'discount', 'event',
+                // Fan activities
+                'fansign', 'fan meet', 'birthday cafe', 'support',
+                // Digital goods
+                'digital single', 'music video', 'MV', 'teaser', 'cover song', 'original song',
+                'membership', 'donation', 'superchat', 'voicepack', 'wallpaper', 'funding',
+                // Activity
+                'vtuber', 'creator', 'streamer',
+                // Content
+                'song', 'cover', 'stream', 'video', 'vlog', 'ASMR', 'live', 'streaming',
+                // Reactions
+                'like', 'subscribe', 'best', 'amazing', 'emotion', 'cheer', 'fan', 'healing',
+                // Quality
+                'aesthetic', 'edit', 'quality', 'voice', 'skill',
               ];
               keywords.forEach(keyword => {
                 if (text.includes(keyword.toLowerCase())) {
@@ -2051,11 +2471,11 @@ function Dashboard() {
                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                   <div style={{ background: '#fafafa', padding: '12px', borderRadius: '8px', flex: '1', minWidth: '200px' }}>
                     <div style={{ fontSize: '12px', color: '#1da1f2', marginBottom: '8px', fontWeight: 'bold' }}>🎤 크리에이터</div>
-                    <div style={{ fontSize: '13px', color: '#333' }}>크리에이터브랜드, 예시기업, 스코시즘, 아카이브, 바라바라, 이브닛, u32, 여르미, 한결, 비몽, 샤르망, 나나문</div>
+                    <div style={{ fontSize: '13px', color: '#333' }}>CreatorBrand, ExampleCorp, ExampleCreator, Creator1, Creator2, Creator3, Creator4</div>
                   </div>
                   <div style={{ background: '#fafafa', padding: '12px', borderRadius: '8px', flex: '1', minWidth: '200px' }}>
                     <div style={{ fontSize: '12px', color: '#9c27b0', marginBottom: '8px', fontWeight: 'bold' }}>🔍 복합 검색</div>
-                    <div style={{ fontSize: '13px', color: '#333' }}>멤버 이름 + 굿즈 (예: 여르미 굿즈, 한결 굿즈 등)</div>
+                    <div style={{ fontSize: '13px', color: '#333' }}>Creator name + merch (e.g. Creator1 merch, Creator2 merch, etc.)</div>
                   </div>
                 </div>
               </div>
@@ -2107,137 +2527,50 @@ function Dashboard() {
         )}
       </div>
 
-      {/* 상세 페이지 링크 섹션 */}
+      {/* Creator detail page links */}
       <div style={{ marginTop: '40px', padding: '20px', textAlign: 'center', borderTop: '2px solid #e0e0e0' }}>
+        <h3 style={{ marginBottom: '16px', color: '#555', fontSize: '16px' }}>Creator Detail Pages</h3>
         <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', flexWrap: 'wrap' }}>
-          <a 
-            href="/akaiv-studio" 
-            onClick={(e) => {
-              e.preventDefault();
-              window.history.pushState({}, '', '/akaiv-studio');
-              window.dispatchEvent(new PopStateEvent('popstate'));
-            }}
-            style={{
-              display: 'inline-block',
-              padding: '12px 24px',
-              background: '#667eea',
-              color: '#ffffff',
-              textDecoration: 'none',
-              borderRadius: '8px',
-              fontWeight: 'bold',
-              fontSize: '16px',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 4px 8px rgba(0,0,0,0.1)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#764ba2';
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 6px 12px rgba(0,0,0,0.15)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = '#667eea';
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
-            }}
-          >
-            🎭 AkaiV Studio 상세 페이지 →
-          </a>
-          <a 
-            href="/skoshism" 
-            onClick={(e) => {
-              e.preventDefault();
-              window.history.pushState({}, '', '/skoshism');
-              window.dispatchEvent(new PopStateEvent('popstate'));
-            }}
-            style={{
-              display: 'inline-block',
-              padding: '12px 24px',
-              background: '#0253fe',
-              color: '#ffffff',
-              textDecoration: 'none',
-              borderRadius: '8px',
-              fontWeight: 'bold',
-              fontSize: '16px',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 4px 8px rgba(0,0,0,0.1)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#0041cc';
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 6px 12px rgba(0,0,0,0.15)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = '#0253fe';
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
-            }}
-          >
-            🎵 SKOSHISM 상세 페이지 →
-          </a>
-          <a
-            href="/barabara"
-            onClick={(e) => {
-              e.preventDefault();
-              window.history.pushState({}, '', '/barabara');
-              window.dispatchEvent(new PopStateEvent('popstate'));
-            }}
-            style={{
-              display: 'inline-block',
-              padding: '12px 24px',
-              background: '#ff6b6b',
-              color: '#ffffff',
-              textDecoration: 'none',
-              borderRadius: '8px',
-              fontWeight: 'bold',
-              fontSize: '16px',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 4px 8px rgba(0,0,0,0.1)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#ee5a5a';
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 6px 12px rgba(0,0,0,0.15)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = '#ff6b6b';
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
-            }}
-          >
-            🎤 BARABARA 상세 페이지 →
-          </a>
-          <a
-            href="/psy-chord"
-            onClick={(e) => {
-              e.preventDefault();
-              window.history.pushState({}, '', '/psy-chord');
-              window.dispatchEvent(new PopStateEvent('popstate'));
-            }}
-            style={{
-              display: 'inline-block',
-              padding: '12px 24px',
-              background: '#9b59b6',
-              color: '#ffffff',
-              textDecoration: 'none',
-              borderRadius: '8px',
-              fontWeight: 'bold',
-              fontSize: '16px',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 4px 8px rgba(0,0,0,0.1)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#8e44ad';
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 6px 12px rgba(0,0,0,0.15)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = '#9b59b6';
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
-            }}
-          >
-            🎸 PSY_CHORD 상세 페이지 →
-          </a>
+          {[
+            { id: 'example-creator-1', label: 'Example Creator 1', bg: '#667eea', hover: '#764ba2' },
+            { id: 'example-creator-2', label: 'Example Creator 2', bg: '#0253fe', hover: '#0041cc' },
+            { id: 'example-creator-3', label: 'Example Creator 3', bg: '#ff6b6b', hover: '#ee5a5a' },
+            { id: 'example-creator-4', label: 'Example Creator 4', bg: '#9b59b6', hover: '#8e44ad' },
+          ].map(({ id, label, bg, hover }) => (
+            <a
+              key={id}
+              href={`/creator/${id}`}
+              onClick={(e) => {
+                e.preventDefault();
+                window.history.pushState({}, '', `/creator/${id}`);
+                window.dispatchEvent(new PopStateEvent('popstate'));
+              }}
+              style={{
+                display: 'inline-block',
+                padding: '12px 24px',
+                background: bg,
+                color: '#ffffff',
+                textDecoration: 'none',
+                borderRadius: '8px',
+                fontWeight: 'bold',
+                fontSize: '16px',
+                transition: 'all 0.3s ease',
+                boxShadow: '0 4px 8px rgba(0,0,0,0.1)'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = hover;
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 6px 12px rgba(0,0,0,0.15)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = bg;
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+              }}
+            >
+              {label} Detail
+            </a>
+          ))}
         </div>
       </div>
                   

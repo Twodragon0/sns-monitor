@@ -50,7 +50,7 @@ TELEGRAM_CHANNELS=
 SEARCH_KEYWORDS=ExampleCorp,CreatorBrand,굿즈
 
 # YouTube 채널 (인수한 회사 및 주요 크리에이터)
-YOUTUBE_CHANNELS=@IVNITOFFICIAL,@BARABARA_KR
+YOUTUBE_CHANNELS=@YourChannelHandle1,@YourChannelHandle2
 
 # RSS 피드 (선택사항)
 # 한국 주요 뉴스 사이트 RSS 피드 (기본값)

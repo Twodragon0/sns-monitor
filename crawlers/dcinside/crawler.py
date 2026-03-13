@@ -45,61 +45,54 @@ LOCAL_DATA_DIR = os.environ.get('LOCAL_DATA_DIR', './local-data')
 # DC인사이드 갤러리 설정
 # 공통 키워드 (모든 갤러리에서 사용)
 COMMON_KEYWORDS = [
-    # ★★★ 최우선순위: 크리에이터브랜드/예시기업 (플랫폼) ★★★
-    '크리에이터브랜드', 'creatorbrand', 'CreatorBrand', 'CREATORBRAND',
-    '예시기업', 'examplecorp', 'ExampleCorp', 'EXAMPLECORP',
-    # ★★★ 최우선순위: 이브닛 관련 ★★★
-    '이브닛', 'IVNIT', 'ivnit', 'u32',
-    # ★★★ 최우선순위: 멤버 이름 ★★★
-    '사미', '우사미', '여르미', '엶', '한결', '결', '비몽', '몽', '샤르망', '쭈쭈', '나나문', '쿠우',
-    # 아카이브 스튜디오 관련
-    '아카이브', 'AkaiV', 'akaiv', 'Studio', 'studio',
-    # ★★★ 최우선순위: 굿즈/상품 관련 ★★★
-    '굿즈', '포토카드', '포카', '아크릴', '키링', '스티커', '포스터', '앨범', '음반', '한정판',
-    '보팩', '디지털 굿즈', '디지털굿즈', '공식굿즈', '머치',
-    # 팬활동 관련
-    '팬싸', '응모', '당첨', '이벤트', '특전'
+    # ExampleCorp / CreatorBrand (platform)
+    'examplecorp', 'ExampleCorp', 'EXAMPLECORP',
+    'creatorbrand', 'CreatorBrand', 'CREATORBRAND',
+    # Creator group keywords
+    'Creator1', 'creator1',
+    'Creator2', 'creator2',
+    'Creator3', 'creator3',
+    'ExampleStudio', 'examplestyle',
+    # Merchandise related
+    'goods', 'photocard', 'keyring', 'sticker', 'poster', 'album', 'limited',
+    'digitalgoods', 'officialgoods',
+    # Fan activity
+    'event', 'giveaway', 'fanmeet',
 ]
 
 GALLERIES = {
-    'ivnit': {
-        'url': 'https://gall.dcinside.com/mini/board/lists/?id=ivnit',
-        'name': '이브닛 미니 갤러리',
+    'example-gallery-1': {
+        'url': 'https://gall.dcinside.com/mini/board/lists/?id=example-gallery-1',
+        'name': 'Example Gallery 1',
         'type': 'mini',
-        'keywords': COMMON_KEYWORDS + ['이브닛갤', 'ivnit갤']
+        'keywords': COMMON_KEYWORDS + ['examplegallery1', 'gallery1']
     },
-    'akaiv': {
-        'url': 'https://gall.dcinside.com/mini/board/lists?id=akaiv',
-        'name': '아카이브 스튜디오 갤러리',
+    'example-gallery-2': {
+        'url': 'https://gall.dcinside.com/mini/board/lists?id=example-gallery-2',
+        'name': 'Example Gallery 2',
         'type': 'mini',
-        'keywords': COMMON_KEYWORDS + ['아카이브갤', 'akaiv갤']
+        'keywords': COMMON_KEYWORDS + ['examplegallery2', 'gallery2']
     },
-    'soopvirtualstreamer': {
-        'url': 'https://gall.dcinside.com/mini/board/lists?id=soopvirtualstreamer',
-        'name': '숲 종합 갤러리',
+    'example-gallery-3': {
+        'url': 'https://gall.dcinside.com/mini/board/lists?id=example-gallery-3',
+        'name': 'Example Gallery 3',
         'type': 'mini',
-        'keywords': COMMON_KEYWORDS + ['숲', 'soop', 'vtuber', '버추얼', '버츄얼']
+        'keywords': COMMON_KEYWORDS + ['examplegallery3', 'gallery3', 'vtuber', 'virtual']
     },
-    'spv': {
-        'url': 'https://gall.dcinside.com/mini/board/lists/?id=spv',
-        'name': '숲 버추얼 갤러리',
+    'example-gallery-4': {
+        'url': 'https://gall.dcinside.com/mini/board/lists/?id=example-gallery-4',
+        'name': 'Example Gallery 4',
         'type': 'mini',
-        'keywords': COMMON_KEYWORDS + ['숲', 'soop', 'virtual', '버추얼', '버츄얼']
+        'keywords': COMMON_KEYWORDS + ['examplegallery4', 'gallery4', 'streaming']
     },
-    'soopstreaming': {
-        'url': 'https://gall.dcinside.com/mini/board/lists/?id=soopstreaming',
-        'name': '숲 스트리밍 갤러리',
-        'type': 'mini',
-        'keywords': COMMON_KEYWORDS + ['숲', 'soop', 'streaming', '스트리밍']
-    },
-    'skoshism': {
-        'url': 'https://gall.dcinside.com/mgallery/board/lists/?id=skoshism',
-        'name': '스코시즘 갤러리',
+    'example-gallery-5': {
+        'url': 'https://gall.dcinside.com/mgallery/board/lists/?id=example-gallery-5',
+        'name': 'Example Gallery 5',
         'type': 'mgallery',
         'keywords': COMMON_KEYWORDS + [
-            '스코시즘', 'skoshism', 'SKOSHISM', '스코',
-            '크리에이터브랜드샵', 'creatorbrand shop', 'creatorbrand.io',
-            '크리에이터브랜드 팝업', '크리에이터브랜드팝업', 'creatorbrand popup'
+            'examplegallery5', 'gallery5',
+            'creatorbrandshop', 'creatorbrand shop', 'creatorbrand.io',
+            'creatorbrand popup'
         ]
     }
 }

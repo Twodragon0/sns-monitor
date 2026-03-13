@@ -100,7 +100,7 @@ User → Frontend (React :3000)
 **Frontend** (`frontend/src/components/`):
 - `URLAnalyzer.jsx` - URL input and analysis results with sentiment charts
 - `Dashboard.jsx` - Main monitoring dashboard
-- Detail pages: `ArchiveStudioDetail`, `BarabaraDetail`, `PsyChordDetail`, `SkoshismDetail`
+- `*Detail.jsx` - Creator detail pages (one per monitored creator)
 
 **API Endpoints:**
 - `POST /api/analyze/url` - Analyze any supported URL `{"url": "https://..."}`
@@ -135,3 +135,12 @@ User → Frontend (React :3000)
 - Validate all external input (whitelist approach)
 - Use `logging` module instead of `print()` in Python
 - No `eval()`, `exec()`, `pickle`
+
+## Centralized Hourly Automation
+
+- Central scheduler and pull runner: `$HOME/Desktop/.twodragon0/bin/hourly-opencode-git-pull.sh`
+- Central OpenClaw cron registration: `$HOME/Desktop/.twodragon0/bin/install-system-cron.sh`
+- Central prompt: `$HOME/Desktop/.twodragon0/openclaw_ultrawork_prompt.md`
+- Central repo registry: `$HOME/Desktop/.twodragon0/repos.list`
+- Use `$HOME`-based paths for user portability across machines.
+- Per-repo OpenClaw/OpenCode cron scripts are not used.

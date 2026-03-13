@@ -190,13 +190,13 @@ VPC (10.0.0.0/16)
 
 #### 3.1.2 모니터링 대상 채널
 
+채널 목록은 Helm values 또는 환경 변수로 설정합니다:
+
 ```yaml
 channels:
-  - "@AkaivStudioOfficial"
-  - "@BARABARA_KR"
-  - "@irocloud_"
-  - "@NIN0SUNDAY"
-  - "@KoyoTempest"
+  - "@YourChannelHandle1"
+  - "@YourChannelHandle2"
+  - "@YourChannelHandle3"
 ```
 
 #### 3.1.3 실행 스케줄
@@ -210,8 +210,8 @@ channels:
 ```json
 {
   "channel_id": "UC...",
-  "channel_title": "Archive Studio Official",
-  "channel_handle": "@AkaivStudioOfficial",
+  "channel_title": "Your Channel Name",
+  "channel_handle": "@YourChannelHandle",
   "subscriber_count": 123456,
   "view_count": 12345678,
   "video_count": 123,
@@ -258,12 +258,12 @@ channels:
 
 #### 3.2.2 모니터링 대상 갤러리
 
+갤러리 목록은 Helm values 또는 환경 변수로 설정합니다:
+
 ```yaml
 galleries:
-  - ivnit (이브닛)
-  - akaiv (아카이브 스튜디오)
-  - skoshism (스코시즘)
-  - soopvirtualstreamer (숲 버추얼)
+  - your-gallery-id-1
+  - your-gallery-id-2
 ```
 
 #### 3.2.3 실행 스케줄
@@ -276,8 +276,8 @@ galleries:
 
 ```json
 {
-  "gallery_id": "akaiv",
-  "gallery_name": "아카이브 스튜디오",
+  "gallery_id": "your-gallery-id",
+  "gallery_name": "Your Gallery Name",
   "crawled_at": "2025-01-01T02:00:00Z",
   "total_posts": 10,
   "total_comments": 123,
@@ -336,9 +336,7 @@ galleries:
 | 컴포넌트 | 경로 | 설명 |
 |----------|------|------|
 | Dashboard | `/` | 메인 대시보드 |
-| ArchiveStudioDetail | `/akaiv-studio` | 아카이브 스튜디오 상세 |
-| SkoshismDetail | `/skoshism` | 스코시즘 상세 |
-| BarabaraDetail | `/barabara` | 바라바라 상세 |
+| CreatorDetail | `/creator/:id` | 크리에이터 상세 페이지 |
 
 #### 3.4.3 UI/UX 기능
 
@@ -385,7 +383,7 @@ s3://sns-monitor-data-{account-id}/
 │   ├── dcinside/
 │   │   └── {gallery_id}/
 │   └── metadata/
-└── raw-data/              # 원본 데이터 아카이브
+└── raw-data/              # raw data storage
     ├── youtube/
     └── dcinside/
 ```
@@ -437,8 +435,8 @@ GET /api/vuddy/creators
 {
   "creators": [
     {
-      "name": "이브닛",
-      "youtube_channel": "@IVNITOFFICIAL",
+      "name": "Creator Name",
+      "youtube_channel": "@YourChannelHandle",
       "subscriber_count": 123456,
       "last_updated": "2025-01-01T00:00:00Z"
     }
@@ -449,15 +447,15 @@ GET /api/vuddy/creators
 ### 5.3 YouTube 채널 데이터
 
 ```http
-GET /api/youtube/channels?handle=@AkaivStudioOfficial
+GET /api/youtube/channels?handle=@YourChannelHandle
 ```
 
 **Response:**
 ```json
 {
   "channel_id": "UC...",
-  "channel_title": "Archive Studio Official",
-  "channel_handle": "@AkaivStudioOfficial",
+  "channel_title": "Your Channel Name",
+  "channel_handle": "@YourChannelHandle",
   "subscriber_count": 123456,
   "view_count": 12345678,
   "video_count": 123,
@@ -469,14 +467,14 @@ GET /api/youtube/channels?handle=@AkaivStudioOfficial
 ### 5.4 DCInside 갤러리 데이터
 
 ```http
-GET /api/dcinside/akaiv
+GET /api/dcinside/your-gallery-id
 ```
 
 **Response:**
 ```json
 {
-  "gallery_id": "akaiv",
-  "gallery_name": "아카이브 스튜디오",
+  "gallery_id": "your-gallery-id",
+  "gallery_name": "Your Gallery Name",
   "total_posts": 10,
   "total_comments": 123,
   "positive_count": 80,

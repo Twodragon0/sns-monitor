@@ -7,12 +7,15 @@ from flask import Blueprint
 
 analyze_bp = Blueprint('analyze', __name__)
 legacy_bp = Blueprint('legacy', __name__)
+analysis_bp = Blueprint('analysis', __name__)
 
 from . import analyze  # noqa: E402, F401
 from . import legacy   # noqa: E402, F401
+from . import analysis  # noqa: E402, F401
 
 
 def register_blueprints(app):
     """Register all API blueprints with the Flask app."""
     app.register_blueprint(analyze_bp)
     app.register_blueprint(legacy_bp)
+    app.register_blueprint(analysis_bp)

@@ -317,8 +317,8 @@ def main():
     parser.add_argument(
         '--keywords',
         nargs='+',
-        default=['AkaiV Studio', 'BARABARA'],
-        help='검색할 키워드 리스트 (기본: AkaiV Studio, BARABARA)'
+        default=['YourKeyword1', 'YourKeyword2'],
+        help='검색할 키워드 리스트 (기본: YourKeyword1, YourKeyword2)'
     )
     parser.add_argument(
         '--days',

@@ -118,106 +118,76 @@ MAX_VIDEOS = int(os.environ.get('MAX_VIDEOS', '15'))
 MAX_COMMENTS = int(os.environ.get('MAX_COMMENTS', '50'))
 
 # 채널 핸들 -> 채널 ID 직접 매핑 (YouTube 검색이 잘못된 결과를 반환하는 경우 사용)
-# SKOSHISM 멤버 및 AkaiV Studio 멤버 채널
+# GroupA channel members and GroupA Studio member channels
 CHANNEL_ID_OVERRIDE = {
-    # SKOSHISM 멤버들 - 실제 채널 ID
-    '@irocloud_': 'UCUMKh_hyaMj3F4Si1T-zXJA',  # 이로 클라우드
-    '@IroCloud': 'UCUMKh_hyaMj3F4Si1T-zXJA',   # 이로 클라우드 (이전 핸들)
-    '@NIN0SUNDAY': 'UCog2Ct-LHsXuy9AQ4l-o9HA', # 니노 선데이
-    '@KoyoTempest': 'UCkKWdIjkuzpcCJJ-dbh-L4w', # 코요 템페스트
-    '@otorainy': 'UCrOAVNbR8vAAo7SZUfkVjhQ',   # 오토 레이니
-    '@RoboFroster': 'UCRQU85B3ux0lzGHWByEWAfw', # 로보 프로스터
+    # GroupA 공식 채널
+    '@example-studio-official': 'UCExampleStudioOfficial1',  # Example Studio official
+    '@ExampleStudioOfficial': 'UCExampleStudioOfficial1',    # Example Studio official (alt)
 
-    # AkaiV Studio 공식 채널
-    '@AkaivStudioOfficial': 'UCCp5MP1BdXFqkMBgZEweqIg',  # 아카이브 스튜디오 공식
-    '@akaivstudioofficial': 'UCCp5MP1BdXFqkMBgZEweqIg',  # 소문자
+    # GroupA / Creator Group 1 멤버들
+    '@example-creator-1': 'UCExampleCreator00000001',  # Creator1
+    '@example-creator-2': 'UCExampleCreator00000002',  # Creator2
+    '@example-creator-3': 'UCExampleCreator00000003',  # Creator3
+    '@example-creator-4': 'UCExampleCreator00000004',  # Creator4
+    '@example-creator-5': 'UCExampleCreator00000005',  # Creator5
 
-    # AkaiV Studio / IVNIT 멤버들
-    '@yeorumi': 'UC9UBS38T2wKKbEKgPFdAoFQ',    # 여르미
-    '@Yeorumi': 'UC9UBS38T2wKKbEKgPFdAoFQ',    # 여르미
-    # 비몽 - @beemong_ 채널 ID 확인 필요 (이전 ID는 잘못된 채널이었음)
-    '@yell_u32': 'UCjsSt2r6DMjNlN6X4TjCc0g',   # u32
-    '@u32': 'UCjsSt2r6DMjNlN6X4TjCc0g',        # u32
-    '@u32S2': 'UCjsSt2r6DMjNlN6X4TjCc0g',      # u32 (새 핸들)
-    '@hangyeol': 'UCluZa5CRH783-eU22_N7f7w',   # 한결
-    '@hangyeol8008': 'UCluZa5CRH783-eU22_N7f7w', # 한결 (새 핸들)
-    '@IVNIT': 'UCR9EtpQhPZvDTkKE81yzHZA',      # 이브닛
-    '@ivnit': 'UCR9EtpQhPZvDTkKE81yzHZA',      # 이브닛
-    '@IVNITOFFICIAL': 'UCR9EtpQhPZvDTkKE81yzHZA', # 이브닛 공식
-    '@owo_zzzz': 'UC3JYpe9DEFydDKtLpsHGbxA',   # 샤르망
-    '@chaarmant_': 'UC3JYpe9DEFydDKtLpsHGbxA', # 샤르망 (이전 핸들)
-    '@beemong_': 'UCO11lxcm_-212ciYIGXZRgw',  # 비몽 (올바른 채널 ID)
-    '@bee_mong': 'UCO11lxcm_-212ciYIGXZRgw',  # 비몽 (이전 핸들)
-    '@beemong': 'UCO11lxcm_-212ciYIGXZRgw',   # 비몽 (핸들 변형)
+    # GroupB 소속
+    '@example-group-b': 'UCExampleGroupB000000001',  # GroupB official
 
-    # CreatorBrand 소속
-    '@BARABARA_KR': 'UCPbZ7kkVqeoEQ6vAiWazYBQ', # 바라바라 (CreatorBrand 소속)
+    # GroupB 멤버들
+    '@example-creator-6': 'UCExampleCreator00000006',  # Creator6
+    '@example-creator-7': 'UCExampleCreator00000007',  # Creator7
+    '@example-creator-8': 'UCExampleCreator00000008',  # Creator8
+    '@example-creator-9': 'UCExampleCreator00000009',  # Creator9
 
-    # BARABARA 멤버들 (CreatorBrand 소속)
-    '@aoseijun': 'UCbP5tBgdBXy0UqxHaj4eUdA',      # 아오세이준
-    '@AkazuneKatsuki': 'UCOHxnPvdeY0e9qqI8NmoNiA', # 아카즈네 카츠키
-    '@Shironeharu': 'UC6cT7F_oCJ8_l1IdCaWOIuQ',   # 시로네 하루
-    '@sinichocoreito': 'UCf2CYwQ-aPvBRC4rlBXH_iw', # 시니초코레이토
-    '@NeruKuroming': 'UCAnolSasakEN7Rlxc7ZLptQ',  # 네루 쿠로밍
-    '@mizuiroSyu': 'UCw0nPJhJWWEYu4g_axF_gQQ',    # 미즈이로슈
-
-    # PSY_CHORD 멤버들
-    '@louiszzan': 'UCKN512k2OXmPgtCjhMj8KZQ',    # 루이쨘
-    '@9jayaj9': 'UCbL1ccbdjSD2c4itQWAw5mg',      # 감제이 (main channel)
-    '@yeon2vt': 'UCGV0Z5J1hcmjZllZpIq_MAg',     # 연이
-    '@psy_haruto': 'UC0QDb4XkScbRzNNQWnIywjg',  # 하루토
-    '@oversleepZzz': 'UCb4MU4hP3BgaRDsnVW-J-QA', # 늦잠
+    # GroupC 멤버들
+    '@example-creator-10': 'UCExampleCreator0000010A',  # Creator10
+    '@example-creator-11': 'UCExampleCreator0000011B',  # Creator11
+    '@example-creator-12': 'UCExampleCreator0000012C',  # Creator12
+    '@example-creator-13': 'UCExampleCreator0000013D',  # Creator13
+    '@example-creator-14': 'UCExampleCreator0000014E',  # Creator14
 }
 
 # 채널 핸들에 대응하는 한국어 이름 (검색용)
 CHANNEL_KOREAN_NAMES = {
-    '@irocloud_': '이로클라우드',  # 띄어쓰기 없이 검색
-    '@IroCloud': '이로클라우드',
-    '@NIN0SUNDAY': '니노선데이',
-    '@KoyoTempest': '코요템페스트',
-    '@otorainy': '오토레이니',
-    '@RoboFroster': '로보프로스터',
-    '@beemong_': '비몽',  # AkaiV Studio / IVNIT 멤버
-    # BARABARA 멤버들
-    '@aoseijun': '아오세이준',
-    '@AkazuneKatsuki': '아카즈네 카츠키',
-    '@Shironeharu': '시로네 하루',
-    '@NeruKuroming': '네루 쿠로밍',
-    '@sinichocoreito': '시니초코레이토',
-    '@mizuiroSyu': '미즈이로슈',
-    # PSY_CHORD 멤버들
-    '@louiszzan': '루이쨘',
-    '@9jayaj9': '감제이',
-    '@yeon2vt': '연이',
-    '@psy_haruto': '하루토',
-    '@oversleepZzz': '늦잠',
+    '@example-creator-1': 'Creator1',
+    '@example-creator-2': 'Creator2',
+    '@example-creator-3': 'Creator3',
+    '@example-creator-4': 'Creator4',
+    '@example-creator-5': 'Creator5',
+    '@example-creator-6': 'Creator6',
+    '@example-creator-7': 'Creator7',
+    '@example-creator-8': 'Creator8',
+    '@example-creator-9': 'Creator9',
+    '@example-creator-10': 'Creator10',
+    '@example-creator-11': 'Creator11',
+    '@example-creator-12': 'Creator12',
+    '@example-creator-13': 'Creator13',
+    '@example-creator-14': 'Creator14',
 }
 
 # 추가 검색 키워드 (채널을 찾지 못할 경우 사용)
 CHANNEL_SEARCH_KEYWORDS = {
-    '@irocloud_': ['이로클라우드', '이로 클라우드', 'irocloud SKOSHISM', '이로클라우드 버튜버'],
-    '@IroCloud': ['이로클라우드', '이로 클라우드', 'IroCloud SKOSHISM', '이로클라우드 버튜버'],
-    '@RoboFroster': ['로보프로스터', '로보 프로스터', 'RoboFroster SKOSHISM'],
-    '@beemong_': ['비몽 버튜버', '비몽 IVNIT', '비몽 아카이브', 'beemong vtuber'],
-    # BARABARA 멤버들
-    '@aoseijun': ['아오세이준 버튜버', '아오세이준 바라바라', 'aoseijun vtuber'],
-    '@AkazuneKatsuki': ['아카즈네 카츠키 버튜버', '아카즈네 카츠키 바라바라', 'akazune katsuki vtuber'],
-    '@Shironeharu': ['시로네 하루 버튜버', '시로네 하루 바라바라', 'shirone haru vtuber'],
-    '@NeruKuroming': ['네루 쿠로밍 버튜버', '네루 쿠로밍 바라바라', 'neru kuroming vtuber'],
-    '@sinichocoreito': ['시니초코레이토 버튜버', '시니초코레이토 바라바라', 'sinichocoreito vtuber'],
-    '@mizuiroSyu': ['미즈이로슈 버튜버', '미즈이로슈 바라바라', 'mizuiro syu vtuber'],
-    # PSY_CHORD 멤버들
-    '@louiszzan': ['루이쨘 버튜버', '루이쨘 사이코드', 'louiszzan vtuber'],
-    '@9jayaj9': ['감제이 버튜버', '감제이 싸이코드', '9jayaj9 vtuber'],
-    '@yeon2vt': ['연이 버튜버', '연이 사이코드', 'yeon2vt vtuber'],
-    '@psy_haruto': ['하루토 버튜버', '하루토 사이코드', 'psy haruto vtuber'],
-    '@oversleepZzz': ['늦잠 버튜버', '늦잠 사이코드', 'oversleep vtuber'],
+    '@example-creator-1': ['Creator1 vtuber', 'ExampleCorp creator1'],
+    '@example-creator-2': ['Creator2 vtuber', 'ExampleCorp creator2'],
+    '@example-creator-3': ['Creator3 vtuber', 'GroupA creator3'],
+    '@example-creator-4': ['Creator4 vtuber', 'GroupA creator4'],
+    '@example-creator-5': ['Creator5 vtuber', 'GroupA creator5'],
+    '@example-creator-6': ['Creator6 vtuber', 'GroupB creator6'],
+    '@example-creator-7': ['Creator7 vtuber', 'GroupB creator7'],
+    '@example-creator-8': ['Creator8 vtuber', 'GroupB creator8'],
+    '@example-creator-9': ['Creator9 vtuber', 'GroupB creator9'],
+    '@example-creator-10': ['Creator10 vtuber', 'GroupC creator10'],
+    '@example-creator-11': ['Creator11 vtuber', 'GroupC creator11'],
+    '@example-creator-12': ['Creator12 vtuber', 'GroupC creator12'],
+    '@example-creator-13': ['Creator13 vtuber', 'GroupC creator13'],
+    '@example-creator-14': ['Creator14 vtuber', 'GroupC creator14'],
 }
 
 # 잘못된 채널 ID 필터링 (이 채널 ID는 수집하지 않음)
 BLOCKED_CHANNEL_IDS = {
-    'UCShvPW7I8scKoOstx1fU4TQ',  # Irocloud - Solution D'hébergement (프랑스 호스팅 회사)
-    # 'UCO11lxcm_-212ciYIGXZRgw' - 비몽 공식 채널 (차단 해제됨)
+    # Add channel IDs to block here (e.g., unrelated channels with similar names)
+    # 'UCExampleBlockedChannel000',  # Example blocked channel
 }
 
 # API Rate Limiting 설정
@@ -417,18 +387,12 @@ def search_videos(youtube, keyword, max_results=10, regions=None, channel_id_fil
                             should_include = True
                         else:
                             continue
-                    elif keyword.lower() == "barabara" or keyword == "BARABARA":
-                        # BARABARA 키워드의 경우 BREAKERZ 같은 다른 아티스트의 영상 제외
-                        # 채널 필터가 있으면 이미 필터링됨
+                    elif keyword.lower() == "groupb" or keyword == "GroupB":
+                        # GroupB 키워드의 경우 채널 필터가 있으면 이미 필터링됨
                         if channel_id_filter:
-                            # 채널 필터가 있으면 해당 채널의 영상만 포함
                             should_include = True
                         else:
-                            # BREAKERZ, 일본어 아티스트 등 제외
-                            exclude_keywords = ['breakerz', 'breaker', 'j-pop', 'jpop', 'japanese']
-                            if any(exclude in title_lower for exclude in exclude_keywords):
-                                continue
-                            if "barabara" in title_lower or "barabara" in description_lower:
+                            if "groupb" in title_lower or "groupb" in description_lower:
                                 should_include = True
                     else:
                         if keyword_lower in title_lower or keyword_lower in description_lower:
@@ -1021,24 +985,24 @@ def analyze_channel(youtube, channel_handle, max_videos=10, max_comments_per_vid
     return analysis_summary
 
 def clean_creator_name_for_search(creator_name):
-    """AkaiV Studio 멤버의 경우 "AkaiV" 제거하고 순수한 이름만 반환"""
+    """Example Studio 멤버의 경우 그룹 이름을 제거하고 순수한 이름만 반환"""
     if not creator_name:
         return creator_name
-    
-    # 먼저 AkaiV 관련 키워드 모두 제거
-    cleaned_name = creator_name.replace('AkaiV', '').replace('akaiv', '').replace('AKAIV', '')
+
+    # 그룹 이름 관련 키워드 제거
+    cleaned_name = creator_name.replace('ExampleStudio', '').replace('examplestudio', '')
     cleaned_name = cleaned_name.replace('Studio', '').replace('studio', '').replace('STUDIO', '')
     cleaned_name = cleaned_name.replace('  ', ' ').strip()
-    
+
     # 멤버 이름 매핑
     member_mapping = {
-        '여르미': ['여르미', 'Yeorumi', 'yeorumi'],
-        '한결': ['한결', 'Hangyeol', 'hangyeol'],
-        '비몽': ['비몽', 'Beemong', 'beemong'],
-        '샤르망': ['샤르망', 'Charmant', 'charmant'],
-        'u32': ['u32', '우사미', 'U32']
+        'Creator1': ['Creator1', 'creator1'],
+        'Creator2': ['Creator2', 'creator2'],
+        'Creator3': ['Creator3', 'creator3'],
+        'Creator4': ['Creator4', 'creator4'],
+        'Creator5': ['Creator5', 'creator5'],
     }
-    
+
     # 멤버 이름 찾기
     for member_name, variants in member_mapping.items():
         for variant in variants:
@@ -1058,17 +1022,12 @@ def clean_creator_name_for_search(creator_name):
 def _get_keyword_channel_map():
     """키워드와 채널 매핑 반환"""
     return {
-        'BARABARA': '@BARABARA_KR',
-        'barabara': '@BARABARA_KR',
-        '바라바라': '@BARABARA_KR',
-        'AkaiV Studio': '@AkaivStudioOfficial',
-        'akaiv studio': '@AkaivStudioOfficial',
-        'AKAIV STUDIO': '@AkaivStudioOfficial',
-        '아카이브스튜디오': '@AkaivStudioOfficial',
-        '아카이브 스튜디오': '@AkaivStudioOfficial',
-        'AkaivStudioOfficial': '@AkaivStudioOfficial',
-        'Akaiv Studio': '@AkaivStudioOfficial',
-        'akaiv studio': '@AkaivStudioOfficial'
+        'GroupB': '@example-group-b',
+        'groupb': '@example-group-b',
+        'ExampleStudio': '@example-studio-official',
+        'example studio': '@example-studio-official',
+        'EXAMPLE STUDIO': '@example-studio-official',
+        'ExampleStudioOfficial': '@example-studio-official',
     }
 
 def _find_channel_by_partial_match(keyword, keyword_normalized, keyword_channel_map):
@@ -1077,14 +1036,14 @@ def _find_channel_by_partial_match(keyword, keyword_normalized, keyword_channel_
         if map_keyword.lower() not in keyword_normalized and keyword_normalized not in map_keyword.lower():
             continue
         
-        # Archive Studio 관련 키워드인지 확인
-        is_archive_keyword = 'archive' in keyword_normalized or 'akaiv' in keyword_normalized or '아카이브' in keyword
-        if is_archive_keyword and '@AkaivStudioOfficial' in map_channel:
+        # Example Studio 관련 키워드인지 확인
+        is_studio_keyword = 'example studio' in keyword_normalized or 'examplestudio' in keyword_normalized
+        if is_studio_keyword and '@example-studio-official' in map_channel:
             return map_channel
-        
-        # BARABARA 관련 키워드인지 확인
-        is_barabara_keyword = 'barabara' in keyword_normalized or '바라바라' in keyword
-        if is_barabara_keyword and '@BARABARA_KR' in map_channel:
+
+        # GroupB 관련 키워드인지 확인
+        is_groupb_keyword = 'groupb' in keyword_normalized or 'group b' in keyword_normalized
+        if is_groupb_keyword and '@example-group-b' in map_channel:
             return map_channel
     
     return None
@@ -1110,9 +1069,9 @@ def _resolve_channel_filter(youtube, keyword, search_keyword):
         if channel_id:
             channel_filter = channel_id
             logger.info("Filtering by channel: %s (ID: %s) for keyword: %s", channel_handle, channel_id, keyword)
-            # 아카이브 스튜디오 채널인 경우 채널 정보 저장
-            if '@AkaivStudioOfficial' in channel_handle or 'akaiv' in channel_handle.lower():
-                logger.info("Archive Studio channel detected: %s -> %s", channel_handle, channel_id)
+            # Example Studio 채널인 경우 채널 정보 저장
+            if '@example-studio-official' in channel_handle or 'examplestudio' in channel_handle.lower():
+                logger.info("Example Studio channel detected: %s -> %s", channel_handle, channel_id)
         else:
             logger.warning("Could not get channel ID for %s", channel_handle)
     
@@ -1206,7 +1165,7 @@ def _process_keyword_search(youtube, event, results):
         if not keyword:
             continue
 
-        # AkaiV Studio 멤버의 경우 "AkaiV" 제거하고 순수한 이름만 사용
+        # For ExampleStudio members, remove the studio prefix and use the creator name only
         search_keyword = clean_creator_name_for_search(keyword)
 
         logger.info("Searching YouTube for keyword: %s (original: %s)", search_keyword, keyword)
