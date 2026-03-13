@@ -32,10 +32,10 @@ crawlers:
 
 ```bash
 # 특정 갤러리 데이터 조회
-curl http://localhost:8080/api/dcinside/your-gallery-id
+curl http://localhost:8888/api/dcinside/your-gallery-id
 
 # 모든 갤러리 목록 조회
-curl http://localhost:8080/api/dcinside/galleries
+curl http://localhost:8888/api/dcinside/galleries
 ```
 
 ### 명령어 옵션 설명
@@ -279,17 +279,16 @@ crawlers:
 
 ### 댓글 수집 실패
 
-```
-Error getting comments via AJAX
-```
+**증상:** 목록에는 댓글 수가 보이지만 수집 0건, 또는 "정상적인 접근이 아닙니다" 응답.
 
 **원인:**
-- DC인사이드 API 변경
-- 네트워크 오류
+- DC인사이드 댓글 API가 서버(비브라우저) 접근을 차단함. 댓글은 JS로 로드되며 API가 브라우저만 허용할 수 있음.
+- API/페이지 구조 변경, 네트워크 오류.
 
 **해결 방법:**
-- 잠시 후 재시도
-- DC인사이드 사이트 정상 작동 확인
+- **원문 보기** 링크로 해당 글에서 댓글 확인.
+- API 백엔드에 Playwright가 설치된 이미지를 사용하면, API 차단 시 자동으로 브라우저(Chromium) fallback으로 댓글 수집 시도.
+- Docker 이미지 빌드 시 `playwright install chromium`가 포함되어 있으면 fallback 사용 가능.
 
 ## 추가 리소스
 

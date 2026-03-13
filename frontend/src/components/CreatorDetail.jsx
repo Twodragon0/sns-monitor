@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import './Dashboard.css';
+import { API_BASE } from '../config';
 
 // Generic monitoring keywords for public release example
 const MONITORING_KEYWORDS = [
@@ -52,7 +53,6 @@ const EXAMPLE_CHANNELS = [
 ];
 
 const SENTIMENT_COLORS = { positive: '#4caf50', neutral: '#ff9800', negative: '#f44336' };
-const CHART_COLORS = ['#667eea', '#764ba2', '#f64f59', '#c471ed', '#12c2e9'];
 
 function CreatorDetail({ creatorId }) {
   const [channelsData, setChannelsData] = useState([]);
@@ -77,7 +77,7 @@ function CreatorDetail({ creatorId }) {
     try {
       const timestamp = Date.now();
       // Try to load from a generic creator API endpoint
-      const response = await fetch(`/api/creator/${encodeURIComponent(creatorId || 'example')}?_t=${timestamp}`, {
+      const response = await fetch(`${API_BASE}/api/creator/${encodeURIComponent(creatorId || 'example')}?_t=${timestamp}`, {
         cache: 'no-cache',
         headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache' },
       });

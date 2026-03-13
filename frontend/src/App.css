@@ -12,6 +12,7 @@
   --c-border: #e2e6ed;
   --c-success: #10b981;
   --c-danger: #ef4444;
+  --c-negative: #c00;
   --c-warn: #f59e0b;
   --radius: 12px;
   --shadow-sm: 0 1px 3px rgba(0,0,0,.06);
@@ -89,6 +90,42 @@
   padding: 20px;
   color: var(--c-text-secondary);
   font-size: 12px;
+}
+
+/* ===== Analysis auth gate (OpenAI OAuth) ===== */
+.analysis-auth-gate {
+  max-width: 480px;
+  margin: 40px auto;
+  padding: 32px 24px;
+  background: var(--c-surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  text-align: center;
+}
+.analysis-auth-gate h2 {
+  font-size: 1.25rem;
+  margin-bottom: 12px;
+  color: var(--c-text);
+}
+.analysis-auth-gate p {
+  color: var(--c-text-secondary);
+  margin-bottom: 20px;
+  font-size: 0.9rem;
+}
+.btn-openai-login {
+  padding: 12px 24px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, #10a37f 0%, #0d8c6c 100%);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+}
+.btn-openai-login:hover {
+  opacity: 0.95;
+  transform: translateY(-1px);
 }
 
 /* ===== Responsive ===== */

@@ -11,10 +11,17 @@ RUN npm install
 # 소스 코드 복사 및 빌드
 COPY frontend/ .
 
-RUN npm run build
+# Docker 사용 시 같은 출처(nginx 프록시)로 요청. .env에 8080이 있어도 빌드에서는 비움.
+ENV REACT_APP_API_URL=""
+RUN sed -i.bak 's/^REACT_APP_API_URL=.*/REACT_APP_API_URL=/' .env 2>/dev/null || true; \
+    rm -f .env.bak; \
+    npm run build
 
 # Production stage
 FROM nginx:alpine
+
+# Install wget for healthcheck (alpine nginx base has no wget/curl)
+RUN apk add --no-cache wget
 
 # nginx 전체 설정 (pid 파일 위치 포함)
 COPY docker/nginx.conf /etc/nginx/nginx.conf
@@ -37,7 +44,7 @@ USER nginx
 
 EXPOSE 3000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget -q --spider http://127.0.0.1:3000/ || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD wget -q -O /dev/null http://127.0.0.1:3000/ || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]

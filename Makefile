@@ -11,7 +11,7 @@ KUBECONFIG_DEV ?= ~/.kube/config
 KUBECONFIG_PROD ?= ~/.kube/config
 
 # Image names
-IMAGES = api-backend frontend youtube-crawler dcinside-crawler llm-analyzer auth-service
+IMAGES = api-backend frontend youtube-crawler dcinside-crawler naver-cafe-crawler
 
 # ============================================
 # Help
@@ -45,7 +45,7 @@ ghcr-login:
 # ============================================
 # Build
 # ============================================
-build: build-api-backend build-frontend build-youtube-crawler build-dcinside-crawler build-llm-analyzer
+build: build-api-backend build-frontend build-youtube-crawler build-dcinside-crawler build-naver-cafe-crawler
 	@echo "✅ All images built!"
 
 build-api-backend:
@@ -68,20 +68,15 @@ build-dcinside-crawler:
 	docker build -t $(REGISTRY)/$(IMAGE_PREFIX)-dcinside-crawler:$(VERSION) -f docker/Dockerfile.crawler .
 	docker tag $(REGISTRY)/$(IMAGE_PREFIX)-dcinside-crawler:$(VERSION) $(REGISTRY)/$(IMAGE_PREFIX)-dcinside-crawler:latest
 
-build-llm-analyzer:
-	@echo "🔨 Building llm-analyzer..."
-	docker build -t $(REGISTRY)/$(IMAGE_PREFIX)-llm-analyzer:$(VERSION) -f docker/Dockerfile.analyzer .
-	docker tag $(REGISTRY)/$(IMAGE_PREFIX)-llm-analyzer:$(VERSION) $(REGISTRY)/$(IMAGE_PREFIX)-llm-analyzer:latest
-
-build-auth-service:
-	@echo "🔨 Building auth-service..."
-	docker build -t $(REGISTRY)/$(IMAGE_PREFIX)-auth-service:$(VERSION) -f docker/Dockerfile.api .
-	docker tag $(REGISTRY)/$(IMAGE_PREFIX)-auth-service:$(VERSION) $(REGISTRY)/$(IMAGE_PREFIX)-auth-service:latest
+build-naver-cafe-crawler:
+	@echo "🔨 Building naver-cafe-crawler..."
+	docker build -t $(REGISTRY)/$(IMAGE_PREFIX)-naver-cafe-crawler:$(VERSION) -f docker/Dockerfile.naver-crawler .
+	docker tag $(REGISTRY)/$(IMAGE_PREFIX)-naver-cafe-crawler:$(VERSION) $(REGISTRY)/$(IMAGE_PREFIX)-naver-cafe-crawler:latest
 
 # ============================================
 # Push
 # ============================================
-push: push-api-backend push-frontend push-youtube-crawler push-dcinside-crawler push-llm-analyzer
+push: push-api-backend push-frontend push-youtube-crawler push-dcinside-crawler push-naver-cafe-crawler
 	@echo "✅ All images pushed!"
 
 push-api-backend: build-api-backend
@@ -104,10 +99,10 @@ push-dcinside-crawler: build-dcinside-crawler
 	docker push $(REGISTRY)/$(IMAGE_PREFIX)-dcinside-crawler:$(VERSION)
 	docker push $(REGISTRY)/$(IMAGE_PREFIX)-dcinside-crawler:latest
 
-push-llm-analyzer: build-llm-analyzer
-	@echo "📤 Pushing llm-analyzer..."
-	docker push $(REGISTRY)/$(IMAGE_PREFIX)-llm-analyzer:$(VERSION)
-	docker push $(REGISTRY)/$(IMAGE_PREFIX)-llm-analyzer:latest
+push-naver-cafe-crawler: build-naver-cafe-crawler
+	@echo "📤 Pushing naver-cafe-crawler..."
+	docker push $(REGISTRY)/$(IMAGE_PREFIX)-naver-cafe-crawler:$(VERSION)
+	docker push $(REGISTRY)/$(IMAGE_PREFIX)-naver-cafe-crawler:latest
 
 # ============================================
 # Helm
@@ -200,26 +195,26 @@ clean:
 	docker rmi $(REGISTRY)/$(IMAGE_PREFIX)-frontend:$(VERSION) 2>/dev/null || true
 	docker rmi $(REGISTRY)/$(IMAGE_PREFIX)-youtube-crawler:$(VERSION) 2>/dev/null || true
 	docker rmi $(REGISTRY)/$(IMAGE_PREFIX)-dcinside-crawler:$(VERSION) 2>/dev/null || true
-	docker rmi $(REGISTRY)/$(IMAGE_PREFIX)-llm-analyzer:$(VERSION) 2>/dev/null || true
+	docker rmi $(REGISTRY)/$(IMAGE_PREFIX)-naver-cafe-crawler:$(VERSION) 2>/dev/null || true
 	@echo "✅ Cleaned!"
 
 # ============================================
-# Local Development
+# Docker Compose (default run)
 # ============================================
 dev:
-	@echo "Starting development environment..."
-	docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+	@echo "Starting with Docker Compose..."
+	docker-compose up --build
 
 dev-down:
-	@echo "Stopping development environment..."
-	docker-compose -f docker-compose.yml -f docker-compose.dev.yml down
+	@echo "Stopping Docker Compose..."
+	docker-compose down
 
 dev-up:
-	@echo "Starting development environment (detached)..."
-	docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+	@echo "Starting Docker Compose (detached)..."
+	docker-compose up -d --build
 
 dev-logs:
-	docker-compose -f docker-compose.yml -f docker-compose.dev.yml logs -f
+	docker-compose logs -f
 
 # ============================================
 # All

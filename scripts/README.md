@@ -7,6 +7,7 @@ This directory contains utility scripts for development, monitoring, and data ma
 ### Monitoring & Data Collection
 
 - **monitor_top_posts.py** - Monitor top posts from various platforms
+- **set_naver_cookie.py** - Set `NAVER_CAFE_COOKIE` in `.env` from paste/clipboard/browser
 
 ### Data Management
 
@@ -33,6 +34,30 @@ The `archive/` subdirectory contains one-time data collection and migration scri
 ```bash
 # Monitor top posts
 python3 scripts/monitor_top_posts.py
+
+# Set NAVER_CAFE_COOKIE from pasted cookie/cURL text
+python3 scripts/set_naver_cookie.py
+
+# Set NAVER_CAFE_COOKIE from clipboard
+python3 scripts/set_naver_cookie.py --clipboard
+
+# Recommended: apply from clipboard and restart API in one step
+python3 scripts/set_naver_cookie.py --clipboard --restart-api
+
+# Optional: read cookie directly from local browser profile
+pip install browser-cookie3
+python3 scripts/set_naver_cookie.py --from-browser chrome
+
+# Auto-probe latest article IDs and retry single-post verification
+python3 scripts/test_naver_cafe.py "https://cafe.naver.com/f-e/cafes/31581843/menus/0?viewType=L" --show-fetch-diagnostics --auto-find-article
+
+# Tune menu scan range and candidate count (cache enabled by default)
+python3 scripts/test_naver_cafe.py "https://cafe.naver.com/f-e/cafes/31581843/menus/0?viewType=L" \
+  --show-fetch-diagnostics --auto-find-article --menu-range 1-80 --max-candidates 20
+
+# Strict success mode: require comment collection
+python3 scripts/test_naver_cafe.py "https://cafe.naver.com/f-e/cafes/31581843/menus/0?viewType=L" \
+  --show-fetch-diagnostics --auto-find-article --require-comments
 ```
 
 ### S3 Sync

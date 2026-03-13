@@ -15,8 +15,22 @@ RUN mkdir -p /app/local-data/youtube/channels \
              /app/local-data/vuddy/comprehensive_analysis \
              /app/local-data/analysis \
              /app/logs \
-    && groupadd -r appuser && useradd -r -g appuser -d /app -s /sbin/nologin appuser \
-    && chown -R appuser:appuser /app
+    && groupadd -r appuser && useradd -r -g appuser -d /app -s /sbin/nologin appuser
+
+# Playwright Chromium for DCInside comment fallback (when API blocks server-side)
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers
+# Browser runtime deps for Playwright Chromium (optional: skip if apt 403 in build env)
+RUN apt-get update -qq \
+    && apt-get install -y -qq --no-install-recommends \
+        libglib2.0-0 libnss3 libnspr4 libatk1.0-0 libdbus-1-3 libx11-6 libxcomposite1 \
+        libxdamage1 libxext6 libxfixes3 libxrandr2 libgbm1 libxcb1 libxkbcommon0 libasound2 \
+        libatspi2.0-0 libdrm2 libexpat1 libxshmfence1 \
+    && rm -rf /var/lib/apt/lists/* \
+    || true
+RUN playwright install-deps chromium 2>/dev/null || true
+RUN (playwright install chromium && chown -R appuser:appuser /opt/pw-browsers) || true
+
+RUN chown -R appuser:appuser /app
 
 USER appuser
 

@@ -253,6 +253,51 @@ def _load_metadata_files_local(metadata_dir):
     
     return items
 
+
+def _load_channels_from_local(youtube_dir):
+    """로컬 youtube 디렉터리에서 채널 목록 수집 (대시보드 /api/channels용)."""
+    channels = []
+    if not os.path.exists(youtube_dir):
+        return channels
+    search_dirs = [
+        youtube_dir,
+        os.path.join(youtube_dir, 'channels'),
+    ]
+    seen = set()
+    for base_dir in search_dirs:
+        if not os.path.isdir(base_dir):
+            continue
+        for file_path in glob.glob(os.path.join(base_dir, '**', '*.json'), recursive=True):
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                channel_id = data.get('channel_handle') or data.get('channel_id') or data.get('channel', '')
+                channel_title = data.get('channel_title', '') or channel_id
+                if not channel_id and not channel_title:
+                    continue
+                key = (channel_id or channel_title).strip()
+                if key in seen:
+                    continue
+                seen.add(key)
+                videos = data.get('videos', [])
+                total_comments = 0
+                for v in videos:
+                    raw = v.get('comments') or v.get('comment_count') or 0
+                    total_comments += int(raw) if raw else 0
+                channels.append({
+                    'channel': channel_id or channel_title,
+                    'channel_title': channel_title or channel_id,
+                    'videos_analyzed': len(videos),
+                    'total_comments': total_comments,
+                    'vtuber_comments': 0,
+                    'vtuber_likes': 0,
+                    's3_key': '',
+                    'last_updated': data.get('last_updated', data.get('timestamp', '')),
+                })
+            except Exception as e:
+                logger.debug("Skip non-channel JSON %s: %s", file_path, e)
+    return channels
+
 def _parse_timestamp_for_today(timestamp_str, today_start):
     """타임스탬프를 파싱하여 오늘 날짜인지 확인"""
     if not timestamp_str:

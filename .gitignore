@@ -6,6 +6,7 @@ docker-data/
 .env
 .env.*
 !.env.example
+!.env.mirofish.example
 .env.local
 .env.bak
 *.enc.yaml

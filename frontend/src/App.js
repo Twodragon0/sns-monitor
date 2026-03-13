@@ -1,41 +1,59 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import axios from 'axios';
 import './App.css';
+import { API_BASE } from './config';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Dashboard from './components/Dashboard';
 import CreatorDetail from './components/CreatorDetail';
 import AnalysisTab from './components/AnalysisTab';
 import { ToastContainer, useToast } from './components/Toast';
 
+if (API_BASE) axios.defaults.withCredentials = true;
+
+const HEALTH_CHECK_INTERVAL_MS = 120000; // 2분
+
 function App() {
   const [servicesStatus, setServicesStatus] = useState({});
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
   const { toasts, removeToast, error: showError } = useToast();
+  const showErrorRef = useRef(showError);
+  showErrorRef.current = showError;
 
   const checkServicesStatus = useCallback(async () => {
     try {
-      const response = await fetch('/api/health');
+      const response = await fetch(`${API_BASE}/api/health`);
       const isOnline = response.ok;
       const newStatus = { 'API Backend': isOnline ? 'online' : 'offline' };
       setServicesStatus(prev => {
         if (prev['API Backend'] === 'online' && !isOnline) {
-          showError('API Backend 서비스에 연결할 수 없습니다.');
+          showErrorRef.current('API Backend 서비스에 연결할 수 없습니다.');
         }
         return newStatus;
       });
     } catch {
       setServicesStatus(prev => {
         if (prev['API Backend'] === 'online') {
-          showError('API Backend 서비스에 연결할 수 없습니다.');
+          showErrorRef.current('API Backend 서비스에 연결할 수 없습니다.');
         }
         return { 'API Backend': 'offline' };
       });
     }
-  }, [showError]);
+  }, []);
 
   useEffect(() => {
     checkServicesStatus();
-    const interval = setInterval(checkServicesStatus, 60000);
+    const interval = setInterval(checkServicesStatus, HEALTH_CHECK_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [checkServicesStatus]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const authError = params.get('auth_error');
+    if (authError) {
+      showError('OpenAI 로그인에 실패했습니다. 다시 시도해 주세요.');
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [showError]);
 
   useEffect(() => {
     const updatePath = () => setCurrentPath(window.location.pathname);
@@ -67,15 +85,16 @@ function App() {
       return <CreatorDetail creatorId={path.split('/creator/')[1]} />;
     }
     if (path === '/analysis' || path.startsWith('/analysis')) {
-      return <AnalysisTab />;
+      return <AnalysisTabWithAuth />;
     }
-    return <Dashboard />;
+    return <Dashboard onShowError={showError} />;
   };
 
   const isDetailPage = path.startsWith('/creator/') || path.startsWith('/analysis');
   const isBackendOnline = servicesStatus['API Backend'] === 'online';
 
   return (
+    <AuthProvider>
     <div className="App">
       {!isDetailPage && (
         <header className="App-header">
@@ -111,7 +130,25 @@ function App() {
 
       <ToastContainer toasts={toasts} removeToast={removeToast} />
     </div>
+    </AuthProvider>
   );
+}
+
+function AnalysisTabWithAuth() {
+  const { loggedIn, authRequired, loading, login } = useAuth();
+  if (loading) return <div className="analysis-auth-gate"><p>인증 확인 중…</p></div>;
+  if (authRequired && !loggedIn) {
+    return (
+      <div className="analysis-auth-gate">
+        <h2>🐟 수집 데이터 분석 · 요약 (MiroFish)</h2>
+        <p>이 기능을 사용하려면 OpenAI OAuth로 로그인해 주세요.</p>
+        <button type="button" className="btn-openai-login" onClick={() => login('/analysis')}>
+          OpenAI(GPT)로 로그인
+        </button>
+      </div>
+    );
+  }
+  return <AnalysisTab />;
 }
 
 export default App;

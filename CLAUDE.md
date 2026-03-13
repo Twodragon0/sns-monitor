@@ -12,20 +12,20 @@ SNS Monitor - A multi-platform social media content analyzer. Paste any URL from
 - Storage: Redis (cache), local filesystem
 - Infrastructure: Docker, Kubernetes (optional), Terraform (optional), Helm (optional)
 
-## Quick Start (Local)
+## Quick Start (Docker)
 
 ```bash
 # 1. Setup
 cp .env.example .env
 # Edit .env → set YOUTUBE_API_KEY (get from https://console.cloud.google.com/apis/credentials)
 
-# 2. Run (only Docker required)
+# 2. Run
 docker-compose up -d --build
 
 # 3. Access
-# Dashboard: http://localhost:3000
-# URL Analyzer: http://localhost:3000/analyze
-# API Health: http://localhost:8080/health
+# Dashboard: http://localhost:3080
+# URL Analyzer: http://localhost:3080
+# API Health: http://localhost:8888/health
 
 # 4. Optional: Run crawlers for periodic data collection
 docker-compose --profile crawlers up -d
@@ -43,9 +43,9 @@ make clean                # Clean up Docker images and volumes
 ## Architecture
 
 ```
-User → Frontend (React :3000)
+User → Frontend (host :3080)
          ↓ /api/*
-       API Backend (Flask :8080)
+       API Backend (host :8888)
          ├── Platform Analyzer (URL-based analysis)
          ├── Redis (cache, optional)
          └── local-data/ (JSON storage)
@@ -109,6 +109,7 @@ User → Frontend (React :3000)
 - `GET /api/dashboard/stats` - Dashboard statistics
 - `GET /api/dcinside/galleries` - DCInside gallery data
 - `GET /api/{group}/members` - Creator group members
+- **수집 데이터 분석·요약 (MiroFish):** `app/api/analysis.py` - `GET /api/analysis/status`, `GET /api/analysis/sources`, `POST /api/analysis/transform`, `POST /api/analysis/graph/build`, `GET /api/analysis/graph/task/<id>`, `GET /api/analysis/graph/data/<id>`, `POST /api/analysis/report/chat`. Frontend: `/analysis` (AnalysisTab.jsx). 대시보드 전체 개요 탭에서 「수집 데이터 분석·요약」 카드로 진입.
 
 ### Supported Platforms (URL Analysis)
 
@@ -119,6 +120,7 @@ User → Frontend (React :3000)
 | Reddit | reddit.com/r/ | Subreddit/post comments |
 | Telegram | t.me/ | Public channel messages |
 | Kakao | pf.kakao.com, story.kakao.com | Profile info |
+| Naver Cafe | cafe.naver.com (f-e/cafes/ID/menus/0, ArticleRead.nhn) | Cafe posts and comments (NAVER_CAFE_COOKIE recommended) |
 
 ## Environment Variables
 
