@@ -1324,6 +1324,8 @@
 }
 
 .result__comment-text {
+  display: block;
+  margin-top: 2px;
   color: var(--c-text);
   word-break: break-word;
 }

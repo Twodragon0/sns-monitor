@@ -1015,46 +1015,86 @@ class PlatformAnalyzer:
             logger.warning("Naver Cafe fetch failed: %s", e)
             self._append_naver_fetch_reason(fetch_reasons, "html_fetch_failed", e)
 
-        # 1b) cafe-articleapi v2.1 — the endpoint that the f-e SPA frontend actually uses
-        if not posts:
+        # 1b) Resolve actual menu IDs when menuId=0 (전체글보기 — not a real API menu)
+        api_menu_ids = [menu_id] if menu_id != "0" else []
+        if not posts and menu_id == "0":
             try:
-                api_url_v21 = (
-                    f"https://apis.naver.com/cafe-web/cafe-articleapi/v2.1/cafes/{club_id}/articles"
-                    f"?page=1&perPage=20&menuId={menu_id}&boardType=L"
-                )
-                api_headers = {
+                side_url = f"https://apis.naver.com/cafe-web/cafe2/SideMenuList.json?cafeId={club_id}"
+                api_headers_side = {
                     **headers,
                     "Accept": "application/json, text/plain, */*",
-                    "Referer": f"https://cafe.naver.com/f-e/cafes/{club_id}/menus/{menu_id}",
+                    "Referer": f"https://cafe.naver.com/f-e/cafes/{club_id}/menus/0",
                 }
-                api_resp = self._naver_get(api_url_v21, headers=api_headers, timeout=15)
-                if api_resp.ok:
+                side_resp = self._naver_get(side_url, headers=api_headers_side, timeout=10)
+                if side_resp.ok:
+                    side_data = side_resp.json()
+                    side_menus = (
+                        side_data.get("message", {}).get("result", {}).get("menus") or []
+                    )
+                    for sm in side_menus:
+                        if sm.get("menuType") == "B" and sm.get("boardType") in ("L", "C", "M"):
+                            api_menu_ids.append(str(sm["menuId"]))
+                    # Also try cafe info for cafeName
+                    gate_url = f"https://apis.naver.com/cafe-web/cafe2/CafeGateInfo.json?cafeId={club_id}"
+                    gate_resp = self._naver_get(gate_url, headers=api_headers_side, timeout=10)
+                    if gate_resp.ok:
+                        gate_data = gate_resp.json()
+                        gate_info = gate_data.get("message", {}).get("result", {}).get("cafeInfoView") or {}
+                        if gate_info.get("cafeName"):
+                            cafe_name = gate_info["cafeName"]
+            except Exception as e:
+                logger.debug("Naver Cafe SideMenuList failed: %s", e)
+            if not api_menu_ids:
+                api_menu_ids = ["0"]
+
+        # 1c) ArticleListV2dot1.json — works with real menu IDs
+        if not posts:
+            api_headers = {
+                **headers,
+                "Accept": "application/json, text/plain, */*",
+                "Referer": f"https://cafe.naver.com/f-e/cafes/{club_id}/menus/{menu_id}",
+            }
+            for mid in api_menu_ids[:5]:
+                try:
+                    api_url_v21 = (
+                        "https://apis.naver.com/cafe-web/cafe2/ArticleListV2dot1.json"
+                        f"?search.clubid={club_id}&search.menuid={mid}"
+                        "&search.page=1&search.perPage=20&search.queryType=lastArticle"
+                    )
+                    api_resp = self._naver_get(api_url_v21, headers=api_headers, timeout=15)
+                    if not api_resp.ok:
+                        continue
                     data = api_resp.json()
-                    result_data = data.get("result") or {}
-                    article_list = result_data.get("articleList") or []
-                    total_count = result_data.get("totalArticleCount")
-                    if total_count is not None and total_posts_estimate is None:
-                        total_posts_estimate = int(total_count)
-                    cafe_info = result_data.get("cafeInfo") or {}
-                    if cafe_info.get("cafeName"):
-                        cafe_name = cafe_info["cafeName"]
-                    for i, art in enumerate(article_list[:50]):
+                    msg = data.get("message") or {}
+                    if msg.get("status") != "200":
+                        continue
+                    result_data = msg.get("result") or {}
+                    article_list = (
+                        result_data.get("articleList")
+                        or result_data.get("articleListMap", {}).get("list")
+                        or []
+                    )
+                    for art in article_list[:30]:
                         title = art.get("subject") or art.get("title") or ""
                         if not title:
                             continue
                         article_id = art.get("articleId") or art.get("id")
+                        aid_str = str(article_id) if article_id is not None else None
+                        if aid_str and any(p.get("article_id") == aid_str for p in posts):
+                            continue
                         post_url = (
                             f"https://cafe.naver.com/ArticleRead.nhn?clubid={club_id}&articleid={article_id}"
                             if article_id else ""
                         )
-                        writer_info = art.get("writer") or {}
-                        writer = writer_info.get("nick") or writer_info.get("id") or "" if isinstance(writer_info, dict) else str(writer_info)
-                        date_str = art.get("writeDateTimestamp") or art.get("writeDate") or ""
-                        if isinstance(date_str, (int, float)):
+                        writer = art.get("writerNickname") or art.get("writerName") or art.get("nickname") or ""
+                        date_str = art.get("writeDate") or art.get("regDate") or ""
+                        if not date_str and art.get("writeDateTimestamp"):
                             try:
-                                date_str = datetime.fromtimestamp(date_str / 1000, tz=KST).strftime("%Y.%m.%d %H:%M")
+                                date_str = datetime.fromtimestamp(
+                                    art["writeDateTimestamp"] / 1000, tz=KST
+                                ).strftime("%Y.%m.%d %H:%M")
                             except Exception:
-                                date_str = str(date_str)
+                                pass
                         view_count = art.get("readCount") or art.get("viewCount")
                         if view_count is not None and not isinstance(view_count, int):
                             try:
@@ -1063,16 +1103,17 @@ class PlatformAnalyzer:
                                 view_count = None
                         posts.append({
                             "text": (title[:300] if isinstance(title, str) else str(title))[:300],
-                            "number": i + 1,
+                            "number": len(posts) + 1,
                             "author": writer if isinstance(writer, str) else str(writer),
                             "date": date_str if isinstance(date_str, str) else str(date_str or ""),
                             "view_count": view_count,
                             "url": post_url,
-                            "article_id": str(article_id) if article_id is not None else None,
+                            "article_id": aid_str,
                         })
-            except Exception as e:
-                logger.debug("Naver Cafe articleapi v2.1 fallback failed: %s", e)
-                self._append_naver_fetch_reason(fetch_reasons, "api_fetch_failed", e)
+                    if len(posts) >= 20:
+                        break
+                except Exception as e:
+                    logger.debug("Naver Cafe ArticleListV2dot1 menu %s failed: %s", mid, e)
 
         if not posts:
             try:
@@ -1153,84 +1194,6 @@ class PlatformAnalyzer:
             except Exception as e:
                 logger.debug("Naver Cafe API fallback failed: %s", e)
                 self._append_naver_fetch_reason(fetch_reasons, "api_fetch_failed", e)
-
-        if not posts:
-            try:
-                api_url_v2 = (
-                    "https://apis.naver.com/cafe-web/cafe2/ArticleListV2dot1.json"
-                    f"?search.clubid={club_id}&search.menuid={menu_id}&search.page=1&search.perPage=20&search.queryType=lastArticle"
-                )
-                api_headers_v2 = {**headers, "Accept": "application/json, text/plain, */*", "Referer": f"https://cafe.naver.com/f-e/cafes/{club_id}/menus/{menu_id}"}
-                api_resp = self._naver_get(api_url_v2, headers=api_headers_v2, timeout=15)
-                if api_resp.ok:
-                    data = api_resp.json()
-                    msg = data.get("message") or {}
-                    result = msg.get("result") or data.get("result") or {}
-                    article_list = (
-                        result.get("articleList")
-                        or result.get("articleListMap", {}).get("list")
-                        or []
-                    )
-                    for i, art in enumerate(article_list[:50]):
-                        title = (
-                            art.get("subject")
-                            or art.get("title")
-                            or art.get("name")
-                            or ""
-                        )
-                        if not title:
-                            continue
-                        article_id = (
-                            art.get("articleId")
-                            or art.get("articleid")
-                            or art.get("id")
-                        )
-                        post_url = (
-                            f"https://cafe.naver.com/ArticleRead.nhn?clubid={club_id}&articleid={article_id}"
-                            if article_id
-                            else ""
-                        )
-                        writer = (
-                            art.get("writer")
-                            or art.get("writerName")
-                            or art.get("nickname")
-                            or ""
-                        )
-                        date_str = (
-                            art.get("writeDate")
-                            or art.get("date")
-                            or art.get("regDate")
-                            or ""
-                        )
-                        view_count = art.get("readCount") or art.get("viewCount")
-                        if view_count is not None and not isinstance(view_count, int):
-                            try:
-                                view_count = int(view_count)
-                            except (TypeError, ValueError):
-                                view_count = None
-                        posts.append(
-                            {
-                                "text": (
-                                    title[:300]
-                                    if isinstance(title, str)
-                                    else str(title)
-                                )[:300],
-                                "number": len(posts) + 1,
-                                "author": writer
-                                if isinstance(writer, str)
-                                else str(writer),
-                                "date": date_str
-                                if isinstance(date_str, str)
-                                else str(date_str or ""),
-                                "view_count": view_count,
-                                "url": post_url,
-                                "article_id": str(article_id)
-                                if article_id is not None
-                                else None,
-                            }
-                        )
-            except Exception as e:
-                logger.debug("Naver Cafe ArticleListV2dot1 fallback failed: %s", e)
 
         if not posts:
             try:
