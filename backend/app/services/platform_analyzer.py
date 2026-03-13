@@ -1236,10 +1236,8 @@ class PlatformAnalyzer:
                 logger.debug("Naver Cafe mobile fallback failed: %s", e)
                 self._append_naver_fetch_reason(fetch_reasons, "mobile_fetch_failed", e)
 
-        max_posts_with_comments = 5
-        for i, post in enumerate(posts):
-            if i >= max_posts_with_comments:
-                break
+        max_posts_with_comments = 10
+        for i, post in enumerate(posts[:max_posts_with_comments]):
             try:
                 article_id = post.get("article_id") or self._extract_naver_article_id(
                     post.get("url", "")
@@ -2401,6 +2399,44 @@ class PlatformAnalyzer:
                     "permalink": f"https://reddit.com{post.get('permalink', '')}",
                 }
             )
+
+        # Fetch top comments for the first N posts
+        max_posts_with_comments = 5
+        for i, p in enumerate(posts[:max_posts_with_comments]):
+            try:
+                permalink = p.get("permalink", "")
+                if not permalink:
+                    continue
+                cmt_url = (
+                    f"https://oauth.reddit.com{permalink[len('https://reddit.com'):]}"
+                    if headers.get("Authorization")
+                    else f"https://www.reddit.com{permalink[len('https://reddit.com'):]}"
+                )
+                cmt_resp = self._session.get(
+                    cmt_url,
+                    params={"limit": 10, "depth": 1},
+                    headers=headers,
+                    timeout=10,
+                )
+                if not cmt_resp.ok:
+                    continue
+                cmt_data = cmt_resp.json()
+                if not isinstance(cmt_data, list) or len(cmt_data) < 2:
+                    continue
+                post_comments = []
+                for child in cmt_data[1].get("data", {}).get("children", []):
+                    if not isinstance(child, dict) or child.get("kind") != "t1":
+                        continue
+                    c = child.get("data", {})
+                    post_comments.append({
+                        "text": (c.get("body", "") or "")[:500],
+                        "author": c.get("author", "[deleted]"),
+                        "score": c.get("score", 0),
+                        "created_utc": c.get("created_utc", 0),
+                    })
+                p["comments"] = post_comments[:10]
+            except Exception as e:
+                logger.debug("Reddit comments for post %d: %s", i, e)
 
         about_url = f"{base_url}/r/{subreddit}/about"
         about = {}
