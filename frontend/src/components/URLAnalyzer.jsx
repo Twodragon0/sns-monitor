@@ -588,7 +588,11 @@ function AnalysisResult({ result }) {
         />
       )}
 
-      {!((result.platform === 'dcinside' || result.platform === 'naver_cafe') && result.type === 'gallery') && !(result.platform === 'reddit' && (result.type === 'subreddit' || result.type === 'post')) && !(result.platform === 'threads' && result.type === 'post') && items.length > 0 && (
+      {result.platform === 'telegram' && result.posts?.length > 0 && (
+        <TelegramMessages messages={result.posts} totalMessages={result.total_messages} />
+      )}
+
+      {!((result.platform === 'dcinside' || result.platform === 'naver_cafe') && result.type === 'gallery') && !(result.platform === 'reddit' && (result.type === 'subreddit' || result.type === 'post')) && !(result.platform === 'telegram') && !(result.platform === 'threads' && result.type === 'post') && items.length > 0 && (
         <GenericItemsAccordion items={items} result={result} />
       )}
     </div>
@@ -948,6 +952,77 @@ function RedditPostComments({ result }) {
             </li>
           )}
         </ul>
+      )}
+    </div>
+  );
+}
+
+function TelegramMessages({ messages, totalMessages }) {
+  const [expanded, setExpanded] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(20);
+  const [order, setOrder] = useState('등록순');
+  const PAGE_SIZE = 20;
+
+  const sorted = useMemo(() => {
+    if (!messages?.length) return [];
+    const list = [...messages];
+    if (order === '최신순' && list.some(m => m.date)) {
+      list.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    }
+    return list;
+  }, [messages, order]);
+
+  const label = totalMessages ? `${messages.length}건 / 전체 ${formatNumber(totalMessages)}건` : `${messages.length}건`;
+
+  return (
+    <div className="items-section">
+      <div className="comment-count-bar">
+        <div className="comment-count-inner">
+          <span className="comment-count-label">✈ 메시지 ({label})</span>
+          <div className="comment-sort">
+            {['등록순', '최신순'].map(o => (
+              <button
+                key={o}
+                type="button"
+                className={`comment-sort-btn ${order === o ? 'is-active' : ''}`}
+                onClick={() => setOrder(o)}
+              >
+                {o}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            className="comments-toggle comments-toggle--all"
+            onClick={() => setExpanded(v => !v)}
+            aria-expanded={expanded}
+          >
+            {expanded ? '접기' : '펼치기'}
+          </button>
+        </div>
+      </div>
+      {expanded && (
+        <div className="items-list">
+          {sorted.slice(0, visibleCount).map((msg, idx) => (
+            <div key={idx} className="item-card">
+              <div className="item-text">{msg.text || ''}</div>
+              <div className="item-meta">
+                {msg.date && <span className="item-date">{msg.date}</span>}
+                {msg.views && <span className="item-views">👁 {msg.views}</span>}
+              </div>
+            </div>
+          ))}
+          {sorted.length > visibleCount && (
+            <button
+              type="button"
+              className="yt-show-more-btn"
+              onClick={() => setVisibleCount(v => v + PAGE_SIZE)}
+              style={{ margin: '12px auto', display: 'block' }}
+            >
+              더 보기 ({visibleCount}/{sorted.length})
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
