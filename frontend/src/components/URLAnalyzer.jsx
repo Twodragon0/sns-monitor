@@ -560,6 +560,26 @@ function AnalysisResult({ result }) {
         />
       )}
 
+      {result.platform === 'naver_cafe' && !result.login_verified && result.posts?.length > 0 && !(result.posts.some(p => p.comments?.length > 0)) && (
+        <div className="naver-cookie-hint" role="status">
+          <p>
+            <strong>☕ 댓글을 수집하려면 로그인 쿠키가 필요합니다.</strong>
+          </p>
+          <p>
+            <code>.env</code> 파일에 <code>NAVER_CAFE_COOKIE</code>를 설정하고 재시작하면 각 게시글의 댓글도 함께 수집됩니다.
+            자세한 설정 방법은 <code>scripts/naver_cookie_helper.html</code>을 참고하세요.
+          </p>
+        </div>
+      )}
+
+      {result.platform === 'reddit' && result.type === 'subreddit' && result.posts?.length > 0 && (
+        <RedditSubredditPosts posts={result.posts} totalPosts={result.total_posts} />
+      )}
+
+      {result.platform === 'reddit' && result.type === 'post' && result.comments?.length > 0 && (
+        <RedditPostComments result={result} />
+      )}
+
       {/* YouTube: 단일 영상/채널 모두 댓글 접기/펼치기 지원 */}
       {hasYoutubeComments && (
         <YouTubeCommentsInline
@@ -568,7 +588,7 @@ function AnalysisResult({ result }) {
         />
       )}
 
-      {!((result.platform === 'dcinside' || result.platform === 'naver_cafe') && result.type === 'gallery') && !(result.platform === 'threads' && result.type === 'post') && items.length > 0 && (
+      {!((result.platform === 'dcinside' || result.platform === 'naver_cafe') && result.type === 'gallery') && !(result.platform === 'reddit' && (result.type === 'subreddit' || result.type === 'post')) && !(result.platform === 'threads' && result.type === 'post') && items.length > 0 && (
         <GenericItemsAccordion items={items} result={result} />
       )}
     </div>
@@ -761,6 +781,174 @@ function DCInsideGalleryPosts({ posts, totalPosts, loginVerified, isNaverCafe })
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function RedditSubredditPosts({ posts, totalPosts }) {
+  const [expandedNo, setExpandedNo] = useState(null);
+  const [commentVisibleCounts, setCommentVisibleCounts] = useState({});
+  const COMMENT_PAGE_SIZE = 10;
+
+  const showMoreComments = (postKey) => {
+    setCommentVisibleCounts(prev => ({
+      ...prev,
+      [postKey]: (prev[postKey] || COMMENT_PAGE_SIZE) + COMMENT_PAGE_SIZE,
+    }));
+  };
+
+  const postsWithComments = posts.filter(p => p.comments?.length > 0).length;
+
+  return (
+    <div className="items-section dcinside-posts-section">
+      <div className="dcinside-posts-section__head">
+        <h3>Posts ({posts.length}건{totalPosts > posts.length ? ` / 전체 ${totalPosts}건` : ''})</h3>
+        <p className="dcinside-posts-section__hint" aria-hidden="true">
+          💬 각 항목을 클릭하면 댓글이 표시됩니다. (댓글 있는 글 {postsWithComments}건)
+        </p>
+      </div>
+      <div className="items-list">
+        {posts.slice(0, 30).map((post, idx) => {
+          const postKey = idx;
+          const hasComments = post.comments?.length > 0;
+          const isExpanded = expandedNo === postKey;
+          return (
+            <div key={postKey} className="item-card item-card--dcinside">
+              {post.permalink ? (
+                <a href={post.permalink} target="_blank" rel="noopener noreferrer" className="item-text item-text--link">
+                  {post.text}
+                </a>
+              ) : (
+                <div className="item-text">{post.text}</div>
+              )}
+              {post.selftext && <div className="item-selftext">{post.selftext}</div>}
+              <div className="item-meta">
+                {post.author && <span className="item-author">{post.author}</span>}
+                {post.score != null && <span className="item-likes">⬆ {formatNumber(post.score)}</span>}
+                {post.num_comments != null && <span className="item-comments">💬 {post.num_comments}</span>}
+                {post.created_utc > 0 && (
+                  <span className="item-date">{new Date(post.created_utc * 1000).toLocaleString('ko-KR')}</span>
+                )}
+              </div>
+              {post.permalink && (
+                <a href={post.permalink} target="_blank" rel="noopener noreferrer" className="item-link">
+                  View →
+                </a>
+              )}
+              {hasComments && (
+                <div className="comment-wrap">
+                  <div className="comment_count">
+                    <button
+                      type="button"
+                      className="comments-toggle comments-toggle--post"
+                      onClick={() => setExpandedNo(isExpanded ? null : postKey)}
+                      aria-expanded={isExpanded}
+                    >
+                      💬 댓글 {post.comments.length}개 {isExpanded ? '접기 ▲' : '클릭 시 보기 ▼'}
+                    </button>
+                  </div>
+                  {isExpanded && (
+                    <ul className="comments-sublist">
+                      {post.comments.slice(0, commentVisibleCounts[postKey] || COMMENT_PAGE_SIZE).map((c, i) => (
+                        <li key={i} className="comment-item">
+                          <span className="comment-meta-inline">
+                            <span className="comment-author">{c.author}</span>
+                            {c.score != null && <span className="comment-score">⬆ {c.score}</span>}
+                          </span>
+                          <span className="comment-text">{c.text}</span>
+                        </li>
+                      ))}
+                      {post.comments.length > (commentVisibleCounts[postKey] || COMMENT_PAGE_SIZE) && (
+                        <li className="comment-show-more">
+                          <button
+                            type="button"
+                            className="comment-show-more-btn"
+                            onClick={() => showMoreComments(postKey)}
+                          >
+                            더 보기 ({commentVisibleCounts[postKey] || COMMENT_PAGE_SIZE}/{post.comments.length})
+                          </button>
+                        </li>
+                      )}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function RedditPostComments({ result }) {
+  const [expanded, setExpanded] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(10);
+  const [order, setOrder] = useState('등록순');
+  const PAGE_SIZE = 10;
+
+  const sorted = useMemo(() => {
+    if (!result.comments?.length) return [];
+    const list = [...result.comments];
+    if (order === '최신순') list.sort((a, b) => (b.created_utc || 0) - (a.created_utc || 0));
+    if (order === '좋아요순') list.sort((a, b) => (b.score || 0) - (a.score || 0));
+    return list;
+  }, [result.comments, order]);
+
+  return (
+    <div className="items-section">
+      <div className="comment-count-bar">
+        <div className="comment-count-inner">
+          <span className="comment-count-label">💬 Comments ({sorted.length})</span>
+          <div className="comment-sort">
+            {['등록순', '최신순', '좋아요순'].map(o => (
+              <button
+                key={o}
+                type="button"
+                className={`comment-sort-btn ${order === o ? 'is-active' : ''}`}
+                onClick={() => setOrder(o)}
+              >
+                {o}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            className="comments-toggle comments-toggle--all"
+            onClick={() => setExpanded(v => !v)}
+            aria-expanded={expanded}
+          >
+            {expanded ? '접기' : '펼치기'}
+          </button>
+        </div>
+      </div>
+      {expanded && (
+        <ul className="comments-sublist">
+          {sorted.slice(0, visibleCount).map((c, i) => (
+            <li key={i} className="comment-item">
+              <span className="comment-meta-inline">
+                <span className="comment-author">{c.author}</span>
+                {c.score != null && <span className="comment-score">⬆ {c.score}</span>}
+                {c.created_utc > 0 && (
+                  <span className="comment-date">{new Date(c.created_utc * 1000).toLocaleString('ko-KR')}</span>
+                )}
+              </span>
+              <span className="comment-text">{c.text}</span>
+            </li>
+          ))}
+          {sorted.length > visibleCount && (
+            <li className="comment-show-more">
+              <button
+                type="button"
+                className="comment-show-more-btn"
+                onClick={() => setVisibleCount(v => v + PAGE_SIZE)}
+              >
+                더 보기 ({visibleCount}/{sorted.length})
+              </button>
+            </li>
+          )}
+        </ul>
+      )}
     </div>
   );
 }
