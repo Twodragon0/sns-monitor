@@ -2593,6 +2593,19 @@ class PlatformAnalyzer:
         preview_url = f"https://t.me/s/{channel_name}"
 
         resp = self._session.get(preview_url, timeout=15)
+        if resp.status_code == 403:
+            return {
+                "type": "channel",
+                "channel_name": channel_name,
+                "title": channel_name,
+                "description": "",
+                "subscriber_count": "0",
+                "total_messages": 0,
+                "posts": [],
+                "source_url": url,
+                "fetch_status": "blocked",
+                "fetch_reason": "telegram_403_forbidden",
+            }
         resp.raise_for_status()
 
         messages = []
