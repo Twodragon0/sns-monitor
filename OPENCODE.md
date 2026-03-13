@@ -4,9 +4,10 @@ This repository is included in centralized hourly automation.
 
 ## Control plane
 
-- Runner: `/Users/namyongkim/Desktop/.twodragon0/bin/hourly-opencode-git-pull.sh`
-- Cron installer: `/Users/namyongkim/Desktop/.twodragon0/bin/install-system-cron.sh`
-- Repo registry: `/Users/namyongkim/Desktop/.twodragon0/repos.list`
+- Runner: `$HOME/Desktop/.twodragon0/bin/hourly-opencode-git-pull.sh`
+- Cron installer: `$HOME/Desktop/.twodragon0/bin/install-system-cron.sh`
+- Repo registry: `$HOME/Desktop/.twodragon0/repos.list`
+- Path policy: use `$HOME`-based paths (no fixed username paths).
 
 ## Guardrails
 
