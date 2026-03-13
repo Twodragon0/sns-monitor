@@ -569,41 +569,7 @@ function AnalysisResult({ result }) {
       )}
 
       {!((result.platform === 'dcinside' || result.platform === 'naver_cafe') && result.type === 'gallery') && !(result.platform === 'threads' && result.type === 'post') && items.length > 0 && (
-        <div className="items-section">
-          <h3>
-            {result.platform === 'dcinside' && result.type === 'post'
-              ? `댓글 (${items.length})`
-              : result.replies
-                ? `댓글 (${items.length})`
-                : `${result.comments ? 'Comments' : result.recent_videos ? 'Recent Videos' : 'Posts'} (${items.length})`}
-          </h3>
-          <div className="items-list">
-            {items.slice(0, result.platform === 'dcinside' ? 100 : 20).map((item, idx) => (
-              <div key={idx} className="item-card">
-                <div className="item-text">{item.text || item.title || item.selftext || ''}</div>
-                <div className="item-meta">
-                  {item.author && <span className="item-author">{item.author}</span>}
-                  {(item.like_count != null || item.score != null || item.recommend != null) && (
-                    <span className="item-likes">
-                      👍 {formatNumber(item.like_count ?? item.score ?? item.recommend ?? 0)}
-                    </span>
-                  )}
-                  {item.view_count != null && <span className="item-views">👁 {formatNumber(item.view_count)}</span>}
-                  {item.num_comments != null && <span className="item-comments">💬 {item.num_comments}</span>}
-                  {(item.published_at || item.date) && (
-                    <span className="item-date">{item.published_at || item.date}</span>
-                  )}
-                  {item.views && <span className="item-views">👁 {item.views}</span>}
-                </div>
-                {(item.permalink || item.url) && (
-                  <a href={item.permalink || item.url} target="_blank" rel="noopener noreferrer" className="item-link">
-                    View →
-                  </a>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
+        <GenericItemsAccordion items={items} result={result} />
       )}
     </div>
   );
@@ -634,6 +600,15 @@ function DCInsideGalleryPosts({ posts, totalPosts, loginVerified, isNaverCafe })
   const [expandedNo, setExpandedNo] = useState(null);
   const [showAllComments, setShowAllComments] = useState(false);
   const [commentSort, setCommentSort] = useState('등록순');
+  const [commentVisibleCounts, setCommentVisibleCounts] = useState({});
+  const COMMENT_PAGE_SIZE = 10;
+
+  const showMoreComments = (postKey) => {
+    setCommentVisibleCounts(prev => ({
+      ...prev,
+      [postKey]: (prev[postKey] || COMMENT_PAGE_SIZE) + COMMENT_PAGE_SIZE,
+    }));
+  };
 
   const allComments = posts.reduce((acc, post) => {
     (post.comments || []).forEach((c) => {
@@ -758,7 +733,7 @@ function DCInsideGalleryPosts({ posts, totalPosts, loginVerified, isNaverCafe })
                       className="comments-sublist"
                       aria-label={`댓글 ${post.comments.length}개`}
                     >
-                      {sortedPostComments.map((c, i) => (
+                      {sortedPostComments.slice(0, commentVisibleCounts[postKey] || COMMENT_PAGE_SIZE).map((c, i) => (
                         <li key={i} className="comment-item">
                           <span className="comment-meta-inline">
                             <span className="comment-author">{c.author}</span>
@@ -767,6 +742,17 @@ function DCInsideGalleryPosts({ posts, totalPosts, loginVerified, isNaverCafe })
                           <span className="comment-text">{c.text}</span>
                         </li>
                       ))}
+                      {sortedPostComments.length > (commentVisibleCounts[postKey] || COMMENT_PAGE_SIZE) && (
+                        <li className="comment-show-more">
+                          <button
+                            type="button"
+                            className="comment-show-more-btn"
+                            onClick={() => showMoreComments(postKey)}
+                          >
+                            더 보기 ({commentVisibleCounts[postKey] || COMMENT_PAGE_SIZE}/{sortedPostComments.length})
+                          </button>
+                        </li>
+                      )}
                     </ul>
                   )}
                 </div>
@@ -782,6 +768,15 @@ function DCInsideGalleryPosts({ posts, totalPosts, loginVerified, isNaverCafe })
 function YouTubeCommentsInline({ comments, totalComments }) {
   const [expandedGroups, setExpandedGroups] = useState(new Set());
   const [order, setOrder] = useState('등록순');
+  const [visibleCounts, setVisibleCounts] = useState({});
+  const PAGE_SIZE = 10;
+
+  const showMore = (gi) => {
+    setVisibleCounts(prev => ({
+      ...prev,
+      [gi]: (prev[gi] || PAGE_SIZE) + PAGE_SIZE,
+    }));
+  };
 
   const grouped = useMemo(() => {
     if (!comments?.length) return [];
@@ -889,7 +884,7 @@ function YouTubeCommentsInline({ comments, totalComments }) {
                   className="yt-accordion-body"
                   aria-label={`${group.title} 댓글 ${group.comments.length}개`}
                 >
-                  {group.comments.map((c, i) => (
+                  {group.comments.slice(0, visibleCounts[gi] || PAGE_SIZE).map((c, i) => (
                     <li key={i} className="yt-comment-row">
                       <div className="yt-comment-meta">
                         {c.author && <span className="yt-comment-author">{c.author}</span>}
@@ -905,12 +900,91 @@ function YouTubeCommentsInline({ comments, totalComments }) {
                       <div className="yt-comment-text">{c.text}</div>
                     </li>
                   ))}
+                  {group.comments.length > (visibleCounts[gi] || PAGE_SIZE) && (
+                    <li className="yt-show-more-row">
+                      <button
+                        type="button"
+                        className="yt-show-more-btn"
+                        onClick={() => showMore(gi)}
+                      >
+                        더 보기 ({(visibleCounts[gi] || PAGE_SIZE)}/{group.comments.length})
+                      </button>
+                    </li>
+                  )}
                 </ul>
               )}
             </div>
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function GenericItemsAccordion({ items, result }) {
+  const [expanded, setExpanded] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(20);
+  const PAGE_SIZE = 20;
+
+  const label = result.platform === 'dcinside' && result.type === 'post'
+    ? `댓글 (${items.length})`
+    : result.replies
+      ? `댓글 (${items.length})`
+      : `${result.comments ? 'Comments' : result.recent_videos ? 'Recent Videos' : 'Posts'} (${items.length})`;
+
+  return (
+    <div className="items-section">
+      <div className="comment-count-bar">
+        <div className="comment-count-inner">
+          <span className="comment-count-label">💬 {label}</span>
+          <button
+            type="button"
+            className="comments-toggle comments-toggle--all"
+            onClick={() => setExpanded(v => !v)}
+            aria-expanded={expanded}
+          >
+            {expanded ? '접기' : '펼치기'}
+          </button>
+        </div>
+      </div>
+      {expanded && (
+        <div className="items-list">
+          {items.slice(0, visibleCount).map((item, idx) => (
+            <div key={idx} className="item-card">
+              <div className="item-text">{item.text || item.title || item.selftext || ''}</div>
+              <div className="item-meta">
+                {item.author && <span className="item-author">{item.author}</span>}
+                {(item.like_count != null || item.score != null || item.recommend != null) && (
+                  <span className="item-likes">
+                    👍 {formatNumber(item.like_count ?? item.score ?? item.recommend ?? 0)}
+                  </span>
+                )}
+                {item.view_count != null && <span className="item-views">👁 {formatNumber(item.view_count)}</span>}
+                {item.num_comments != null && <span className="item-comments">💬 {item.num_comments}</span>}
+                {(item.published_at || item.date) && (
+                  <span className="item-date">{item.published_at || item.date}</span>
+                )}
+                {item.views && <span className="item-views">👁 {item.views}</span>}
+              </div>
+              {(item.permalink || item.url) && (
+                <a href={item.permalink || item.url} target="_blank" rel="noopener noreferrer" className="item-link">
+                  View →
+                </a>
+              )}
+            </div>
+          ))}
+          {items.length > visibleCount && (
+            <button
+              type="button"
+              className="yt-show-more-btn"
+              onClick={() => setVisibleCount(v => v + PAGE_SIZE)}
+              style={{ margin: '12px auto', display: 'block' }}
+            >
+              더 보기 ({visibleCount}/{items.length})
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

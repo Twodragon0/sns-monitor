@@ -1015,6 +1015,65 @@ class PlatformAnalyzer:
             logger.warning("Naver Cafe fetch failed: %s", e)
             self._append_naver_fetch_reason(fetch_reasons, "html_fetch_failed", e)
 
+        # 1b) cafe-articleapi v2.1 — the endpoint that the f-e SPA frontend actually uses
+        if not posts:
+            try:
+                api_url_v21 = (
+                    f"https://apis.naver.com/cafe-web/cafe-articleapi/v2.1/cafes/{club_id}/articles"
+                    f"?page=1&perPage=20&menuId={menu_id}&boardType=L"
+                )
+                api_headers = {
+                    **headers,
+                    "Accept": "application/json, text/plain, */*",
+                    "Referer": f"https://cafe.naver.com/f-e/cafes/{club_id}/menus/{menu_id}",
+                }
+                api_resp = self._naver_get(api_url_v21, headers=api_headers, timeout=15)
+                if api_resp.ok:
+                    data = api_resp.json()
+                    result_data = data.get("result") or {}
+                    article_list = result_data.get("articleList") or []
+                    total_count = result_data.get("totalArticleCount")
+                    if total_count is not None and total_posts_estimate is None:
+                        total_posts_estimate = int(total_count)
+                    cafe_info = result_data.get("cafeInfo") or {}
+                    if cafe_info.get("cafeName"):
+                        cafe_name = cafe_info["cafeName"]
+                    for i, art in enumerate(article_list[:50]):
+                        title = art.get("subject") or art.get("title") or ""
+                        if not title:
+                            continue
+                        article_id = art.get("articleId") or art.get("id")
+                        post_url = (
+                            f"https://cafe.naver.com/ArticleRead.nhn?clubid={club_id}&articleid={article_id}"
+                            if article_id else ""
+                        )
+                        writer_info = art.get("writer") or {}
+                        writer = writer_info.get("nick") or writer_info.get("id") or "" if isinstance(writer_info, dict) else str(writer_info)
+                        date_str = art.get("writeDateTimestamp") or art.get("writeDate") or ""
+                        if isinstance(date_str, (int, float)):
+                            try:
+                                date_str = datetime.fromtimestamp(date_str / 1000, tz=KST).strftime("%Y.%m.%d %H:%M")
+                            except Exception:
+                                date_str = str(date_str)
+                        view_count = art.get("readCount") or art.get("viewCount")
+                        if view_count is not None and not isinstance(view_count, int):
+                            try:
+                                view_count = int(view_count)
+                            except (TypeError, ValueError):
+                                view_count = None
+                        posts.append({
+                            "text": (title[:300] if isinstance(title, str) else str(title))[:300],
+                            "number": i + 1,
+                            "author": writer if isinstance(writer, str) else str(writer),
+                            "date": date_str if isinstance(date_str, str) else str(date_str or ""),
+                            "view_count": view_count,
+                            "url": post_url,
+                            "article_id": str(article_id) if article_id is not None else None,
+                        })
+            except Exception as e:
+                logger.debug("Naver Cafe articleapi v2.1 fallback failed: %s", e)
+                self._append_naver_fetch_reason(fetch_reasons, "api_fetch_failed", e)
+
         if not posts:
             try:
                 # Naver Cafe ArticleList API uses search.clubid (lowercase)
@@ -1022,7 +1081,8 @@ class PlatformAnalyzer:
                     "https://apis.naver.com/cafe-web/cafe2/ArticleList.json"
                     f"?search.clubid={club_id}&search.menuid={menu_id}&search.page=1&search.perPage=20&search.queryType=lastArticle"
                 )
-                api_resp = self._naver_get(api_url, headers=headers, timeout=15)
+                api_headers_v1 = {**headers, "Accept": "application/json, text/plain, */*", "Referer": f"https://cafe.naver.com/f-e/cafes/{club_id}/menus/{menu_id}"}
+                api_resp = self._naver_get(api_url, headers=api_headers_v1, timeout=15)
                 if api_resp.ok:
                     data = api_resp.json()
                     msg = data.get("message") or {}
@@ -1100,7 +1160,8 @@ class PlatformAnalyzer:
                     "https://apis.naver.com/cafe-web/cafe2/ArticleListV2dot1.json"
                     f"?search.clubid={club_id}&search.menuid={menu_id}&search.page=1&search.perPage=20&search.queryType=lastArticle"
                 )
-                api_resp = self._naver_get(api_url_v2, headers=headers, timeout=15)
+                api_headers_v2 = {**headers, "Accept": "application/json, text/plain, */*", "Referer": f"https://cafe.naver.com/f-e/cafes/{club_id}/menus/{menu_id}"}
+                api_resp = self._naver_get(api_url_v2, headers=api_headers_v2, timeout=15)
                 if api_resp.ok:
                     data = api_resp.json()
                     msg = data.get("message") or {}
