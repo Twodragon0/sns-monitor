@@ -776,6 +776,147 @@
   word-break: break-word;
 }
 
+/* ===== YouTube Accordion Comments ===== */
+.yt-comments-section .comment-count-bar {
+  margin-bottom: 8px;
+}
+.comment-sort-label {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-right: 2px;
+}
+
+.yt-accordion {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.yt-accordion-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.yt-accordion-item:hover {
+  border-color: #cbd5e1;
+}
+.yt-accordion-item.is-open {
+  border-color: #667eea;
+  box-shadow: 0 1px 4px rgba(102, 126, 234, 0.12);
+}
+
+.yt-accordion-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-size: 14px;
+  color: #1e293b;
+  transition: background 0.15s;
+}
+.yt-accordion-header:hover {
+  background: #f1f5f9;
+}
+.is-open > .yt-accordion-header {
+  background: #eef2ff;
+  border-bottom: 1px solid #e0e7ff;
+}
+
+.yt-accordion-icon {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #94a3b8;
+  width: 14px;
+  text-align: center;
+}
+.is-open .yt-accordion-icon { color: #667eea; }
+
+.yt-accordion-title {
+  flex: 1;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.yt-accordion-count {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #64748b;
+  background: #e2e8f0;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+.is-open .yt-accordion-count {
+  background: #c7d2fe;
+  color: #4338ca;
+}
+
+.yt-accordion-link {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #667eea;
+  text-decoration: none;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.yt-accordion-link:hover {
+  text-decoration: underline;
+  background: rgba(102, 126, 234, 0.08);
+}
+
+.yt-accordion-body {
+  list-style: none;
+  margin: 0;
+  padding: 8px 16px 12px;
+  background: #fff;
+}
+
+.yt-comment-row {
+  padding: 10px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+.yt-comment-row:last-child {
+  border-bottom: none;
+}
+
+.yt-comment-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.yt-comment-author {
+  font-weight: 600;
+  color: #475569;
+}
+
+.yt-comment-date {
+  opacity: 0.85;
+}
+
+.yt-comment-like {
+  color: #667eea;
+  font-weight: 500;
+}
+
+.yt-comment-text {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #1e293b;
+  word-break: break-word;
+}
+
 .threads-post-block {
   margin-top: 16px;
 }

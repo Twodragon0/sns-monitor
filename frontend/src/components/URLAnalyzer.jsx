@@ -780,7 +780,7 @@ function DCInsideGalleryPosts({ posts, totalPosts, loginVerified, isNaverCafe })
 }
 
 function YouTubeCommentsInline({ comments, totalComments }) {
-  const [expanded, setExpanded] = useState(true);
+  const [expandedGroups, setExpandedGroups] = useState(new Set());
   const [order, setOrder] = useState('등록순');
 
   const grouped = useMemo(() => {
@@ -803,19 +803,36 @@ function YouTubeCommentsInline({ comments, totalComments }) {
     });
     return groups;
   }, [comments, order]);
+
   const collectedCount = comments.length;
   const label = totalComments != null
     ? `댓글 (목록 ${formatNumber(totalComments)} / 수집 ${formatNumber(collectedCount)})`
     : `댓글 (${formatNumber(collectedCount)})`;
 
+  const allExpanded = grouped.length > 0 && expandedGroups.size === grouped.length;
+  const toggleAll = () => {
+    if (allExpanded) {
+      setExpandedGroups(new Set());
+    } else {
+      setExpandedGroups(new Set(grouped.map((_, i) => i)));
+    }
+  };
+  const toggleGroup = (idx) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  };
+
   return (
-    <div className="items-section">
+    <div className="items-section yt-comments-section">
       <div className="comment-count-bar" aria-label="YouTube 댓글">
         <div className="comment-count-inner">
-          <span className="comment-count-label">
-            💬 {label}
-          </span>
+          <span className="comment-count-label">💬 {label}</span>
           <div className="comment-sort">
+            <span className="comment-sort-label">정렬</span>
             {['등록순', '최신순', '좋아요순'].map((orderLabel) => (
               <button
                 key={orderLabel}
@@ -831,53 +848,69 @@ function YouTubeCommentsInline({ comments, totalComments }) {
           <button
             type="button"
             className="comments-toggle comments-toggle--all"
-            onClick={() => setExpanded((v) => !v)}
-            aria-expanded={expanded}
+            onClick={toggleAll}
+            aria-expanded={allExpanded}
           >
-            {expanded ? '댓글 접기' : '댓글 펼치기'}
+            {allExpanded ? '모두 접기' : '모두 펼치기'}
           </button>
         </div>
       </div>
-      {expanded && (
-        <div className="all-comments-box" aria-label="YouTube 댓글 목록">
-          {grouped.map((group, gi) => (
-            <div key={group.videoId || gi} className="comments-group">
-              <div className="comments-group-head">
-                <span className="comments-group-title">
-                  [{group.title}]
-                </span>
+
+      <div className="yt-accordion" aria-label="YouTube 댓글 목록">
+        {grouped.map((group, gi) => {
+          const isOpen = expandedGroups.has(gi);
+          return (
+            <div key={group.videoId || gi} className={`yt-accordion-item ${isOpen ? 'is-open' : ''}`}>
+              <button
+                type="button"
+                className="yt-accordion-header"
+                onClick={() => toggleGroup(gi)}
+                aria-expanded={isOpen}
+                aria-controls={`yt-cmt-${gi}`}
+              >
+                <span className="yt-accordion-icon">{isOpen ? '▾' : '▸'}</span>
+                <span className="yt-accordion-title">{group.title}</span>
+                <span className="yt-accordion-count">💬 {group.comments.length}</span>
                 {group.videoId && (
                   <a
                     href={`https://www.youtube.com/watch?v=${group.videoId}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="comment-post-link"
+                    className="yt-accordion-link"
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    원문
+                    원문 ↗
                   </a>
                 )}
-                <span className="comments-group-count">
-                  댓글 {formatNumber(group.comments.length)}개
-                </span>
-              </div>
-              <ul className="comments-sublist comments-sublist--all">
-                {group.comments.map((c, i) => (
-                  <li key={i} className="comment-item">
-                    <span className="comment-meta-inline">
-                      {c.author && <span className="comment-author">{c.author}</span>}
-                      {c.published_at && <span className="comment-date">{c.published_at}</span>}
-                      {c.like_count != null && (
-                        <span className="comment-like">👍 {formatNumber(c.like_count)}</span>
-                      )}
-                    </span>
-                    <span className="comment-text">{c.text}</span>
-                  </li>
-                ))}
-              </ul>
+              </button>
+              {isOpen && (
+                <ul
+                  id={`yt-cmt-${gi}`}
+                  className="yt-accordion-body"
+                  aria-label={`${group.title} 댓글 ${group.comments.length}개`}
+                >
+                  {group.comments.map((c, i) => (
+                    <li key={i} className="yt-comment-row">
+                      <div className="yt-comment-meta">
+                        {c.author && <span className="yt-comment-author">{c.author}</span>}
+                        {c.published_at && (
+                          <span className="yt-comment-date">
+                            {new Date(c.published_at).toLocaleDateString('ko-KR')}
+                          </span>
+                        )}
+                        {c.like_count != null && c.like_count > 0 && (
+                          <span className="yt-comment-like">👍 {formatNumber(c.like_count)}</span>
+                        )}
+                      </div>
+                      <div className="yt-comment-text">{c.text}</div>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
-          ))}
-        </div>
-      )}
+          );
+        })}
+      </div>
     </div>
   );
 }
