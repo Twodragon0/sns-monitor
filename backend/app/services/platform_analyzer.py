@@ -132,11 +132,15 @@ class PlatformAnalyzer:
         self._reddit_token: Optional[str] = None
         self._reddit_token_expiry: float = 0
 
-    def _reddit_get_token(self) -> Optional[str]:
+    def _reddit_get_token(self, force_refresh: bool = False) -> Optional[str]:
         """Obtain Reddit OAuth2 access token (client credentials)."""
         if not self._reddit_client_id or not self._reddit_client_secret:
             return None
-        if self._reddit_token and time.time() < self._reddit_token_expiry - 60:
+        if (
+            not force_refresh
+            and self._reddit_token
+            and time.time() < self._reddit_token_expiry - 60
+        ):
             return self._reddit_token
         try:
             auth = base64.b64encode(
@@ -156,11 +160,24 @@ class PlatformAnalyzer:
             data = r.json()
             self._reddit_token = data.get("access_token")
             self._reddit_token_expiry = time.time() + int(data.get("expires_in", 3600))
+            logger.debug("Reddit OAuth2 token refreshed, expires in %ss", data.get("expires_in", 3600))
             return self._reddit_token
         except Exception as e:
             logger.warning("Reddit OAuth2 token failed: %s", e)
             self._reddit_token = None
+            self._reddit_token_expiry = 0
             return None
+
+    def _reddit_request(self, url, headers, params=None, timeout=15):
+        """Make a Reddit API request with automatic token refresh on 401."""
+        resp = self._session.get(url, params=params, headers=headers, timeout=timeout)
+        if resp.status_code == 401 and headers.get("Authorization"):
+            logger.info("Reddit 401 — refreshing OAuth token and retrying")
+            new_token = self._reddit_get_token(force_refresh=True)
+            if new_token:
+                headers = {**headers, "Authorization": f"Bearer {new_token}"}
+                resp = self._session.get(url, params=params, headers=headers, timeout=timeout)
+        return resp
 
     def _naver_get(self, url, headers, timeout):
         kwargs = {"headers": headers, "timeout": timeout}
@@ -2344,10 +2361,10 @@ class PlatformAnalyzer:
         )
         list_url = f"{base_url}/r/{subreddit}/hot"
         try:
-            resp = self._session.get(
+            resp = self._reddit_request(
                 list_url,
-                params={"limit": 50},
                 headers=headers,
+                params={"limit": 50},
                 timeout=15,
             )
             if resp.status_code == 403:
@@ -2412,10 +2429,10 @@ class PlatformAnalyzer:
                     if headers.get("Authorization")
                     else f"https://www.reddit.com{permalink[len('https://reddit.com'):]}"
                 )
-                cmt_resp = self._session.get(
+                cmt_resp = self._reddit_request(
                     cmt_url,
-                    params={"limit": 10, "depth": 1},
                     headers=headers,
+                    params={"limit": 10, "depth": 1},
                     timeout=10,
                 )
                 if not cmt_resp.ok:
@@ -2441,7 +2458,7 @@ class PlatformAnalyzer:
         about_url = f"{base_url}/r/{subreddit}/about"
         about = {}
         try:
-            about_resp = self._session.get(about_url, headers=headers, timeout=10)
+            about_resp = self._reddit_request(about_url, headers=headers, timeout=10)
             if about_resp.ok:
                 raw = about_resp.json()
                 about = raw.get("data", {}) if isinstance(raw, dict) else {}
@@ -2483,10 +2500,10 @@ class PlatformAnalyzer:
         )
         url = f"{base_url}/r/{subreddit}/comments/{post_id}"
         try:
-            resp = self._session.get(
+            resp = self._reddit_request(
                 url,
-                params={"limit": 100},
                 headers=headers,
+                params={"limit": 100},
                 timeout=15,
             )
             if resp.status_code == 403:
