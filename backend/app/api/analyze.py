@@ -8,6 +8,7 @@ import logging
 from flask import request, jsonify
 
 from . import analyze_bp
+from .. import limiter
 from ..config import Config
 
 logger = logging.getLogger(__name__)
@@ -30,6 +31,7 @@ MAX_ANALYZE_URL_LENGTH = 2048
 
 
 @analyze_bp.route("/api/analyze/url", methods=["POST"])
+@limiter.limit("30 per minute")
 def analyze_url():
     """Analyze content from any supported platform URL."""
     data = request.get_json(silent=True)
@@ -59,6 +61,7 @@ def analyze_url():
 
 
 @analyze_bp.route("/api/analyze/summarize", methods=["POST"])
+@limiter.limit("10 per minute")
 def summarize_analysis():
     """Summarize analysis results using MiroFish AI service."""
     data = request.get_json(silent=True)

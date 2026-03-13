@@ -15,6 +15,7 @@ from flask import request, jsonify, session
 
 from . import analysis_bp
 from .auth import require_analysis_auth
+from .. import limiter
 from ..config import Config
 
 # Alphanumeric + hyphens + underscores only for path IDs
@@ -141,6 +142,7 @@ def analysis_status():
 
 
 @analysis_bp.route('/api/analysis/transform', methods=['POST'])
+@limiter.limit("5 per minute")
 @require_analysis_auth
 def transform_sns_data():
     """
@@ -315,6 +317,7 @@ def get_analysis_report(report_id):
 
 
 @analysis_bp.route('/api/analysis/report/chat', methods=['POST'])
+@limiter.limit("20 per minute")
 @require_analysis_auth
 def chat_with_analysis():
     """Proxy chat with MiroFish ReportAgent."""
@@ -442,6 +445,7 @@ def _read_source_items(src_type, src_id):
 
 
 @analysis_bp.route('/api/analysis/local-summary', methods=['POST'])
+@limiter.limit("10 per minute")
 def local_summary():
     """
     Local analysis without MiroFish: reads crawled data and runs keyword-based sentiment analysis.

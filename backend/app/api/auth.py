@@ -12,6 +12,7 @@ import requests
 from flask import request, jsonify, redirect, session
 
 from . import auth_bp
+from .. import limiter
 from ..config import Config
 
 logger = logging.getLogger(__name__)
@@ -49,6 +50,7 @@ def auth_me():
 
 
 @auth_bp.route("/api/auth/openai", methods=["GET"])
+@limiter.limit("10 per minute")
 def auth_openai_start():
     """Redirect to OpenAI (or configured IdP) OAuth authorize URL."""
     if not _oauth_configured():
@@ -74,6 +76,7 @@ def auth_openai_start():
 
 
 @auth_bp.route("/api/auth/callback", methods=["GET"])
+@limiter.limit("10 per minute")
 def auth_callback():
     """Exchange OAuth code for tokens and create session."""
     if not _oauth_configured():

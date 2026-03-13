@@ -5,9 +5,18 @@ SNS Monitor Backend - Flask Application Factory
 import os
 from flask import Flask, jsonify
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 from .config import Config
 from .utils.logger import setup_logger, get_logger
+
+# Module-level limiter so blueprints can import and decorate routes
+limiter = Limiter(
+    key_func=get_remote_address,
+    storage_uri=f"redis://{Config.REDIS_HOST}:{Config.REDIS_PORT}" if Config.REDIS_HOST else "memory://",
+    default_limits=["200 per minute"],
+)
 
 
 def create_app(config_class=Config):
@@ -22,6 +31,9 @@ def create_app(config_class=Config):
 
     # Setup logging
     logger = setup_logger('sns-monitor')
+
+    # Rate limiter
+    limiter.init_app(app)
 
     # CORS (allow credentials for session when frontend origin is set)
     _cors_origins = os.environ.get("CORS_ORIGINS", "").strip() or os.environ.get("FRONTEND_URL", "").strip()
