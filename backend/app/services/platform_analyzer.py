@@ -1597,7 +1597,7 @@ class PlatformAnalyzer:
         }
 
         api_candidates = [
-            f"https://apis.naver.com/cafe-web/cafe2/CommentList.json?search.clubid={club_id}&search.articleid={article_id}&search.page=1&search.perPage=30",
+            f"https://apis.naver.com/cafe-web/cafe-articleapi/cafes/{club_id}/articles/{article_id}/comments?page=1&pageSize=30",
             f"https://apis.naver.com/cafe-web/cafe-articleapi/v2/cafes/{club_id}/articles/{article_id}/comments?page=1&pageSize=30",
             f"https://apis.naver.com/cafe-web/cafe-articleapi/v2/cafes/{club_id}/articles/{article_id}",
         ]
@@ -1663,6 +1663,14 @@ class PlatformAnalyzer:
         return comments[:100]
 
     def _extract_naver_comments_from_payload(self, payload):
+        # New API format: {"comments": {"items": [...]}}
+        comments_obj = payload.get("comments")
+        if isinstance(comments_obj, dict) and "items" in comments_obj:
+            items = comments_obj["items"]
+            if isinstance(items, list):
+                return self._parse_naver_comment_items(items)
+
+        # Legacy / generic walk: find any list under a key containing "comment"
         candidates = []
 
         def walk(node):
@@ -1680,22 +1688,49 @@ class PlatformAnalyzer:
 
         comments = []
         for group in candidates:
-            for item in group:
-                if not isinstance(item, dict):
-                    continue
-                text = (
-                    item.get("content")
-                    or item.get("comment")
-                    or item.get("text")
-                    or item.get("memo")
-                    or item.get("body")
-                    or item.get("description")
-                    or item.get("message")
-                    or ""
+            parsed = self._parse_naver_comment_items(group)
+            if parsed:
+                comments = parsed
+                break
+
+        return comments
+
+    def _parse_naver_comment_items(self, items):
+        """Parse Naver Cafe comment items from API response."""
+        comments = []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            if item.get("isDeleted"):
+                continue
+            text = (
+                item.get("content")
+                or item.get("comment")
+                or item.get("text")
+                or item.get("memo")
+                or item.get("body")
+                or item.get("description")
+                or item.get("message")
+                or ""
+            )
+            text = str(text).strip()
+            # Include sticker-only comments
+            if not text and item.get("sticker"):
+                text = "[스티커]"
+            if not text:
+                continue
+            # Author: may be dict (new API) or string (legacy)
+            writer = item.get("writer") or {}
+            if isinstance(writer, dict):
+                author = (
+                    writer.get("nick")
+                    or writer.get("nickName")
+                    or writer.get("memberNickname")
+                    or writer.get("name")
+                    or writer.get("id")
+                    or "—"
                 )
-                text = str(text).strip()
-                if not text:
-                    continue
+            else:
                 author = (
                     item.get("writer")
                     or item.get("nickname")
@@ -1704,21 +1739,28 @@ class PlatformAnalyzer:
                     or item.get("name")
                     or "—"
                 )
-                date_str = (
-                    item.get("registerDate")
-                    or item.get("regDate")
-                    or item.get("date")
-                    or item.get("writeDate")
-                    or ""
-                )
-                comments.append(
-                    {
-                        "author": str(author),
-                        "text": text[:500],
-                        "date": str(date_str),
-                    }
-                )
-
+            # Date: may be epoch ms (new API) or string
+            date_str = (
+                item.get("updateDate")
+                or item.get("createDate")
+                or item.get("registerDate")
+                or item.get("regDate")
+                or item.get("date")
+                or item.get("writeDate")
+                or ""
+            )
+            if isinstance(date_str, (int, float)) and date_str > 1_000_000_000_000:
+                from datetime import datetime, timezone
+                date_str = datetime.fromtimestamp(
+                    date_str / 1000, tz=timezone.utc
+                ).strftime("%Y-%m-%d %H:%M:%S")
+            comments.append(
+                {
+                    "author": str(author),
+                    "text": text[:500],
+                    "date": str(date_str),
+                }
+            )
         return comments
 
     def _analyze_dcinside_single_post(self, gallery_id, post_no, url):
