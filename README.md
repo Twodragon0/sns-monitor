@@ -121,6 +121,16 @@ docker-compose --profile crawlers up -d
 # Crawlers collect data every 2 hours from configured channels
 ```
 
+## Security Scanning Operations
+
+- Automatic code scanning uses GitHub Code Scanning default setup.
+- `.github/workflows/codeql.yml` is reserved for manual advanced scans only (`workflow_dispatch`).
+- Trigger manual advanced CodeQL only when one of these is true:
+  - repository-level CodeQL query pack/config change needs verification
+  - unusual language/extractor issue needs deeper diagnostics than default setup
+  - release/security audit requires explicit advanced-scan evidence
+- Do not require manual advanced CodeQL on every PR; use default setup for routine gating.
+
 ## License
 
 MIT

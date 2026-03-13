@@ -122,7 +122,14 @@ securityContext:
   * Dependabot alerts 자동 생성
   * Secret scanning 결과 즉시 알림
 * **Dependabot**: 자동 의존성 업데이트 및 취약점 알림
-* **Code Scanning**: GitHub CodeQL 또는 외부 SAST 도구 통합
+* **Code Scanning (운영 기준)**:
+  * 기본 자동 스캔은 GitHub Code Scanning default setup을 사용
+  * `.github/workflows/codeql.yml`은 수동 고급 분석(`workflow_dispatch`) 전용으로 유지
+  * 수동 고급 분석 실행 기준:
+    * CodeQL query/config 변경 검증이 필요한 경우
+    * default setup 결과만으로 원인 파악이 어려운 추출/분석 이슈가 있는 경우
+    * 릴리스/감사 시 고급 분석 결과 증적이 필요한 경우
+  * 일반 PR 머지 게이팅에는 default setup 결과를 우선 사용
 
 ### 💰 비용 최적화 (FinOps)
 * **스토리지**: S3 버킷에는 수명 주기(Lifecycle) 정책을 걸어 오래된 로그를 Glacier로 보냅니다.

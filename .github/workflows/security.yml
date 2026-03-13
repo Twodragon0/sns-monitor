@@ -7,6 +7,10 @@ on:
     branches: [main]
     paths-ignore:
       - '**/*.md'
+      - 'README.md'
+      - 'CLAUDE.md'
+      - 'OPENCODE.md'
+      - 'MEMORY.md'
       - 'docs/**'
       - '.github/*.md'
       - '.github/ISSUE_TEMPLATE/**'
