@@ -1,15 +1,20 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import axios from 'axios';
+import DOMPurify from 'dompurify';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import './URLAnalyzer.css';
+import { API_BASE } from '../config';
 
 const PLATFORM_INFO = {
   youtube: { name: 'YouTube', color: '#FF0000', icon: '▶' },
   dcinside: { name: 'DCInside', color: '#2B65EC', icon: '📋' },
+  naver_cafe: { name: '네이버 카페', color: '#03c75a', icon: '☕' },
   reddit: { name: 'Reddit', color: '#FF4500', icon: '🔗' },
   telegram: { name: 'Telegram', color: '#0088cc', icon: '✈' },
   kakao: { name: 'Kakao', color: '#FEE500', icon: '💬' },
   twitter: { name: 'X (Twitter)', color: '#000000', icon: '𝕏' },
+  instagram: { name: 'Instagram', color: '#E4405F', icon: '📸' },
+  threads: { name: 'Threads', color: '#000000', icon: '🧵' },
 };
 
 const SENTIMENT_COLORS = {
@@ -18,17 +23,93 @@ const SENTIMENT_COLORS = {
   negative: '#F44336',
 };
 
-const API_BASE = process.env.REACT_APP_API_URL || '';
+const RESULTS_CACHE_KEY = 'sns-analyzer-results';
+const RESULTS_CACHE_MAX = 5;
+const NAVER_FETCH_STATUS_LABELS = {
+  ok: '정상',
+  partial: '부분 수집',
+  blocked: '수집 제한',
+};
+const NAVER_FETCH_REASON_LABELS = {
+  html_fetch_failed: 'HTML 수집 실패',
+  api_fetch_failed: 'API 수집 실패',
+  mobile_fetch_failed: '모바일 수집 실패',
+  no_posts_detected: '게시글 미감지',
+  posts_found_but_comments_unavailable: '게시글만 수집, 댓글 미수집',
+  content_and_comments_unavailable: '본문/댓글 모두 미수집',
+  content_found_but_comments_unavailable: '본문 수집, 댓글 미수집',
+  cookie_not_set: '로그인 쿠키 미설정',
+  proxy_not_set: '프록시 미설정',
+};
+
+function loadResultsCache() {
+  try {
+    const raw = localStorage.getItem(RESULTS_CACHE_KEY);
+    if (!raw) return { urls: [], data: {} };
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed?.urls) && parsed.data && typeof parsed.data === 'object'
+      ? parsed
+      : { urls: [], data: {} };
+  } catch {
+    return { urls: [], data: {} };
+  }
+}
+
+function saveResultsCache(url, result) {
+  const prev = loadResultsCache();
+  const urls = [url, ...prev.urls.filter(u => u !== url)].slice(0, RESULTS_CACHE_MAX);
+  const data = { ...prev.data, [url]: result };
+  const trimmed = {};
+  urls.forEach(u => { if (data[u]) trimmed[u] = data[u]; });
+  localStorage.setItem(RESULTS_CACHE_KEY, JSON.stringify({ urls, data: trimmed }));
+}
+
+/** 요약 API 전송용 페이로드 축소 (413 Payload Too Large 방지) */
+function trimResultForSummarize(result) {
+  if (!result) return null;
+  const statKeys = ['view_count', 'like_count', 'comment_count', 'subscriber_count', 'follower_count', 'tweet_count', 'total_posts', 'score'];
+  const stats = {};
+  statKeys.forEach(k => { if (result[k] != null) stats[k] = result[k]; });
+  const base = {
+    platform: result.platform,
+    title: result.title,
+    gallery_id: result.gallery_id,
+    gallery_name: result.gallery_name,
+    subreddit: result.subreddit,
+    username: result.username,
+    analyzed_at: result.analyzed_at,
+    source_url: result.source_url,
+    description: result.description ? String(result.description).slice(0, 2000) : undefined,
+    fetch_status: result.fetch_status,
+    fetch_reason: result.fetch_reason,
+    content: result.content ? String(result.content).slice(0, 3000) : undefined,
+    analysis: result.analysis ? { overall: result.analysis.overall, sentiment: result.analysis.sentiment, top_keywords: (result.analysis.top_keywords || []).slice(0, 10) } : undefined,
+    ...stats,
+  };
+  const items = result.comments || result.replies || result.posts || result.recent_videos;
+  if (Array.isArray(items) && items.length > 0) {
+    const key = result.comments ? 'comments' : (result.replies ? 'replies' : (result.posts ? 'posts' : 'recent_videos'));
+    base[key] = items.slice(0, 50).map(item => ({
+      text: (item.text || item.title || item.selftext || '').slice(0, 200),
+      author: item.author,
+      date: item.date || item.published_at,
+    }));
+  }
+  return base;
+}
 
 function detectPlatform(url) {
   if (!url) return null;
   const lower = url.toLowerCase();
   if (lower.includes('youtube.com') || lower.includes('youtu.be')) return 'youtube';
   if (lower.includes('dcinside.com')) return 'dcinside';
+  if (lower.includes('cafe.naver.com')) return 'naver_cafe';
   if (lower.includes('reddit.com')) return 'reddit';
   if (lower.includes('t.me/')) return 'telegram';
   if (lower.includes('kakao.com')) return 'kakao';
   if (lower.includes('x.com') || lower.includes('twitter.com')) return 'twitter';
+  if (lower.includes('instagram.com')) return 'instagram';
+  if (lower.includes('threads.net') || lower.includes('threads.com')) return 'threads';
   return null;
 }
 
@@ -58,17 +139,23 @@ function URLAnalyzer() {
     setResult(null);
 
     try {
-      const response = await axios.post(`${API_BASE}/api/analyze/url`, { url: url.trim() });
+      const response = await axios.post(`${API_BASE}/api/analyze/url`, { url: url.trim() }, { timeout: 300000 });
+      const trimmedUrl = url.trim();
       setResult(response.data);
+      saveResultsCache(trimmedUrl, response.data);
       setHistory(prev => [{
-        url: url.trim(),
+        url: trimmedUrl,
         platform: response.data.platform,
-        title: response.data.title || response.data.gallery_id || response.data.subreddit || url.trim(),
+        title: response.data.title || response.data.gallery_id || response.data.subreddit || trimmedUrl,
         analyzed_at: response.data.analyzed_at,
-      }, ...prev.slice(0, 9)]);
+      }, ...prev.filter(h => h.url !== trimmedUrl).slice(0, 9)]);
     } catch (err) {
       const msg = err.response?.data?.error || err.message || 'Analysis failed';
-      setError(msg);
+      setError(
+        !err.response && (err.message === 'Network Error' || err.code === 'ECONNABORTED')
+          ? '서버 연결 실패 또는 요청 시간 초과입니다. 잠시 후 다시 시도해 주세요.'
+          : msg
+      );
     } finally {
       setLoading(false);
     }
@@ -76,6 +163,14 @@ function URLAnalyzer() {
 
   const clearHistory = () => {
     setHistory([]);
+    localStorage.removeItem(RESULTS_CACHE_KEY);
+    setResult(null);
+  };
+
+  const openHistoryItem = (item) => {
+    setUrl(item.url);
+    const cache = loadResultsCache();
+    setResult(cache.data[item.url] ?? null);
   };
 
   return (
@@ -91,9 +186,10 @@ function URLAnalyzer() {
             type="url"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://www.youtube.com/watch?v=... or any supported URL"
+            placeholder="https://gall.dcinside.com/... 또는 지원 URL 붙여넣기"
             className="url-input"
             disabled={loading}
+            aria-label="분석할 URL 입력"
           />
           {detectedPlatform && (
             <span
@@ -136,7 +232,7 @@ function URLAnalyzer() {
           </div>
           <ul>
             {history.map((item, idx) => (
-              <li key={idx} onClick={() => setUrl(item.url)}>
+              <li key={idx} onClick={() => openHistoryItem(item)}>
                 <span className="history-platform" style={{
                   color: PLATFORM_INFO[item.platform]?.color || '#666'
                 }}>
@@ -144,7 +240,7 @@ function URLAnalyzer() {
                 </span>
                 <span className="history-title">{item.title}</span>
                 <span className="history-time">
-                  {new Date(item.analyzed_at).toLocaleTimeString('ko-KR')}
+                  {item.analyzed_at ? new Date(item.analyzed_at).toLocaleTimeString('ko-KR') : ''}
                 </span>
               </li>
             ))}
@@ -155,10 +251,88 @@ function URLAnalyzer() {
   );
 }
 
+function ThreadsPostBlock({ embedHtml, url, replies, description }) {
+  const embedRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (!embedHtml) return;
+    const container = embedRef.current;
+    if (!container) return;
+    if (container.querySelector('[data-text-post-permalink]')) return;
+    // Sanitize embed HTML to prevent XSS (allow only Threads embed markup)
+    const sanitized = DOMPurify.sanitize(embedHtml, {
+      ADD_TAGS: ['blockquote'],
+      ADD_ATTR: ['data-text-post-permalink', 'data-text-post-version', 'class', 'style', 'cite'],
+      FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form'],
+    });
+    container.innerHTML = sanitized;
+    const existing = document.querySelector('script[src="https://www.threads.com/embed.js"]');
+    if (existing) return;
+    const script = document.createElement('script');
+    script.src = 'https://www.threads.com/embed.js';
+    script.async = true;
+    document.body.appendChild(script);
+    return () => {
+      if (script.parentNode) script.parentNode.removeChild(script);
+    };
+  }, [embedHtml]);
+
+  const replyList = Array.isArray(replies) ? replies : [];
+  const hasEmbed = !!embedHtml?.trim();
+
+  return (
+    <div className="result-content threads-post-block">
+      <h3>게시글</h3>
+      {hasEmbed ? (
+        <div ref={embedRef} className="threads-embed-wrap" />
+      ) : (
+        <>
+          {description && (
+            <p className="threads-post-fallback-desc">{description}</p>
+          )}
+          {!description && (
+            <p className="threads-no-embed">임베드를 불러오지 못했습니다. 원문 링크에서 확인해 주세요.</p>
+          )}
+        </>
+      )}
+      {url && (
+        <a href={url} target="_blank" rel="noopener noreferrer" className="result-origin-link">
+          Threads 원문 보기 →
+        </a>
+      )}
+      <h3>댓글 {replyList.length > 0 ? `(${replyList.length})` : '(Threads API 미제공)'}</h3>
+      {replyList.length > 0 ? (
+        <ul className="comments-sublist">
+          {replyList.map((r, i) => (
+            <li key={i} className="comment-item">
+              <span className="comment-meta-inline">
+                {r.author && <span className="comment-author">{r.author}</span>}
+                {r.date && <span className="comment-date">{r.date}</span>}
+              </span>
+              <span className="comment-text">{r.text || r.title || ''}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="threads-replies-hint">Threads는 댓글(답글) 데이터를 공개 API로 제공하지 않아 여기서는 표시되지 않습니다.</p>
+      )}
+    </div>
+  );
+}
+
 function AnalysisResult({ result }) {
   const platform = PLATFORM_INFO[result.platform] || { name: result.platform, color: '#666' };
   const analysis = result.analysis;
-  const items = result.comments || result.posts || result.recent_videos || [];
+  const hasYoutubeComments =
+    result.platform === 'youtube' && Array.isArray(result.comments) && result.comments.length > 0;
+  const items = !hasYoutubeComments ? (result.comments || result.replies || result.posts || result.recent_videos || []) : [];
+  const isNaverSinglePost = result.platform === 'naver_cafe' && result.type === 'post';
+  const naverFetchStatus = result.fetch_status || 'ok';
+  const naverFetchReason = result.fetch_reason || '';
+  const naverReasonTokens = parseNaverReasonTokens(naverFetchReason);
+  const naverFetchReasonLabel = formatNaverFetchReason(naverFetchReason);
+  const naverFetchStatusLabel = NAVER_FETCH_STATUS_LABELS[naverFetchStatus] || naverFetchStatus;
+  const naverActionItems = getNaverDiagnosticActions(naverReasonTokens);
   const [summary, setSummary] = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState(null);
@@ -167,10 +341,12 @@ function AnalysisResult({ result }) {
     setSummaryLoading(true);
     setSummaryError(null);
     try {
-      const resp = await axios.post(`${API_BASE}/api/analyze/summarize`, { result });
+      const payload = trimResultForSummarize(result);
+      const resp = await axios.post(`${API_BASE}/api/analyze/summarize`, { result: payload }, { timeout: 60000 });
       setSummary(resp.data);
     } catch (err) {
-      setSummaryError(err.response?.data?.error || err.message || 'Summarization failed');
+      const msg = err.response?.data?.error || err.message || 'Summarization failed';
+      setSummaryError(err.response?.status === 413 ? 'Request too large. Payload was trimmed; try again.' : msg);
     } finally {
       setSummaryLoading(false);
     }
@@ -185,22 +361,79 @@ function AnalysisResult({ result }) {
   const keywordData = analysis?.top_keywords?.slice(0, 10) || [];
 
   return (
-    <div className="analysis-result">
+    <div className="analysis-result" role="region" aria-label="분석 결과">
       <div className="result-header">
         <div className="result-platform" style={{ backgroundColor: platform.color }}>
           {platform.name}
         </div>
-        <h2>{result.title || result.gallery_id || result.subreddit || result.channel_name || result.username || 'Analysis Result'}</h2>
+        <h2>{result.title || result.gallery_name || result.gallery_id || result.subreddit || result.channel_name || result.username || 'Analysis Result'}</h2>
         {result.analyzed_at && (
           <span className="result-time">
             {new Date(result.analyzed_at).toLocaleString('ko-KR')}
           </span>
         )}
+        {isNaverSinglePost && (
+          <div className="naver-result-badges">
+            {result.login_verified && (
+              <span className="naver-result-badge naver-result-badge--login" title="로그인된 상태로 수집됨">로그인됨</span>
+            )}
+            <a href={result.url || result.source_url} target="_blank" rel="noopener noreferrer" className="naver-result-badge naver-result-badge--link">원문 URL</a>
+            <span className="naver-result-badge">댓글 {formatNumber(result.comment_count ?? 0)}</span>
+            {naverFetchStatus !== 'ok' && (
+              <span className="naver-result-badge naver-result-badge--warn">
+                {naverFetchStatusLabel}: {naverFetchReasonLabel || naverFetchStatusLabel}
+              </span>
+            )}
+          </div>
+        )}
       </div>
+
+      {isNaverSinglePost && naverFetchStatus !== 'ok' && (
+        <div className="naver-diagnostic-panel" role="status" aria-live="polite">
+          <strong className="naver-diagnostic-panel__title">네이버 카페 진단</strong>
+          <p className="naver-diagnostic-panel__summary">
+            현재 상태: {naverFetchStatusLabel}
+          </p>
+          {naverFetchReasonLabel && (
+            <p className="naver-diagnostic-panel__reasons">원인: {naverFetchReasonLabel}</p>
+          )}
+          {naverActionItems.length > 0 && (
+            <ul className="naver-diagnostic-panel__actions">
+              {naverActionItems.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {result.platform === 'naver_cafe' && naverFetchStatus !== 'ok' && (
+        <div className="naver-hint-block" role="status" title={naverFetchReasonLabel}>
+          <p className="naver-hint-block__status">
+            ☕ 네이버 카페: {naverFetchStatusLabel}
+            {naverFetchReasonLabel && (
+              <span className="naver-hint-block__reasons"> — {naverFetchReasonLabel}</span>
+            )}
+          </p>
+          <p className="naver-hint-block__action">
+            <strong>수집하려면:</strong> .env에 <code>NAVER_CAFE_COOKIE</code>를 넣고 <code>docker compose up -d --build</code>로 재시작하세요. (필요 시 <code>NAVER_CAFE_PROXY_URL</code>도 설정)
+          </p>
+        </div>
+      )}
+
+      {result.platform === 'reddit' && result.fetch_status === 'blocked' && (
+        <div className="reddit-hint-block" role="status">
+          <p className="reddit-hint-block__status">🔗 Reddit: API 접근이 차단되었습니다.</p>
+          <p className="reddit-hint-block__action">
+            {result.description || 'Reddit이 비인증 요청을 막고 있습니다. .env에 REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET을 설정한 뒤 docker compose up -d --build로 재시작하세요.'}
+          </p>
+        </div>
+      )}
 
       <div className="result-stats">
         {result.view_count != null && <StatCard label="Views" value={formatNumber(result.view_count)} />}
         {result.like_count != null && <StatCard label="Likes" value={formatNumber(result.like_count)} />}
+        {result.recommend != null && <StatCard label="추천" value={formatNumber(result.recommend)} />}
         {result.comment_count != null && <StatCard label="Comments" value={formatNumber(result.comment_count)} />}
         {result.subscriber_count != null && <StatCard label="Subscribers" value={formatNumber(result.subscriber_count)} />}
         {result.video_count != null && <StatCard label="Videos" value={formatNumber(result.video_count)} />}
@@ -235,10 +468,40 @@ function AnalysisResult({ result }) {
         )}
       </div>
 
-      {result.description && (
+      {(result.platform === 'dcinside' || result.platform === 'naver_cafe') && result.type === 'post' && (
+        <div className="result-content result-description">
+          {result.content && (
+            <>
+              <h3>본문</h3>
+              <div className="result-content-body">{result.content}</div>
+            </>
+          )}
+          {result.url && (
+            <a href={result.url} target="_blank" rel="noopener noreferrer" className="result-origin-link">
+              원문 보기 →
+            </a>
+          )}
+        </div>
+      )}
+
+      {result.platform === 'threads' && result.type === 'post' && (
+        <ThreadsPostBlock
+          embedHtml={result.embed_html}
+          url={result.url}
+          replies={result.replies}
+          description={result.description}
+        />
+      )}
+
+      {result.description && !(result.platform === 'threads' && result.type === 'post') && (
         <div className="result-description">
-          <h3>Description</h3>
+          <h3>설명</h3>
           <p>{result.description}</p>
+          {result.platform === 'instagram' && result.url && (
+            <a href={result.url} target="_blank" rel="noopener noreferrer" className="result-origin-link">
+              Instagram 원문 보기 →
+            </a>
+          )}
         </div>
       )}
 
@@ -288,14 +551,34 @@ function AnalysisResult({ result }) {
         </div>
       )}
 
-      {items.length > 0 && (
+      {(result.platform === 'dcinside' || result.platform === 'naver_cafe') && result.type === 'gallery' && result.posts?.length > 0 && (
+        <DCInsideGalleryPosts
+          posts={result.posts}
+          totalPosts={result.total_posts}
+          loginVerified={result.login_verified}
+          isNaverCafe={result.platform === 'naver_cafe'}
+        />
+      )}
+
+      {/* YouTube: 단일 영상/채널 모두 댓글 접기/펼치기 지원 */}
+      {hasYoutubeComments && (
+        <YouTubeCommentsInline
+          comments={result.comments}
+          totalComments={result.comment_count}
+        />
+      )}
+
+      {!((result.platform === 'dcinside' || result.platform === 'naver_cafe') && result.type === 'gallery') && !(result.platform === 'threads' && result.type === 'post') && items.length > 0 && (
         <div className="items-section">
           <h3>
-            {result.comments ? 'Comments' : result.recent_videos ? 'Recent Videos' : 'Posts'}
-            ({items.length})
+            {result.platform === 'dcinside' && result.type === 'post'
+              ? `댓글 (${items.length})`
+              : result.replies
+                ? `댓글 (${items.length})`
+                : `${result.comments ? 'Comments' : result.recent_videos ? 'Recent Videos' : 'Posts'} (${items.length})`}
           </h3>
           <div className="items-list">
-            {items.slice(0, 20).map((item, idx) => (
+            {items.slice(0, result.platform === 'dcinside' ? 100 : 20).map((item, idx) => (
               <div key={idx} className="item-card">
                 <div className="item-text">{item.text || item.title || item.selftext || ''}</div>
                 <div className="item-meta">
@@ -312,14 +595,287 @@ function AnalysisResult({ result }) {
                   )}
                   {item.views && <span className="item-views">👁 {item.views}</span>}
                 </div>
-                {item.permalink && (
-                  <a href={item.permalink} target="_blank" rel="noopener noreferrer" className="item-link">
+                {(item.permalink || item.url) && (
+                  <a href={item.permalink || item.url} target="_blank" rel="noopener noreferrer" className="item-link">
                     View →
                   </a>
                 )}
               </div>
             ))}
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function sortComments(comments, order) {
+  if (!comments?.length) return comments || [];
+  const list = [...comments];
+  if (order === '최신순' && list.some(c => c.date)) {
+    list.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  }
+  return list;
+}
+
+function sortYoutubeCommentsInline(comments, order) {
+  if (!comments?.length) return comments || [];
+  const list = [...comments];
+  if (order === '최신순' && list.some(c => c.published_at)) {
+    list.sort((a, b) => (b.published_at || '').localeCompare(a.published_at || ''));
+  }
+  if (order === '좋아요순') {
+    list.sort((a, b) => (b.like_count ?? 0) - (a.like_count ?? 0));
+  }
+  return list;
+}
+
+function DCInsideGalleryPosts({ posts, totalPosts, loginVerified, isNaverCafe }) {
+  const [expandedNo, setExpandedNo] = useState(null);
+  const [showAllComments, setShowAllComments] = useState(false);
+  const [commentSort, setCommentSort] = useState('등록순');
+
+  const allComments = posts.reduce((acc, post) => {
+    (post.comments || []).forEach((c) => {
+      acc.push({ ...c, postTitle: post.text || `게시글 #${post.number ?? ''}`, postUrl: post.url });
+    });
+    return acc;
+  }, []);
+
+  const sortedAllComments = sortComments(allComments, commentSort);
+  const totalCommentCount = allComments.length;
+  const postsWithComments = posts.filter((p) => (p.comments?.length || 0) > 0).length;
+
+  const listLabel = totalPosts != null && totalPosts > posts.length && isNaverCafe
+    ? `수집 ${posts.length}건 / 전체 약 ${formatNumber(totalPosts)}건`
+    : `${posts.length}건`;
+
+  return (
+    <div className="items-section dcinside-posts-section">
+      <div className="dcinside-posts-section__head">
+        <h3>
+          게시글 목록 ({listLabel})
+          {isNaverCafe && loginVerified && (
+            <span className="naver-login-badge" title="로그인된 상태로 수집됨">로그인됨</span>
+          )}
+        </h3>
+        <p className="dcinside-posts-section__hint" aria-hidden="true">
+          💬 각 항목을 클릭하면 댓글이 표시됩니다. (댓글 있는 글 {postsWithComments}건)
+        </p>
+      </div>
+
+      {totalCommentCount > 0 && (
+        <div className="comment-count-bar" aria-label="전체 댓글">
+          <div className="comment-count-inner">
+            <span className="comment-count-label">전체 댓글 {totalCommentCount}개 · 클릭 시 댓글 표시</span>
+            <div className="comment-sort">
+              {['등록순', '최신순', '답글순'].map((order) => (
+                <button
+                  key={order}
+                  type="button"
+                  className={`comment-sort-btn ${commentSort === order ? 'is-active' : ''}`}
+                  onClick={() => setCommentSort(order)}
+                  aria-pressed={commentSort === order}
+                >
+                  {order}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="comments-toggle comments-toggle--all"
+              onClick={() => setShowAllComments((v) => !v)}
+              aria-expanded={showAllComments}
+            >
+              {showAllComments ? '통합 댓글 접기' : '통합 보기'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showAllComments && sortedAllComments.length > 0 && (
+        <div className="all-comments-box" aria-label="전체 댓글 통합">
+          <ul className="comments-sublist comments-sublist--all">
+            {sortedAllComments.map((c, i) => (
+              <li key={i} className="comment-item">
+                <span className="comment-meta">
+                  [{c.postTitle}]
+                  {c.postUrl && (
+                    <a href={c.postUrl} target="_blank" rel="noopener noreferrer" className="comment-post-link">원문</a>
+                  )}{' '}
+                  <span className="comment-author">{c.author}</span>
+                  {c.date && <span className="comment-date">{c.date}</span>}
+                </span>
+                <span className="comment-text">{c.text}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="items-list">
+        {posts.slice(0, 30).map((post, idx) => {
+          const postKey = post.number ?? post.post_id ?? idx;
+          const hasComments = post.comments?.length > 0;
+          const isExpanded = expandedNo === postKey;
+          const sortedPostComments = sortComments(post.comments, commentSort);
+          return (
+            <div key={postKey} className="item-card item-card--dcinside">
+              {post.url ? (
+                <a href={post.url} target="_blank" rel="noopener noreferrer" className="item-text item-text--link">
+                  {post.text}
+                </a>
+              ) : (
+                <div className="item-text">{post.text}</div>
+              )}
+              <div className="item-meta">
+                {post.author && <span className="item-author">{post.author}</span>}
+                {post.view_count != null && <span className="item-views">👁 {formatNumber(post.view_count)}</span>}
+                {post.recommend != null && <span className="item-likes">👍 {formatNumber(post.recommend)}</span>}
+                {post.date && <span className="item-date">{post.date}</span>}
+              </div>
+              {post.url && (
+                <a href={post.url} target="_blank" rel="noopener noreferrer" className="item-link">
+                  원문 보기 →
+                </a>
+              )}
+              {hasComments && (
+                <div className="comment-wrap">
+                  <div className="comment_count">
+                    <button
+                      type="button"
+                      className="comments-toggle comments-toggle--post"
+                      onClick={() => setExpandedNo(isExpanded ? null : postKey)}
+                      aria-expanded={isExpanded}
+                      aria-controls={`focus-cmt-${postKey}`}
+                    >
+                      💬 댓글 {post.comments.length}개 {isExpanded ? '접기 ▲' : '클릭 시 보기 ▼'}
+                    </button>
+                  </div>
+                  {isExpanded && (
+                    <ul
+                      id={`focus-cmt-${postKey}`}
+                      className="comments-sublist"
+                      aria-label={`댓글 ${post.comments.length}개`}
+                    >
+                      {sortedPostComments.map((c, i) => (
+                        <li key={i} className="comment-item">
+                          <span className="comment-meta-inline">
+                            <span className="comment-author">{c.author}</span>
+                            {c.date && <span className="comment-date">{c.date}</span>}
+                          </span>
+                          <span className="comment-text">{c.text}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function YouTubeCommentsInline({ comments, totalComments }) {
+  const [expanded, setExpanded] = useState(true);
+  const [order, setOrder] = useState('등록순');
+
+  const grouped = useMemo(() => {
+    if (!comments?.length) return [];
+    const buckets = new Map();
+    comments.forEach((c) => {
+      const key = c.video_id || 'video';
+      if (!buckets.has(key)) buckets.set(key, []);
+      buckets.get(key).push(c);
+    });
+    const groups = [];
+    buckets.forEach((list, key) => {
+      const sortedList = sortYoutubeCommentsInline(list, order);
+      const sample = sortedList[0] || {};
+      groups.push({
+        videoId: key === 'video' ? null : key,
+        title: sample.video_title || sample.video_id || '영상',
+        comments: sortedList,
+      });
+    });
+    return groups;
+  }, [comments, order]);
+  const collectedCount = comments.length;
+  const label = totalComments != null
+    ? `댓글 (목록 ${formatNumber(totalComments)} / 수집 ${formatNumber(collectedCount)})`
+    : `댓글 (${formatNumber(collectedCount)})`;
+
+  return (
+    <div className="items-section">
+      <div className="comment-count-bar" aria-label="YouTube 댓글">
+        <div className="comment-count-inner">
+          <span className="comment-count-label">
+            💬 {label}
+          </span>
+          <div className="comment-sort">
+            {['등록순', '최신순', '좋아요순'].map((orderLabel) => (
+              <button
+                key={orderLabel}
+                type="button"
+                className={`comment-sort-btn ${order === orderLabel ? 'is-active' : ''}`}
+                onClick={() => setOrder(orderLabel)}
+                aria-pressed={order === orderLabel}
+              >
+                {orderLabel}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            className="comments-toggle comments-toggle--all"
+            onClick={() => setExpanded((v) => !v)}
+            aria-expanded={expanded}
+          >
+            {expanded ? '댓글 접기' : '댓글 펼치기'}
+          </button>
+        </div>
+      </div>
+      {expanded && (
+        <div className="all-comments-box" aria-label="YouTube 댓글 목록">
+          {grouped.map((group, gi) => (
+            <div key={group.videoId || gi} className="comments-group">
+              <div className="comments-group-head">
+                <span className="comments-group-title">
+                  [{group.title}]
+                </span>
+                {group.videoId && (
+                  <a
+                    href={`https://www.youtube.com/watch?v=${group.videoId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="comment-post-link"
+                  >
+                    원문
+                  </a>
+                )}
+                <span className="comments-group-count">
+                  댓글 {formatNumber(group.comments.length)}개
+                </span>
+              </div>
+              <ul className="comments-sublist comments-sublist--all">
+                {group.comments.map((c, i) => (
+                  <li key={i} className="comment-item">
+                    <span className="comment-meta-inline">
+                      {c.author && <span className="comment-author">{c.author}</span>}
+                      {c.published_at && <span className="comment-date">{c.published_at}</span>}
+                      {c.like_count != null && (
+                        <span className="comment-like">👍 {formatNumber(c.like_count)}</span>
+                      )}
+                    </span>
+                    <span className="comment-text">{c.text}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -343,6 +899,44 @@ function formatNumber(num) {
   if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
   if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
   return num.toLocaleString();
+}
+
+function formatNaverFetchReason(reason) {
+  if (!reason) return '';
+  return reason
+    .split(',')
+    .map(token => token.trim())
+    .filter(Boolean)
+    .map(token => NAVER_FETCH_REASON_LABELS[token] || token)
+    .join(', ');
+}
+
+function parseNaverReasonTokens(reason) {
+  if (!reason) return [];
+  return reason
+    .split(',')
+    .map(token => token.trim())
+    .filter(Boolean);
+}
+
+function getNaverDiagnosticActions(tokens) {
+  const actions = [];
+  if (tokens.includes('cookie_not_set')) {
+    actions.push('.env에 NAVER_CAFE_COOKIE를 추가하고 docker-compose up -d --build로 재시작하세요.');
+  }
+  if (tokens.includes('proxy_not_set')) {
+    actions.push('사내망 환경이면 NAVER_CAFE_PROXY_URL을 설정하고 필요 시 사용자/비밀번호를 함께 지정하세요.');
+  }
+  if (tokens.includes('posts_found_but_comments_unavailable') || tokens.includes('content_found_but_comments_unavailable')) {
+    actions.push('공개 글/댓글 허용 게시글 URL로 재시도하고 단건 URL(ArticleRead) 기준으로 확인하세요.');
+  }
+  if (tokens.includes('html_fetch_failed') || tokens.includes('api_fetch_failed') || tokens.includes('mobile_fetch_failed')) {
+    actions.push('네트워크/차단 상태를 점검하고, 프록시 사용 시 인증 정보를 확인하세요.');
+  }
+  if (actions.length === 0) {
+    actions.push('URL 접근 권한과 네트워크 상태를 확인한 뒤 다시 시도하세요.');
+  }
+  return actions;
 }
 
 export default URLAnalyzer;

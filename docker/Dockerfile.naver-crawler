@@ -1,0 +1,15 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY crawlers/naver_cafe/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+RUN adduser --disabled-password --gecos "" --shell /sbin/nologin appuser \
+    && mkdir -p /app/local-data \
+    && chown -R appuser:appuser /app
+
+COPY --chown=appuser:appuser crawlers/naver_cafe/crawler.py .
+
+USER appuser
+CMD ["python", "crawler.py"]

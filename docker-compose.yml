@@ -1,10 +1,13 @@
 # SNS Monitor - Local Development
+# Copy .env.example to .env and set YOUTUBE_API_KEY before running.
+
 services:
   redis:
     image: redis:7-alpine
     container_name: sns-monitor-redis
-    ports:
-      - "6379:6379"
+    # Redis is internal-only; expose port only for local debugging via REDIS_HOST_PORT
+    # ports:
+    #   - "${REDIS_HOST_PORT:-6380}:6379"
     volumes:
       - redis-data:/data
     networks:
@@ -21,7 +24,7 @@ services:
       dockerfile: docker/Dockerfile.api
     container_name: sns-monitor-api
     ports:
-      - "${API_PORT:-8080}:8080"
+      - "${API_PORT:-8888}:8080"
     environment:
       - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
       - REDIS_HOST=redis
@@ -30,8 +33,16 @@ services:
       - LOCAL_DATA_DIR=/app/local-data
       - FLASK_DEBUG=${FLASK_DEBUG:-false}
       - MIROFISH_ENDPOINT=http://mirofish:5001
-      - DISABLE_SSL_VERIFY=${DISABLE_SSL_VERIFY:-true}
+      - DISABLE_SSL_VERIFY=${DISABLE_SSL_VERIFY:-false}
       - TWITTER_BEARER_TOKEN=${TWITTER_BEARER_TOKEN:-}
+      - REDDIT_CLIENT_ID=${REDDIT_CLIENT_ID:-}
+      - REDDIT_CLIENT_SECRET=${REDDIT_CLIENT_SECRET:-}
+      - REDDIT_USER_AGENT=${REDDIT_USER_AGENT:-}
+      - NAVER_CAFE_COOKIE=${NAVER_CAFE_COOKIE:-}
+      - NAVER_CAFE_PROXY_URL=${NAVER_CAFE_PROXY_URL:-}
+      - NAVER_CAFE_PROXY_USERNAME=${NAVER_CAFE_PROXY_USERNAME:-}
+      - NAVER_CAFE_PROXY_PASSWORD=${NAVER_CAFE_PROXY_PASSWORD:-}
+      - NAVER_CAFE_DISABLE_SSL_VERIFY=${NAVER_CAFE_DISABLE_SSL_VERIFY:-false}
     volumes:
       - ./local-data:/app/local-data:rw
     depends_on:
@@ -51,7 +62,7 @@ services:
       dockerfile: docker/Dockerfile.frontend
     container_name: sns-monitor-frontend
     ports:
-      - "${FRONTEND_PORT:-3000}:3000"
+      - "${FRONTEND_PORT:-3080}:3000"
     depends_on:
       - api-backend
     networks:
@@ -101,10 +112,31 @@ services:
     networks:
       - sns-network
 
-  # MiroFish AI Analysis Service
+  naver-cafe-crawler:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.naver-crawler
+    container_name: sns-monitor-naver-cafe-crawler
+    profiles:
+      - crawlers
+    environment:
+      - API_BASE_URL=http://api-backend:8080
+      - LOCAL_MODE=true
+      - LOCAL_DATA_DIR=/app/local-data
+      - NAVER_CAFE_URLS=${NAVER_CAFE_URLS:-}
+      - NAVER_CAFE_COOKIE=${NAVER_CAFE_COOKIE:-}
+    volumes:
+      - ./local-data:/app/local-data:rw
+    depends_on:
+      api-backend:
+        condition: service_healthy
+    networks:
+      - sns-network
+
+  # MiroFish AI Analysis Service (optional: set build context to your mirofish repo)
   mirofish:
     build:
-      context: /Users/yong/Desktop/mirofish
+      context: ${MIROFISH_CONTEXT:-./mirofish}
       dockerfile: Dockerfile
     container_name: sns-monitor-mirofish
     profiles:

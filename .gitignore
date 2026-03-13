@@ -2,8 +2,10 @@
 local-data/
 docker-data/
 
-# 환경 변수 파일
+# 환경 변수 파일 (실제 키/비밀번호 포함 금지)
 .env
+.env.*
+!.env.example
 .env.local
 .env.bak
 *.enc.yaml
@@ -44,9 +46,14 @@ yarn-error.log*
 *.tgz
 helm/sns-monitor/charts/*.tgz
 
-# Secrets
+# Secrets & 내부 정보 (계정 ID, Role ARN, OAuth 등)
 **/secrets/*.yaml
 !**/secrets/*.example.yaml
+k8s/config/secrets.yaml
+**/values-*-local.yaml
+**/*-local.yaml
+**/*internal*.yaml
+**/*.secrets.yaml
 
 # Analysis files (local)
 *_analysis.json
@@ -64,11 +71,13 @@ helm/sns-monitor/charts/*.tgz
 # Frontend build
 frontend/build/
 
-# Terraform sensitive files
+# Terraform (계정 ID, 리소스 ID 등 실제 값 포함 금지)
 terraform/.terraform/
 terraform/*.tfstate
 terraform/*.tfstate.*
 terraform/.envrc
 terraform/.terraform.lock.hcl
 terraform/tfplan
+terraform/terraform.tfvars
+terraform/*.auto.tfvars
 .playwright-mcp/
