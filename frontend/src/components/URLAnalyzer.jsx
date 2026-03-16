@@ -40,6 +40,7 @@ const NAVER_FETCH_REASON_LABELS = {
   content_found_but_comments_unavailable: '본문 수집, 댓글 미수집',
   cookie_not_set: '로그인 쿠키 미설정',
   proxy_not_set: '프록시 미설정',
+  no_search_results: '검색 결과 없음',
 };
 
 function loadResultsCache() {
@@ -557,6 +558,7 @@ function AnalysisResult({ result }) {
           totalPosts={result.total_posts}
           loginVerified={result.login_verified}
           isNaverCafe={result.platform === 'naver_cafe'}
+          searchQuery={result.search_query}
         />
       )}
 
@@ -620,7 +622,7 @@ function sortYoutubeCommentsInline(comments, order) {
   return list;
 }
 
-function DCInsideGalleryPosts({ posts, totalPosts, loginVerified, isNaverCafe }) {
+function DCInsideGalleryPosts({ posts, totalPosts, loginVerified, isNaverCafe, searchQuery }) {
   const [expandedNo, setExpandedNo] = useState(null);
   const [showAllComments, setShowAllComments] = useState(false);
   const [commentSort, setCommentSort] = useState('등록순');
@@ -643,7 +645,7 @@ function DCInsideGalleryPosts({ posts, totalPosts, loginVerified, isNaverCafe })
 
   const sortedAllComments = sortComments(allComments, commentSort);
   const totalCommentCount = allComments.length;
-  const postsWithComments = posts.filter((p) => (p.comments?.length || 0) > 0).length;
+  const postsWithComments = posts.filter((p) => (p.comments?.length || 0) > 0 || (p.comment_count || 0) > 0).length;
 
   const listLabel = totalPosts != null && totalPosts > posts.length && isNaverCafe
     ? `수집 ${posts.length}건 / 전체 약 ${formatNumber(totalPosts)}건`
@@ -658,6 +660,11 @@ function DCInsideGalleryPosts({ posts, totalPosts, loginVerified, isNaverCafe })
             <span className="naver-login-badge" title="로그인된 상태로 수집됨">로그인됨</span>
           )}
         </h3>
+        {searchQuery && (
+          <p className="dcinside-posts-section__search-query">
+            🔍 검색: <strong>{searchQuery}</strong>
+          </p>
+        )}
         <p className="dcinside-posts-section__hint" aria-hidden="true">
           💬 각 항목을 클릭하면 댓글이 표시됩니다. (댓글 있는 글 {postsWithComments}건)
         </p>
@@ -713,9 +720,11 @@ function DCInsideGalleryPosts({ posts, totalPosts, loginVerified, isNaverCafe })
       )}
 
       <div className="items-list">
-        {posts.slice(0, 30).map((post, idx) => {
+        {posts.slice(0, 50).map((post, idx) => {
           const postKey = post.number ?? post.post_id ?? idx;
           const hasComments = post.comments?.length > 0;
+          const apiCommentCount = post.comment_count || 0;
+          const displayCommentCount = hasComments ? post.comments.length : apiCommentCount;
           const isExpanded = expandedNo === postKey;
           const sortedPostComments = sortComments(post.comments, commentSort);
           return (
@@ -731,6 +740,7 @@ function DCInsideGalleryPosts({ posts, totalPosts, loginVerified, isNaverCafe })
                 {post.author && <span className="item-author">{post.author}</span>}
                 {post.view_count != null && <span className="item-views">👁 {formatNumber(post.view_count)}</span>}
                 {post.recommend != null && <span className="item-likes">👍 {formatNumber(post.recommend)}</span>}
+                {displayCommentCount > 0 && <span className="item-comments">💬 {formatNumber(displayCommentCount)}</span>}
                 {post.date && <span className="item-date">{post.date}</span>}
               </div>
               {post.url && (
@@ -812,7 +822,7 @@ function RedditSubredditPosts({ posts, totalPosts }) {
         </p>
       </div>
       <div className="items-list">
-        {posts.slice(0, 30).map((post, idx) => {
+        {posts.slice(0, 50).map((post, idx) => {
           const postKey = idx;
           const hasComments = post.comments?.length > 0;
           const isExpanded = expandedNo === postKey;

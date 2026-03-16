@@ -529,7 +529,7 @@ function MiroFishCtaButton({ result, onShowError }) {
     try {
       const { data } = await axios.get(`${API_BASE}/api/analysis/status`, { timeout: 5000 });
       if (!data.mirofish_available) {
-        onShowError?.('MiroFish 서비스가 꺼져 있습니다. docker-compose --profile analysis up -d 및 .env.mirofish 설정 후 이용해 주세요.');
+        onShowError?.('MiroFish 서비스가 꺼져 있습니다.\n\n시작 방법:\n1. .env.mirofish 파일에 OPENAI_API_KEY 설정\n2. docker-compose --profile analysis up -d\n3. 페이지 새로고침 후 다시 시도');
       }
       const preselect = [];
       if (result.platform === 'youtube' && (result.channel_id || result.channelId)) {
