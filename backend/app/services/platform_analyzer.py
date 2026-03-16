@@ -2214,6 +2214,7 @@ class PlatformAnalyzer:
         if not token:
             logger.debug("DCInside comment API: trying without e_s_n_o token")
         api_url = self._build_dcinside_comment_api_url(gallery_type)
+        referer_url = self._build_dcinside_view_url(ref_type, gallery_id, post_no)
         req_headers = {
             "User-Agent": headers.get(
                 "User-Agent", self._session.headers["User-Agent"]
@@ -2221,22 +2222,28 @@ class PlatformAnalyzer:
             "X-Requested-With": "XMLHttpRequest",
             "Accept": "application/json, text/javascript, */*; q=0.01",
             "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
-            "Referer": self._build_dcinside_view_url(ref_type, gallery_id, post_no),
+            "Referer": referer_url,
+            "Origin": "https://gall.dcinside.com",
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        }
+        form_data = {
+            "id": gallery_id,
+            "no": str(post_no),
+            "cmt_id": gallery_id,
+            "cmt_no": str(post_no),
+            "e_s_n_o": token,
+            "comment_page": "1",
+            "sort": "",
+            "prevCnt": "0",
+            "_GALLTYPE_": "G" if gallery_type in ("board", "major") else "M",
         }
         comments = []
         for page in range(1, 6):
             try:
-                r = self._session.get(
+                form_data["comment_page"] = str(page)
+                r = self._session.post(
                     api_url,
-                    params={
-                        "id": gallery_id,
-                        "no": post_no,
-                        "cmt_id": gallery_id,
-                        "cmt_no": post_no,
-                        "e_s_n_o": token,
-                        "comment_page": str(page),
-                        "sort": "",
-                    },
+                    data=form_data,
                     headers=req_headers,
                     timeout=12,
                 )
