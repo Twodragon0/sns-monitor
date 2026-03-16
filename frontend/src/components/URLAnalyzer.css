@@ -39,7 +39,45 @@
 .analyzer-form {
   display: flex;
   gap: 12px;
+  margin-bottom: 8px;
+}
+
+.search-query-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 16px;
+  animation: fadeIn 0.2s ease;
+}
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+.search-query-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #03c75a;
+  white-space: nowrap;
+}
+.search-query-input {
+  flex: 1;
+  padding: 10px 14px;
+  font-size: 14px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.search-query-input:focus {
+  border-color: #03c75a;
+}
+.search-query-clear {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: #999;
+  padding: 4px 8px;
+}
+.search-query-clear:hover {
+  color: #333;
 }
 
 .url-input-wrapper {
