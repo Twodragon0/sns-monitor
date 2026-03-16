@@ -215,6 +215,23 @@
   margin-top: 2px;
 }
 
+.api-usage-warning-banner {
+  margin-bottom: 12px;
+  animation: fadeIn 0.3s ease;
+}
+
+.api-usage-warning-item {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-left: 4px solid #f59e0b;
+  border-radius: 6px;
+  padding: 10px 14px;
+  color: #92400e;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  margin-bottom: 6px;
+}
+
 .error-message {
   background: #fff3f3;
   border: 1px solid #ffcdd2;

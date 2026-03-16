@@ -146,6 +146,20 @@ function URLAnalyzer() {
 
   const detectedPlatform = detectPlatform(url);
 
+  // 80% usage warning alerts
+  const usageWarnings = useMemo(() => {
+    if (!apiUsage) return [];
+    const DISPLAY_NAMES = { naver_search: '네이버 검색', youtube: 'YouTube', reddit: 'Reddit' };
+    return Object.entries(apiUsage)
+      .filter(([, u]) => u.configured && u.daily_limit > 0 && (u.used_today / u.daily_limit) >= 0.8)
+      .map(([key, u]) => ({
+        name: DISPLAY_NAMES[key] || key,
+        pct: Math.round((u.used_today / u.daily_limit) * 100),
+        used: u.used_today,
+        limit: u.daily_limit,
+      }));
+  }, [apiUsage]);
+
   const handleAnalyze = useCallback(async (e) => {
     e.preventDefault();
     if (!url.trim()) return;
@@ -293,6 +307,16 @@ function URLAnalyzer() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {usageWarnings.length > 0 && (
+        <div className="api-usage-warning-banner">
+          {usageWarnings.map(w => (
+            <div key={w.name} className="api-usage-warning-item">
+              ⚠ {w.name} API 사용량 {w.pct}% ({w.used.toLocaleString()}/{w.limit.toLocaleString()}) — 한도 초과 시 분석이 실패할 수 있습니다.
+            </div>
+          ))}
         </div>
       )}
 

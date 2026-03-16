@@ -187,7 +187,8 @@ class PlatformAnalyzer:
             return None
 
     def _reddit_request(self, url, headers, params=None, timeout=15):
-        """Make a Reddit API request with automatic token refresh on 401."""
+        """Make a Reddit API request with automatic token refresh on 401 and rate tracking."""
+        self._rate_incr("reddit")
         resp = self._session.get(url, params=params, headers=headers, timeout=timeout)
         if resp.status_code == 401 and headers.get("Authorization"):
             logger.info("Reddit 401 — refreshing OAuth token and retrying")
@@ -347,55 +348,103 @@ class PlatformAnalyzer:
             },
         ]
 
-    # --- Rate limit helpers (Redis-backed with in-memory fallback) ---
+    # --- Unified rate limit helpers (Redis-backed with in-memory fallback) ---
+    # API limits: YouTube 10,000 quota/day, Reddit 600 req/10min, Naver 25,000/day
 
-    _NAVER_RATE_KEY = "sns:naver_api:count:{date}"
+    _RATE_KEY_TPL = "sns:{service}:count:{window}"
 
-    def _get_naver_api_count(self, date_str):
-        """Get current Naver API call count for the given date."""
+    _API_LIMITS = {
+        "naver_search": {"limit": 25000, "window": "daily", "ttl": 90000},
+        "youtube": {"limit": 10000, "window": "daily", "ttl": 90000},
+        "reddit": {"limit": 600, "window": "10min", "ttl": 660},
+    }
+
+    def _rate_window(self, service):
+        """Return the current window key for the given service."""
+        cfg = self._API_LIMITS.get(service, {})
+        if cfg.get("window") == "10min":
+            now = datetime.now(KST)
+            slot = now.minute // 10
+            return f"{now.strftime('%Y-%m-%d')}T{now.hour:02d}:{slot}"
+        return datetime.now(KST).strftime("%Y-%m-%d")
+
+    def _rate_get(self, service):
+        """Get current call count for a service."""
+        window = self._rate_window(service)
         if self._redis:
             try:
-                val = self._redis.get(self._NAVER_RATE_KEY.format(date=date_str))
+                val = self._redis.get(self._RATE_KEY_TPL.format(service=service, window=window))
                 return int(val) if val else 0
             except Exception:
                 pass
         # In-memory fallback
-        if self._naver_api_count_date != date_str:
-            self._naver_api_call_count = 0
-            self._naver_api_count_date = date_str
-        return self._naver_api_call_count
+        key = f"_mem_{service}"
+        mem = getattr(self, key, None) or {"window": "", "count": 0}
+        if mem["window"] != window:
+            return 0
+        return mem["count"]
 
-    def _incr_naver_api_count(self, date_str):
-        """Increment Naver API call count for the given date."""
+    def _rate_incr(self, service):
+        """Increment call count for a service."""
+        window = self._rate_window(service)
+        ttl = self._API_LIMITS.get(service, {}).get("ttl", 90000)
         if self._redis:
             try:
-                key = self._NAVER_RATE_KEY.format(date=date_str)
+                rkey = self._RATE_KEY_TPL.format(service=service, window=window)
                 pipe = self._redis.pipeline()
-                pipe.incr(key)
-                pipe.expire(key, 90000)  # 25 hours TTL
+                pipe.incr(rkey)
+                pipe.expire(rkey, ttl)
                 pipe.execute()
                 return
             except Exception:
                 pass
         # In-memory fallback
-        if self._naver_api_count_date != date_str:
-            self._naver_api_call_count = 0
-            self._naver_api_count_date = date_str
-        self._naver_api_call_count += 1
+        key = f"_mem_{service}"
+        mem = getattr(self, key, None) or {"window": "", "count": 0}
+        if mem["window"] != window:
+            mem = {"window": window, "count": 0}
+        mem["count"] += 1
+        setattr(self, key, mem)
+
+    def _rate_check(self, service):
+        """Check if service is within rate limit. Returns (allowed, count, limit)."""
+        cfg = self._API_LIMITS.get(service, {})
+        limit = cfg.get("limit", 999999)
+        count = self._rate_get(service)
+        return count < limit, count, limit
+
+    # Backwards-compatible aliases for Naver
+    def _get_naver_api_count(self, _date_str=None):
+        return self._rate_get("naver_search")
+
+    def _incr_naver_api_count(self, _date_str=None):
+        self._rate_incr("naver_search")
 
     def get_api_usage(self):
-        """Return API usage stats for rate-limited services."""
+        """Return API usage stats for all rate-limited services."""
         today = datetime.now(KST).strftime("%Y-%m-%d")
-        naver_count = self._get_naver_api_count(today)
-        return {
-            "naver_search": {
-                "configured": bool(self._naver_search_client_id),
-                "daily_limit": self._naver_api_daily_limit,
-                "used_today": naver_count,
-                "remaining": max(0, self._naver_api_daily_limit - naver_count),
+        storage = "redis" if self._redis else "memory"
+
+        def _build(service, configured):
+            cfg = self._API_LIMITS[service]
+            count = self._rate_get(service)
+            limit = cfg["limit"]
+            window_label = "일일" if cfg["window"] == "daily" else "10분"
+            return {
+                "configured": configured,
+                "daily_limit": limit,
+                "used_today": count,
+                "remaining": max(0, limit - count),
+                "window": window_label,
                 "date": today,
-                "storage": "redis" if self._redis else "memory",
-            },
+                "storage": storage,
+            }
+
+        yt_key = (os.environ.get("YOUTUBE_API_KEY") or "").strip()
+        return {
+            "naver_search": _build("naver_search", bool(self._naver_search_client_id)),
+            "youtube": _build("youtube", bool(yt_key) and yt_key.lower() not in ("your_youtube_api_key_here",)),
+            "reddit": _build("reddit", bool(self._reddit_client_id)),
         }
 
     # ==========================================
@@ -439,12 +488,31 @@ class PlatformAnalyzer:
         else:
             raise ValueError("Could not extract video ID or channel handle from URL")
 
+    # YouTube Data API v3 quota costs per endpoint
+    _YT_QUOTA_COSTS = {
+        "/search": 100,
+        "/commentThreads": 1,
+        "/videos": 1,
+        "/channels": 1,
+    }
+
+    def _youtube_api_get(self, url, **kwargs):
+        """YouTube API GET with weighted quota tracking."""
+        cost = 1
+        for endpoint, c in self._YT_QUOTA_COSTS.items():
+            if endpoint in url:
+                cost = c
+                break
+        for _ in range(cost):
+            self._rate_incr("youtube")
+        return self._session.get(url, **kwargs)
+
     def _analyze_youtube_video(self, video_id, api_key):
         """Fetch video info and comments."""
         base = "https://www.googleapis.com/youtube/v3"
 
         # Get video details
-        resp = self._session.get(
+        resp = self._youtube_api_get(
             f"{base}/videos",
             params={
                 "part": "snippet,statistics",
@@ -465,7 +533,7 @@ class PlatformAnalyzer:
         # Get comments
         comments = []
         try:
-            resp = self._session.get(
+            resp = self._youtube_api_get(
                 f"{base}/commentThreads",
                 params={
                     "part": "snippet",
@@ -512,7 +580,7 @@ class PlatformAnalyzer:
         handle = channel_handle.lstrip("@")
 
         # Get channel by handle
-        resp = self._session.get(
+        resp = self._youtube_api_get(
             f"{base}/channels",
             params={
                 "part": "snippet,statistics",
@@ -532,7 +600,7 @@ class PlatformAnalyzer:
         # Get recent videos
         videos = []
         try:
-            resp = self._session.get(
+            resp = self._youtube_api_get(
                 f"{base}/search",
                 params={
                     "part": "snippet",
@@ -568,7 +636,7 @@ class PlatformAnalyzer:
             if not video_id:
                 continue
             try:
-                resp = self._session.get(
+                resp = self._youtube_api_get(
                     f"{base}/commentThreads",
                     params={
                         "part": "snippet",
