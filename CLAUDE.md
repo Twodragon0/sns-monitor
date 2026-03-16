@@ -130,6 +130,8 @@ User → Frontend (host :3080)
 | `LOCAL_MODE` | No | Use local filesystem (default: true) |
 | `REDIS_HOST` | No | Redis hostname (default: redis) |
 | `FLASK_DEBUG` | No | Enable Flask debug mode (default: false) |
+| `NAVER_SEARCH_CLIENT_ID` | No | Naver Open API Client ID for cafe search |
+| `NAVER_SEARCH_CLIENT_SECRET` | No | Naver Open API Client Secret for cafe search |
 
 ## Security Requirements
 

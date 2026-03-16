@@ -657,6 +657,16 @@
   border-radius: 6px;
   border: 1px solid var(--c-primary-border, #bfdbfe);
 }
+.search-snippet {
+  margin: 4px 0 0;
+  padding: 0;
+  font-size: 0.8rem;
+  color: var(--c-text-secondary, #64748b);
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .dcinside-posts-section__hint {
   width: 100%;
   margin: 6px 0 0;

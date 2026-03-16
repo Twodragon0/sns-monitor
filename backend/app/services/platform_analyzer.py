@@ -125,6 +125,10 @@ class PlatformAnalyzer:
 
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+        # Naver Search API (optional; enables server-side cafe article search)
+        self._naver_search_client_id = (os.environ.get("NAVER_SEARCH_CLIENT_ID") or "").strip()
+        self._naver_search_client_secret = (os.environ.get("NAVER_SEARCH_CLIENT_SECRET") or "").strip()
+
         # Reddit OAuth2 (optional; avoids 403 when Reddit blocks unauthenticated requests)
         self._reddit_client_id = (os.environ.get("REDDIT_CLIENT_ID") or "").strip()
         self._reddit_client_secret = (
@@ -1273,10 +1277,27 @@ class PlatformAnalyzer:
                 logger.debug("Naver Cafe mobile fallback failed: %s", e)
                 self._append_naver_fetch_reason(fetch_reasons, "mobile_fetch_failed", e)
 
-        # Filter posts by search query if present (client-side filtering since Naver API doesn't support search)
+        # Search: try Naver Open API first, then fall back to client-side filtering
         if search_query and posts:
-            query_lower = search_query.lower()
-            posts = [p for p in posts if query_lower in (p.get("text") or "").lower()]
+            naver_search_posts = self._naver_search_cafe_articles(
+                search_query, cafe_name, club_id
+            )
+            if naver_search_posts is not None:
+                # Merge: keep Open API results but enrich with existing post data
+                existing_by_aid = {p.get("article_id"): p for p in posts if p.get("article_id")}
+                merged = []
+                for sp in naver_search_posts:
+                    aid = sp.get("article_id")
+                    if aid and aid in existing_by_aid:
+                        # Prefer existing post (has comments etc), but update URL if missing
+                        merged.append(existing_by_aid[aid])
+                    else:
+                        merged.append(sp)
+                posts = merged
+            else:
+                # Fallback: client-side filtering
+                query_lower = search_query.lower()
+                posts = [p for p in posts if query_lower in (p.get("text") or "").lower()]
             # Re-number filtered posts
             for i, p in enumerate(posts):
                 p["number"] = i + 1
@@ -1356,6 +1377,77 @@ class PlatformAnalyzer:
         if search_query:
             result_data["search_query"] = search_query
         return result_data
+
+    def _naver_search_cafe_articles(self, query, cafe_name, club_id):
+        """Search cafe articles using Naver Open API (cafearticle).
+
+        Returns list of post dicts if API is configured, None otherwise.
+        The Open API searches all cafes, so we filter by cafe_name or link pattern.
+        """
+        if not self._naver_search_client_id or not self._naver_search_client_secret:
+            return None
+
+        try:
+            resp = self._session.get(
+                "https://openapi.naver.com/v1/search/cafearticle.json",
+                params={"query": query, "display": 50, "start": 1, "sort": "date"},
+                headers={
+                    "X-Naver-Client-Id": self._naver_search_client_id,
+                    "X-Naver-Client-Secret": self._naver_search_client_secret,
+                },
+                timeout=10,
+            )
+            if not resp.ok:
+                logger.warning("Naver Search API error: %s %s", resp.status_code, resp.text[:200])
+                return None
+
+            data = resp.json()
+            items = data.get("items", [])
+            if not items:
+                return []
+
+            # Filter to this specific cafe by matching club_id in link or cafename
+            cafe_name_lower = (cafe_name or "").lower()
+            cafe_link_pattern = f"/{club_id}/" if club_id else None
+            filtered = []
+            for item in items:
+                link = item.get("link", "")
+                item_cafe = item.get("cafename", "").lower()
+                # Match by club_id in URL or cafe name
+                if cafe_link_pattern and cafe_link_pattern in link:
+                    pass
+                elif cafe_name_lower and item_cafe == cafe_name_lower:
+                    pass
+                else:
+                    continue
+
+                # Extract article_id from link
+                aid_match = re.search(r'/(\d+)(?:\?|$)', link)
+                aid = aid_match.group(1) if aid_match else None
+
+                # Clean HTML tags from title/description
+                title = re.sub(r'<[^>]+>', '', item.get("title", ""))
+                desc = re.sub(r'<[^>]+>', '', item.get("description", ""))
+
+                filtered.append({
+                    "text": title[:300],
+                    "number": len(filtered) + 1,
+                    "author": "",
+                    "date": item.get("postdate", ""),
+                    "url": link,
+                    "article_id": aid,
+                    "search_snippet": desc[:200],
+                })
+
+            logger.info(
+                "Naver Search API: %d results, %d matched cafe %s",
+                len(items), len(filtered), cafe_name or club_id,
+            )
+            return filtered if filtered else None  # None = fallback to client-side
+
+        except Exception as e:
+            logger.warning("Naver Search API failed: %s", e)
+            return None
 
     def _analyze_naver_cafe_single_post(self, club_id, article_id, headers):
         post_title = f"카페 게시글 {article_id}"
