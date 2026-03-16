@@ -122,6 +122,8 @@ function URLAnalyzer() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const [apiUsage, setApiUsage] = useState(null);
+  const [showUsage, setShowUsage] = useState(false);
   const [history, setHistory] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('sns-analyzer-history') || '[]');
@@ -131,6 +133,16 @@ function URLAnalyzer() {
   useEffect(() => {
     localStorage.setItem('sns-analyzer-history', JSON.stringify(history));
   }, [history]);
+
+  // Fetch API usage stats
+  const fetchApiUsage = useCallback(async () => {
+    try {
+      const { data } = await axios.get(`${API_BASE}/api/platforms`, { timeout: 5000 });
+      setApiUsage(data.api_usage || null);
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => { fetchApiUsage(); }, [fetchApiUsage]);
 
   const detectedPlatform = detectPlatform(url);
 
@@ -169,8 +181,9 @@ function URLAnalyzer() {
       );
     } finally {
       setLoading(false);
+      fetchApiUsage(); // Refresh usage stats after analysis
     }
-  }, [url]);
+  }, [url, searchQuery, fetchApiUsage]);
 
   const clearHistory = () => {
     setHistory([]);
@@ -241,7 +254,47 @@ function URLAnalyzer() {
             {info.icon} {info.name}
           </span>
         ))}
+        {apiUsage && (
+          <button
+            type="button"
+            className="api-usage-toggle"
+            onClick={() => setShowUsage(v => !v)}
+            title="API 사용량 보기"
+          >
+            {showUsage ? '▲' : '▼'} API
+          </button>
+        )}
       </div>
+
+      {showUsage && apiUsage && (
+        <div className="api-usage-panel">
+          <h4 className="api-usage-title">API 사용량</h4>
+          {Object.entries(apiUsage).map(([key, usage]) => {
+            const pct = usage.daily_limit > 0 ? (usage.used_today / usage.daily_limit) * 100 : 0;
+            const barColor = pct > 80 ? '#ef4444' : pct > 50 ? '#f59e0b' : '#22c55e';
+            return (
+              <div key={key} className="api-usage-item">
+                <div className="api-usage-header">
+                  <span className="api-usage-name">
+                    {key === 'naver_search' ? '네이버 검색' : key}
+                    {!usage.configured && <span className="api-usage-badge api-usage-badge--off">미설정</span>}
+                    {usage.configured && <span className="api-usage-badge api-usage-badge--on">활성</span>}
+                    <span className="api-usage-storage">{usage.storage === 'redis' ? '(Redis)' : '(Memory)'}</span>
+                  </span>
+                  <span className="api-usage-count">{usage.used_today.toLocaleString()} / {usage.daily_limit.toLocaleString()}</span>
+                </div>
+                <div className="api-usage-bar-bg">
+                  <div className="api-usage-bar-fill" style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: barColor }} />
+                </div>
+                <div className="api-usage-footer">
+                  <span>잔여: {usage.remaining.toLocaleString()}건</span>
+                  <span>{usage.date}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {error && <div className="error-message">{error}</div>}
 
