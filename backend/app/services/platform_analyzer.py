@@ -3345,6 +3345,7 @@ class PlatformAnalyzer:
         author_name = username
         thumbnail = ""
 
+        oembed_ok = False
         try:
             oembed_api = f"https://www.tiktok.com/oembed?url={quote(url, safe='')}"
             r = self._session.get(oembed_api, timeout=15)
@@ -3356,8 +3357,30 @@ class PlatformAnalyzer:
                 thumbnail = data.get("thumbnail_url") or ""
                 if data.get("author_url"):
                     description = f"TikTok @{author_name}"
+                oembed_ok = True
         except Exception as e:
             logger.warning("TikTok oEmbed failed: %s", e)
+
+        # Fallback: scrape og:meta tags when oEmbed is blocked
+        if not oembed_ok:
+            try:
+                r = self._session.get(url, timeout=15, headers={
+                    "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1)",
+                    "Accept": "text/html",
+                })
+                if r.ok:
+                    text = r.text[:30000]
+                    og_title = re.search(r'<meta[^>]+property="og:title"[^>]+content="([^"]*)"', text)
+                    og_desc = re.search(r'<meta[^>]+property="og:description"[^>]+content="([^"]*)"', text)
+                    og_image = re.search(r'<meta[^>]+property="og:image"[^>]+content="([^"]*)"', text)
+                    if og_title:
+                        title = og_title.group(1)
+                    if og_desc:
+                        description = og_desc.group(1)
+                    if og_image and not thumbnail:
+                        thumbnail = og_image.group(1)
+            except Exception as e:
+                logger.debug("TikTok og:meta fallback failed: %s", e)
 
         if not description:
             if is_video:
