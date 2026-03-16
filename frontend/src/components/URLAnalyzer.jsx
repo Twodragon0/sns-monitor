@@ -269,8 +269,9 @@ function URLAnalyzer() {
         </div>
       )}
 
-      {detectedPlatform === 'dcinside' && (
+      {detectedPlatform === 'dcinside' && !/board\/view/i.test(url) && (
         <div className="dc-options-row">
+          <span className="dc-options-title">갤러리 목록 옵션</span>
           <label className="dc-option-check">
             <input
               type="checkbox"
@@ -306,6 +307,23 @@ function URLAnalyzer() {
               </label>
             </>
           )}
+        </div>
+      )}
+
+      {detectedPlatform === 'dcinside' && /board\/view/i.test(url) && (
+        <div className="dc-options-row">
+          <span className="dc-options-title">단일글 옵션</span>
+          <label className="dc-option-label">
+            최대 댓글 수
+            <select
+              value={dcOptions.maxComments}
+              onChange={(e) => setDcOptions(prev => ({ ...prev, maxComments: Number(e.target.value) }))}
+              disabled={loading}
+              className="dc-option-select"
+            >
+              {[100, 200, 500, 1000].map(n => <option key={n} value={n}>{n}건</option>)}
+            </select>
+          </label>
         </div>
       )}
 

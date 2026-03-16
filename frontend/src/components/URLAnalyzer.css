@@ -92,6 +92,12 @@
   font-size: 0.85rem;
   animation: fadeIn 0.2s ease;
 }
+.dc-options-title {
+  font-weight: 700;
+  color: #2B65EC;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
 .dc-option-check {
   display: flex;
   align-items: center;
