@@ -3340,8 +3340,61 @@ class PlatformAnalyzer:
             except Exception as e:
                 logger.warning(f"Twitter tweet page fetch failed: {e}")
 
+        # Fetch replies (comments) for the tweet
+        comments = self._fetch_twitter_replies(tweet_id, username)
+        tweet_info["comments"] = comments
+        tweet_info["comment_count"] = tweet_info.get("reply_count", len(comments))
         tweet_info["total_posts"] = len(tweet_info["posts"])
         return tweet_info
+
+    def _fetch_twitter_replies(self, tweet_id, username):
+        """Fetch replies to a tweet via Twitter API v2 conversation search."""
+        bearer_token = (os.environ.get("TWITTER_BEARER_TOKEN") or "").strip()
+        if not bearer_token:
+            return []
+
+        comments = []
+        try:
+            headers = {
+                "Authorization": f"Bearer {bearer_token}",
+                "User-Agent": "SNSMonitor/1.0",
+            }
+            resp = self._session.get(
+                "https://api.twitter.com/2/tweets/search/recent",
+                params={
+                    "query": f"conversation_id:{tweet_id}",
+                    "max_results": 100,
+                    "tweet.fields": "created_at,public_metrics,author_id,in_reply_to_user_id",
+                    "expansions": "author_id",
+                    "user.fields": "username,name",
+                },
+                headers=headers,
+                timeout=15,
+            )
+            if not resp.ok:
+                logger.warning("Twitter v2 replies search failed: %s %s", resp.status_code, resp.text[:200])
+                return []
+
+            data = resp.json()
+            tweets = data.get("data", [])
+            # Build author_id -> username mapping
+            users = {u["id"]: u for u in data.get("includes", {}).get("users", [])}
+
+            for tweet in tweets:
+                metrics = tweet.get("public_metrics", {})
+                author_id = tweet.get("author_id", "")
+                author_info = users.get(author_id, {})
+                author_username = author_info.get("username", "")
+                comments.append({
+                    "text": tweet.get("text", "")[:500],
+                    "author": f"@{author_username}" if author_username else "",
+                    "like_count": metrics.get("like_count", 0),
+                    "date": tweet.get("created_at", ""),
+                })
+        except Exception as e:
+            logger.warning("Twitter replies fetch failed for %s: %s", tweet_id, e)
+
+        return comments
 
     # ==========================================
     # Instagram (og:meta 기반 게시글/프로필 내용 수집, 댓글은 공식 API 필요)

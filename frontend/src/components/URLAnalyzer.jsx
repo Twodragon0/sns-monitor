@@ -432,7 +432,12 @@ function AnalysisResult({ result }) {
   const analysis = result.analysis;
   const hasYoutubeComments =
     result.platform === 'youtube' && Array.isArray(result.comments) && result.comments.length > 0;
-  const items = !hasYoutubeComments ? (result.comments || result.replies || result.posts || result.recent_videos || []) : [];
+  const hasTwitterComments =
+    result.platform === 'twitter' && result.type === 'tweet' && Array.isArray(result.comments) && result.comments.length > 0;
+  // When YouTube or Twitter has dedicated comment sections, exclude comments from generic items
+  const items = (hasYoutubeComments || hasTwitterComments)
+    ? (result.posts || result.recent_videos || [])
+    : (result.comments || result.replies || result.posts || result.recent_videos || []);
   const isNaverSinglePost = result.platform === 'naver_cafe' && result.type === 'post';
   const naverFetchStatus = result.fetch_status || 'ok';
   const naverFetchReason = result.fetch_reason || '';
@@ -696,11 +701,19 @@ function AnalysisResult({ result }) {
         />
       )}
 
+      {/* Twitter/X: 트윗 댓글(리플라이) */}
+      {(hasTwitterComments || (result.platform === 'twitter' && result.type === 'tweet' && (result.reply_count > 0 || result.comment_count > 0))) && (
+        <TwitterReplies
+          comments={result.comments || []}
+          replyCount={result.reply_count || result.comment_count || (result.comments || []).length}
+        />
+      )}
+
       {result.platform === 'telegram' && result.posts?.length > 0 && (
         <TelegramMessages messages={result.posts} totalMessages={result.total_messages} />
       )}
 
-      {!((result.platform === 'dcinside' || result.platform === 'naver_cafe') && result.type === 'gallery') && !(result.platform === 'reddit' && (result.type === 'subreddit' || result.type === 'post')) && !(result.platform === 'telegram') && !(result.platform === 'threads' && result.type === 'post') && items.length > 0 && (
+      {!((result.platform === 'dcinside' || result.platform === 'naver_cafe') && result.type === 'gallery') && !(result.platform === 'reddit' && (result.type === 'subreddit' || result.type === 'post')) && !(result.platform === 'telegram') && !(result.platform === 'threads' && result.type === 'post') && !(result.platform === 'twitter' && result.type === 'tweet') && items.length > 0 && (
         <GenericItemsAccordion items={items} result={result} />
       )}
     </div>
@@ -1299,6 +1312,80 @@ function YouTubeCommentsInline({ comments, totalComments }) {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function TwitterReplies({ comments, replyCount }) {
+  const [expanded, setExpanded] = useState(true);
+  const [visibleCount, setVisibleCount] = useState(20);
+  const [sortOrder, setSortOrder] = useState('좋아요순');
+  const PAGE_SIZE = 20;
+
+  const sorted = useMemo(() => {
+    const list = [...comments];
+    if (sortOrder === '좋아요순') {
+      list.sort((a, b) => (b.like_count ?? 0) - (a.like_count ?? 0));
+    } else if (sortOrder === '최신순') {
+      list.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    }
+    return list;
+  }, [comments, sortOrder]);
+
+  return (
+    <div className="items-section">
+      <div className="comment-count-bar">
+        <div className="comment-count-inner">
+          <span className="comment-count-label">💬 댓글 ({replyCount}건 중 {comments.length}건 수집)</span>
+          <select
+            className="comment-sort-select"
+            value={sortOrder}
+            onChange={e => setSortOrder(e.target.value)}
+          >
+            <option value="좋아요순">좋아요순</option>
+            <option value="최신순">최신순</option>
+            <option value="등록순">등록순</option>
+          </select>
+          <button
+            type="button"
+            className="comments-toggle comments-toggle--all"
+            onClick={() => setExpanded(v => !v)}
+            aria-expanded={expanded}
+          >
+            {expanded ? '접기' : '펼치기'}
+          </button>
+        </div>
+      </div>
+      {expanded && (
+        <div className="items-list">
+          {sorted.slice(0, visibleCount).map((c, idx) => (
+            <div key={idx} className="item-card">
+              <div className="item-text">{c.text}</div>
+              <div className="item-meta">
+                {c.author && <span className="item-author">{c.author}</span>}
+                {c.like_count != null && <span className="item-likes">👍 {formatNumber(c.like_count)}</span>}
+                {c.date && <span className="item-date">{c.date}</span>}
+              </div>
+            </div>
+          ))}
+          {sorted.length > visibleCount && (
+            <button
+              type="button"
+              className="yt-show-more-btn"
+              onClick={() => setVisibleCount(v => v + PAGE_SIZE)}
+              style={{ margin: '12px auto', display: 'block' }}
+            >
+              더 보기 ({visibleCount}/{sorted.length})
+            </button>
+          )}
+        </div>
+      )}
+      {!comments.length && replyCount > 0 && (
+        <div className="naver-cookie-hint" role="status">
+          <p><strong>💬 댓글을 수집하려면 TWITTER_BEARER_TOKEN이 필요합니다.</strong></p>
+          <p>.env에 <code>TWITTER_BEARER_TOKEN</code>을 설정하고 재시작하면 트윗의 댓글(리플라이)이 함께 수집됩니다.</p>
+        </div>
+      )}
     </div>
   );
 }
