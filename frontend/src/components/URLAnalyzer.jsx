@@ -423,15 +423,15 @@ function URLAnalyzer() {
   );
 }
 
-function ThreadsPostBlock({ embedHtml, url, replies, description }) {
+function ThreadsPostBlock({ embedHtml, url, replies, description, content, result }) {
   const embedRef = React.useRef(null);
+  const [showAllReplies, setShowAllReplies] = React.useState(false);
 
   React.useEffect(() => {
     if (!embedHtml) return;
     const container = embedRef.current;
     if (!container) return;
     if (container.querySelector('[data-text-post-permalink]')) return;
-    // Sanitize embed HTML to prevent XSS (allow only Threads embed markup)
     const sanitized = DOMPurify.sanitize(embedHtml, {
       ADD_TAGS: ['blockquote'],
       ADD_ATTR: ['data-text-post-permalink', 'data-text-post-version', 'class', 'style', 'cite'],
@@ -451,42 +451,61 @@ function ThreadsPostBlock({ embedHtml, url, replies, description }) {
 
   const replyList = Array.isArray(replies) ? replies : [];
   const hasEmbed = !!embedHtml?.trim();
+  const postContent = content || description || '';
+  const displayReplies = showAllReplies ? replyList : replyList.slice(0, 20);
+  const hasToken = result?.source === 'threads_api';
 
   return (
     <div className="result-content threads-post-block">
       <h3>게시글</h3>
       {hasEmbed ? (
         <div ref={embedRef} className="threads-embed-wrap" />
+      ) : postContent ? (
+        <div className="threads-post-content">
+          <p className="threads-post-text">{postContent}</p>
+        </div>
       ) : (
-        <>
-          {description && (
-            <p className="threads-post-fallback-desc">{description}</p>
-          )}
-          {!description && (
-            <p className="threads-no-embed">임베드를 불러오지 못했습니다. 원문 링크에서 확인해 주세요.</p>
-          )}
-        </>
+        <p className="threads-no-embed">게시글 내용을 불러오지 못했습니다. 원문 링크에서 확인해 주세요.</p>
       )}
       {url && (
         <a href={url} target="_blank" rel="noopener noreferrer" className="result-origin-link">
           Threads 원문 보기 →
         </a>
       )}
-      <h3>댓글 {replyList.length > 0 ? `(${replyList.length})` : '(Threads API 미제공)'}</h3>
+      <h3>
+        댓글 {replyList.length > 0
+          ? `(${replyList.length}${result?.reply_count > replyList.length ? ` / ${result.reply_count}` : ''})`
+          : result?.reply_count > 0 ? `(${result.reply_count}건)` : ''}
+      </h3>
       {replyList.length > 0 ? (
-        <ul className="comments-sublist">
-          {replyList.map((r, i) => (
-            <li key={i} className="comment-item">
-              <span className="comment-meta-inline">
-                {r.author && <span className="comment-author">{r.author}</span>}
-                {r.date && <span className="comment-date">{r.date}</span>}
-              </span>
-              <span className="comment-text">{r.text || r.title || ''}</span>
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul className="comments-sublist">
+            {displayReplies.map((r, i) => (
+              <li key={i} className="comment-item">
+                <span className="comment-meta-inline">
+                  {r.author && <span className="comment-author">{r.author}</span>}
+                  {r.date && <span className="comment-date">{r.date}</span>}
+                </span>
+                <span className="comment-text">{r.text || r.title || ''}</span>
+              </li>
+            ))}
+          </ul>
+          {replyList.length > 20 && !showAllReplies && (
+            <button className="show-more-btn" onClick={() => setShowAllReplies(true)}>
+              나머지 {replyList.length - 20}개 댓글 더 보기
+            </button>
+          )}
+        </>
+      ) : !hasToken ? (
+        <div className="threads-replies-hint">
+          <p>THREADS_ACCESS_TOKEN을 설정하면 댓글(답글)을 수집할 수 있습니다.</p>
+          <p className="threads-hint-detail">
+            Meta Developer 앱에서 Threads API 권한(threads_basic, threads_read_replies)을 활성화하고,
+            발급받은 Access Token을 .env에 설정하세요.
+          </p>
+        </div>
       ) : (
-        <p className="threads-replies-hint">Threads는 댓글(답글) 데이터를 공개 API로 제공하지 않아 여기서는 표시되지 않습니다.</p>
+        <p className="threads-replies-hint">이 게시글에 댓글이 없습니다.</p>
       )}
     </div>
   );
@@ -671,6 +690,8 @@ function AnalysisResult({ result }) {
           url={result.url}
           replies={result.replies}
           description={result.description}
+          content={result.content}
+          result={result}
         />
       )}
 

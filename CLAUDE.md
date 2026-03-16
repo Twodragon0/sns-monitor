@@ -135,6 +135,8 @@ User → Frontend (host :3080)
 | `NAVER_SEARCH_CLIENT_ID` | No | Naver Open API Client ID for cafe search |
 | `NAVER_SEARCH_CLIENT_SECRET` | No | Naver Open API Client Secret for cafe search |
 | `NAVER_CAFE_COOKIE` | No | Naver login cookie for Cafe crawling (required for members-only content) |
+| `TWITTER_BEARER_TOKEN` | No | Twitter API v2 Bearer Token for tweet replies |
+| `THREADS_ACCESS_TOKEN` | No | Meta Threads API access token for post content and replies |
 
 ## Security Requirements
 
