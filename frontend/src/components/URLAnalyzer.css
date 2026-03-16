@@ -647,6 +647,16 @@
   margin-bottom: 12px;
 }
 .dcinside-posts-section__head h3 { margin: 0; }
+.dcinside-posts-section__search-query {
+  width: 100%;
+  margin: 4px 0 0;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  color: var(--c-primary, #2563eb);
+  background: var(--c-primary-bg, #eff6ff);
+  border-radius: 6px;
+  border: 1px solid var(--c-primary-border, #bfdbfe);
+}
 .dcinside-posts-section__hint {
   width: 100%;
   margin: 6px 0 0;

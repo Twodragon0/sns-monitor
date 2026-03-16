@@ -69,6 +69,10 @@ class PlatformAnalyzer:
             r"(?:www\.)?threads\.net",
             r"(?:www\.)?threads\.com",
         ],
+        "tiktok": [
+            r"(?:www\.)?tiktok\.com",
+            r"vm\.tiktok\.com",
+        ],
     }
 
     def __init__(self, data_dir="/app/local-data"):
@@ -317,6 +321,15 @@ class PlatformAnalyzer:
                     "https://cafe.naver.com/ArticleList.nhn?search.clubid=CLUB_ID",
                 ],
                 "description": "Cafe article list: title, author, date, link (same UI as DCInside)",
+            },
+            {
+                "name": "TikTok",
+                "id": "tiktok",
+                "examples": [
+                    "https://www.tiktok.com/@USERNAME",
+                    "https://www.tiktok.com/@USERNAME/video/VIDEO_ID",
+                ],
+                "description": "TikTok profile or video info via oEmbed API",
             },
         ]
 
@@ -784,6 +797,7 @@ class PlatformAnalyzer:
 
         club_id = None
         menu_id = "0"
+        search_query = (params.get("q") or params.get("query") or [None])[0]
 
         # Support /cafes/123, /menus/0 and f-e/cafes/123/menus/0, ca-fe/web/cafes/123
         cafe_match = re.search(
@@ -1064,7 +1078,6 @@ class PlatformAnalyzer:
             if not api_menu_ids:
                 api_menu_ids = ["0"]
 
-        # 1c) ArticleListV2dot1.json — works with real menu IDs
         if not posts:
             api_headers = {
                 **headers,
@@ -1076,7 +1089,7 @@ class PlatformAnalyzer:
                     api_url_v21 = (
                         "https://apis.naver.com/cafe-web/cafe2/ArticleListV2dot1.json"
                         f"?search.clubid={club_id}&search.menuid={mid}"
-                        "&search.page=1&search.perPage=20&search.queryType=lastArticle"
+                        "&search.page=1&search.perPage=50&search.queryType=lastArticle"
                     )
                     api_resp = self._naver_get(api_url_v21, headers=api_headers, timeout=15)
                     if not api_resp.ok:
@@ -1091,7 +1104,7 @@ class PlatformAnalyzer:
                         or result_data.get("articleListMap", {}).get("list")
                         or []
                     )
-                    for art in article_list[:30]:
+                    for art in article_list[:50]:
                         title = art.get("subject") or art.get("title") or ""
                         if not title:
                             continue
@@ -1118,16 +1131,23 @@ class PlatformAnalyzer:
                                 view_count = int(view_count)
                             except (TypeError, ValueError):
                                 view_count = None
+                        comment_count_api = art.get("commentCount") or art.get("replyCount") or 0
+                        if not isinstance(comment_count_api, int):
+                            try:
+                                comment_count_api = int(comment_count_api)
+                            except (TypeError, ValueError):
+                                comment_count_api = 0
                         posts.append({
                             "text": (title[:300] if isinstance(title, str) else str(title))[:300],
                             "number": len(posts) + 1,
                             "author": writer if isinstance(writer, str) else str(writer),
                             "date": date_str if isinstance(date_str, str) else str(date_str or ""),
                             "view_count": view_count,
+                            "comment_count": comment_count_api,
                             "url": post_url,
                             "article_id": aid_str,
                         })
-                    if len(posts) >= 20:
+                    if len(posts) >= 50:
                         break
                 except Exception as e:
                     logger.debug("Naver Cafe ArticleListV2dot1 menu %s failed: %s", mid, e)
@@ -1137,7 +1157,7 @@ class PlatformAnalyzer:
                 # Naver Cafe ArticleList API uses search.clubid (lowercase)
                 api_url = (
                     "https://apis.naver.com/cafe-web/cafe2/ArticleList.json"
-                    f"?search.clubid={club_id}&search.menuid={menu_id}&search.page=1&search.perPage=20&search.queryType=lastArticle"
+                    f"?search.clubid={club_id}&search.menuid={menu_id}&search.page=1&search.perPage=50&search.queryType=lastArticle"
                 )
                 api_headers_v1 = {**headers, "Accept": "application/json, text/plain, */*", "Referer": f"https://cafe.naver.com/f-e/cafes/{club_id}/menus/{menu_id}"}
                 api_resp = self._naver_get(api_url, headers=api_headers_v1, timeout=15)
@@ -1253,6 +1273,14 @@ class PlatformAnalyzer:
                 logger.debug("Naver Cafe mobile fallback failed: %s", e)
                 self._append_naver_fetch_reason(fetch_reasons, "mobile_fetch_failed", e)
 
+        # Filter posts by search query if present (client-side filtering since Naver API doesn't support search)
+        if search_query and posts:
+            query_lower = search_query.lower()
+            posts = [p for p in posts if query_lower in (p.get("text") or "").lower()]
+            # Re-number filtered posts
+            for i, p in enumerate(posts):
+                p["number"] = i + 1
+
         max_posts_with_comments = 10
         for i, post in enumerate(posts[:max_posts_with_comments]):
             try:
@@ -1277,13 +1305,20 @@ class PlatformAnalyzer:
         posts_with_comments = 0
         for post in posts:
             post_comments = post.get("comments") or []
+            api_count = post.get("comment_count") or 0
             if isinstance(post_comments, list) and post_comments:
                 posts_with_comments += 1
                 total_comments += len(post_comments)
+            elif api_count > 0:
+                posts_with_comments += 1
+                total_comments += api_count
 
         fetch_status = "ok"
         fetch_reason = ""
-        if not posts:
+        if not posts and search_query:
+            fetch_status = "ok"
+            fetch_reason = "no_search_results"
+        elif not posts:
             fetch_status = "blocked"
             reason_parts = fetch_reasons[:] if fetch_reasons else ["no_posts_detected"]
             if not self._naver_cookie:
@@ -1306,7 +1341,7 @@ class PlatformAnalyzer:
         total_posts = (
             total_posts_estimate if total_posts_estimate is not None else len(posts)
         )
-        return {
+        result_data = {
             "type": "gallery",
             "gallery_id": club_id,
             "gallery_name": cafe_name,
@@ -1318,6 +1353,9 @@ class PlatformAnalyzer:
             "login_verified": login_verified,
             "posts": posts,
         }
+        if search_query:
+            result_data["search_query"] = search_query
+        return result_data
 
     def _analyze_naver_cafe_single_post(self, club_id, article_id, headers):
         post_title = f"카페 게시글 {article_id}"
@@ -1555,6 +1593,7 @@ class PlatformAnalyzer:
                             or ""
                         ),
                         "view_count": art.get("readCount") or art.get("viewCount"),
+                        "comment_count": art.get("commentCount") or art.get("replyCount") or 0,
                         "url": post_url,
                         "article_id": aid,
                     }
@@ -3283,6 +3322,82 @@ class PlatformAnalyzer:
             "content": description,
             "embed_html": embed_html,
             "replies": [],
+        }
+
+    def _analyze_tiktok(self, url):
+        """TikTok URL analysis using oEmbed API."""
+        parsed = urlparse(url)
+        path = (parsed.path or "").strip("/")
+        segments = [s for s in path.split("/") if s]
+
+        username = ""
+        video_id = None
+        for seg in segments:
+            if seg.startswith("@"):
+                username = seg.lstrip("@")
+            if seg.isdigit() and len(seg) > 10:
+                video_id = seg
+
+        is_video = "video" in segments and video_id
+        title = f"@{username}" if username else "TikTok"
+        description = ""
+        embed_html = ""
+        author_name = username
+        thumbnail = ""
+
+        oembed_ok = False
+        try:
+            oembed_api = f"https://www.tiktok.com/oembed?url={quote(url, safe='')}"
+            r = self._session.get(oembed_api, timeout=15)
+            if r.ok:
+                data = r.json()
+                title = data.get("title") or title
+                author_name = data.get("author_name") or username
+                embed_html = data.get("html") or ""
+                thumbnail = data.get("thumbnail_url") or ""
+                if data.get("author_url"):
+                    description = f"TikTok @{author_name}"
+                oembed_ok = True
+        except Exception as e:
+            logger.warning("TikTok oEmbed failed: %s", e)
+
+        # Fallback: scrape og:meta tags when oEmbed is blocked
+        if not oembed_ok:
+            try:
+                r = self._session.get(url, timeout=15, headers={
+                    "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1)",
+                    "Accept": "text/html",
+                })
+                if r.ok:
+                    text = r.text[:30000]
+                    og_title = re.search(r'<meta[^>]+property="og:title"[^>]+content="([^"]*)"', text)
+                    og_desc = re.search(r'<meta[^>]+property="og:description"[^>]+content="([^"]*)"', text)
+                    og_image = re.search(r'<meta[^>]+property="og:image"[^>]+content="([^"]*)"', text)
+                    if og_title:
+                        title = og_title.group(1)
+                    if og_desc:
+                        description = og_desc.group(1)
+                    if og_image and not thumbnail:
+                        thumbnail = og_image.group(1)
+            except Exception as e:
+                logger.debug("TikTok og:meta fallback failed: %s", e)
+
+        if not description:
+            if is_video:
+                description = "TikTok 동영상입니다. 댓글은 TikTok API 제한으로 수집되지 않습니다."
+            else:
+                description = f"TikTok @{username} 프로필입니다. 개별 동영상 URL을 입력하면 더 자세한 분석이 가능합니다."
+
+        return {
+            "type": "video" if is_video else "profile",
+            "username": username or author_name,
+            "title": title,
+            "description": description,
+            "thumbnail": thumbnail,
+            "url": url.split("?")[0] if url else url,
+            "content": description,
+            "embed_html": embed_html,
+            "comments": [],
         }
 
     # ==========================================
