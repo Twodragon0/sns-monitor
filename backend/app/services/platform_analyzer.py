@@ -132,6 +132,12 @@ class PlatformAnalyzer:
         self._naver_api_daily_limit = 25000
         self._naver_api_call_count = 0
         self._naver_api_count_date = ""
+        self._redis = None
+        try:
+            from .redis_client import get_redis
+            self._redis = get_redis()
+        except Exception:
+            pass
 
         # Reddit OAuth2 (optional; avoids 403 when Reddit blocks unauthenticated requests)
         self._reddit_client_id = (os.environ.get("REDDIT_CLIENT_ID") or "").strip()
@@ -341,20 +347,54 @@ class PlatformAnalyzer:
             },
         ]
 
+    # --- Rate limit helpers (Redis-backed with in-memory fallback) ---
+
+    _NAVER_RATE_KEY = "sns:naver_api:count:{date}"
+
+    def _get_naver_api_count(self, date_str):
+        """Get current Naver API call count for the given date."""
+        if self._redis:
+            try:
+                val = self._redis.get(self._NAVER_RATE_KEY.format(date=date_str))
+                return int(val) if val else 0
+            except Exception:
+                pass
+        # In-memory fallback
+        if self._naver_api_count_date != date_str:
+            self._naver_api_call_count = 0
+            self._naver_api_count_date = date_str
+        return self._naver_api_call_count
+
+    def _incr_naver_api_count(self, date_str):
+        """Increment Naver API call count for the given date."""
+        if self._redis:
+            try:
+                key = self._NAVER_RATE_KEY.format(date=date_str)
+                pipe = self._redis.pipeline()
+                pipe.incr(key)
+                pipe.expire(key, 90000)  # 25 hours TTL
+                pipe.execute()
+                return
+            except Exception:
+                pass
+        # In-memory fallback
+        if self._naver_api_count_date != date_str:
+            self._naver_api_call_count = 0
+            self._naver_api_count_date = date_str
+        self._naver_api_call_count += 1
+
     def get_api_usage(self):
         """Return API usage stats for rate-limited services."""
         today = datetime.now(KST).strftime("%Y-%m-%d")
-        if self._naver_api_count_date != today:
-            naver_count = 0
-        else:
-            naver_count = self._naver_api_call_count
+        naver_count = self._get_naver_api_count(today)
         return {
             "naver_search": {
                 "configured": bool(self._naver_search_client_id),
                 "daily_limit": self._naver_api_daily_limit,
                 "used_today": naver_count,
-                "remaining": self._naver_api_daily_limit - naver_count,
+                "remaining": max(0, self._naver_api_daily_limit - naver_count),
                 "date": today,
+                "storage": "redis" if self._redis else "memory",
             },
         }
 
@@ -1408,17 +1448,15 @@ class PlatformAnalyzer:
         if not self._naver_search_client_id or not self._naver_search_client_secret:
             return None
 
-        # Rate limit check (25,000 calls/day)
+        # Rate limit check (25,000 calls/day) — persist to Redis if available
         today = datetime.now(KST).strftime("%Y-%m-%d")
-        if self._naver_api_count_date != today:
-            self._naver_api_call_count = 0
-            self._naver_api_count_date = today
-        if self._naver_api_call_count >= self._naver_api_daily_limit:
-            logger.warning("Naver Search API daily limit reached (%d/%d)", self._naver_api_call_count, self._naver_api_daily_limit)
+        count = self._get_naver_api_count(today)
+        if count >= self._naver_api_daily_limit:
+            logger.warning("Naver Search API daily limit reached (%d/%d)", count, self._naver_api_daily_limit)
             return None
 
         try:
-            self._naver_api_call_count += 1
+            self._incr_naver_api_count(today)
             resp = self._session.get(
                 "https://openapi.naver.com/v1/search/cafearticle.json",
                 params={"query": query, "display": 50, "start": 1, "sort": "date"},
