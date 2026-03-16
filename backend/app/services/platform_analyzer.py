@@ -241,8 +241,10 @@ class PlatformAnalyzer:
                     return platform
         return None
 
-    def analyze(self, url):
-        """Main entry point: detect platform and analyze content."""
+    def analyze(self, url, options=None):
+        """Main entry point: detect platform and analyze content.
+        options: dict with platform-specific flags (e.g. fetch_comments, max_comments).
+        """
         self._validate_url_host(url)
         platform = self.detect_platform(url)
         if not platform:
@@ -254,6 +256,7 @@ class PlatformAnalyzer:
         if not handler:
             raise ValueError(f"Analyzer not implemented for: {platform}")
 
+        self._analyze_options = options or {}
         result = handler(url)
         result["platform"] = platform
         result["source_url"] = url
@@ -868,31 +871,38 @@ class PlatformAnalyzer:
         except Exception as e:
             logger.warning("DCInside scraping failed: %s", e)
 
-        # Limit to avoid 502 when nginx/proxy timeout; each post may try Playwright (~25s)
-        max_posts_with_comments = 5
-        for i, post in enumerate(posts):
-            if i >= max_posts_with_comments:
-                break
-            try:
-                comments = self._fetch_dcinside_post_comments(
-                    gallery_id, post["number"], gallery_type, headers
-                )
-                post["comments"] = comments if comments else []
-                list_count = post.get("comment_count") or 0
-                collected = len(post["comments"])
-                if list_count > 0 and collected == 0:
-                    logger.warning(
-                        "DCInside post %s: list comment_count=%s but collected 0",
-                        post.get("number"),
-                        list_count,
+        # Per-post comment collection (opt-in via options or default top 5)
+        opts = getattr(self, "_analyze_options", {})
+        fetch_comments = opts.get("fetch_comments", True)
+        max_comment_posts = int(opts.get("max_comment_posts", 5))
+        max_comment_posts = min(max(max_comment_posts, 0), 50)
+
+        if fetch_comments:
+            for i, post in enumerate(posts):
+                if i >= max_comment_posts:
+                    break
+                if not post.get("comment_count", 0):
+                    continue
+                try:
+                    comments = self._fetch_dcinside_post_comments(
+                        gallery_id, post["number"], gallery_type, headers
                     )
-            except Exception as e:
-                logger.warning(
-                    "DCInside comments for post %s: %s",
-                    post.get("number"),
-                    e,
-                    exc_info=False,
-                )
+                    post["comments"] = comments if comments else []
+                    list_count = post.get("comment_count") or 0
+                    collected = len(post["comments"])
+                    if list_count > 0 and collected == 0:
+                        logger.warning(
+                            "DCInside post %s: list comment_count=%s but collected 0",
+                            post.get("number"),
+                            list_count,
+                        )
+                except Exception as e:
+                    logger.warning(
+                        "DCInside comments for post %s: %s",
+                        post.get("number"),
+                        e,
+                        exc_info=False,
+                    )
 
         return {
             "type": "gallery",
@@ -2095,6 +2105,8 @@ class PlatformAnalyzer:
             gallery_id, post_no, gallery_type, headers
         )
         comment_count = len(comments)
+        opts = getattr(self, "_analyze_options", {})
+        max_comments = int(opts.get("max_comments", 500))
 
         return {
             "type": "post",
@@ -2107,7 +2119,7 @@ class PlatformAnalyzer:
             "view_count": view_count,
             "recommend": recommend,
             "comment_count": comment_count,
-            "comments": comments[:100],
+            "comments": comments[:max_comments],
             "url": view_url,
         }
 
@@ -2237,10 +2249,14 @@ class PlatformAnalyzer:
             "prevCnt": "0",
             "_GALLTYPE_": "G" if gallery_type in ("board", "major") else "M",
         }
+        opts = getattr(self, "_analyze_options", {})
+        max_comments = int(opts.get("max_comments", 500))
+        max_pages = max(max_comments // 20, 5)  # ~20 comments per page
         comments = []
-        for page in range(1, 6):
+        for page in range(1, max_pages + 1):
             try:
                 form_data["comment_page"] = str(page)
+                form_data["prevCnt"] = str(len(comments))
                 r = self._session.post(
                     api_url,
                     data=form_data,
@@ -2358,7 +2374,7 @@ class PlatformAnalyzer:
             except Exception as e:
                 logger.debug("DCInside comment API page %s: %s", page, e)
                 break
-        return comments[:100]
+        return comments[:max_comments]
 
     def _parse_dcinside_comment_item(self, item):
         """Extract author, text, date from a comment DOM item (view page HTML).
@@ -2464,6 +2480,8 @@ class PlatformAnalyzer:
         """Fetch comments: try AJAX API first (comments loaded by JS), then HTML fallback.
         Crawler uses unified board/comment/ API with gallery-specific Referer for mini/mgallery.
         """
+        opts = getattr(self, "_analyze_options", {})
+        max_comments = int(opts.get("max_comments", 500))
         # mgallery/mini: board comment API + gallery Referer (same as crawlers/dcinside)
         if gallery_type == "mgallery":
             comments = self._fetch_dcinside_comments_ajax(
@@ -2509,7 +2527,7 @@ class PlatformAnalyzer:
             html_text = resp.text
             comments = self._extract_dcinside_comments_from_view_html(html_text)
             if comments:
-                return comments[:100]
+                return comments[:max_comments]
             from bs4 import BeautifulSoup
 
             soup = BeautifulSoup(html_text, "html.parser")
@@ -2543,7 +2561,7 @@ class PlatformAnalyzer:
                 if comments:
                     break
             if comments:
-                return comments[:100]
+                return comments[:max_comments]
         except Exception as e:
             logger.debug("DCInside view page comments: %s", e)
         # When API is blocked or view HTML has no comments (JS-loaded): try Playwright
@@ -2554,7 +2572,7 @@ class PlatformAnalyzer:
         comments = self._fetch_dcinside_comments_playwright(
             gallery_id, post_no, gallery_type
         )
-        return comments[:100] if comments else []
+        return comments[:max_comments] if comments else []
 
     def _fetch_dcinside_comments_playwright(self, gallery_id, post_no, gallery_type):
         """Playwright fallback when comment API is blocked. Requires playwright + chromium in environment."""
@@ -2628,7 +2646,9 @@ class PlatformAnalyzer:
                         "DCInside comments collected via Playwright fallback: %s",
                         len(comments),
                     )
-                    return comments[:100]
+                    opts = getattr(self, "_analyze_options", {})
+                    max_cmt = int(opts.get("max_comments", 500))
+                    return comments[:max_cmt]
         except Exception as e:
             logger.warning(
                 "DCInside Playwright comment fallback failed (post %s): %s",
