@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 상세 기술 명세: spec.md 참조
+
 ## Project Overview
 
 SNS Monitor - A multi-platform social media content analyzer. Paste any URL from YouTube, DCInside, Reddit, Telegram, or Kakao to analyze content and sentiment.
@@ -132,6 +134,7 @@ User → Frontend (host :3080)
 | `FLASK_DEBUG` | No | Enable Flask debug mode (default: false) |
 | `NAVER_SEARCH_CLIENT_ID` | No | Naver Open API Client ID for cafe search |
 | `NAVER_SEARCH_CLIENT_SECRET` | No | Naver Open API Client Secret for cafe search |
+| `NAVER_CAFE_COOKIE` | No | Naver login cookie for Cafe crawling (required for members-only content) |
 
 ## Security Requirements
 
