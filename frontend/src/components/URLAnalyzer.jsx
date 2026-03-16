@@ -608,6 +608,10 @@ function AnalysisResult({ result }) {
         {result.reply_count != null && <StatCard label="Replies" value={formatNumber(result.reply_count)} />}
       </div>
 
+      {result.comment_fetch_note && (
+        <div className="comment-fetch-note">{result.comment_fetch_note}</div>
+      )}
+
       <div className="ai-summary-section">
         <button
           className="summarize-button"
