@@ -743,6 +743,9 @@ function DCInsideGalleryPosts({ posts, totalPosts, loginVerified, isNaverCafe, s
                 {displayCommentCount > 0 && <span className="item-comments">💬 {formatNumber(displayCommentCount)}</span>}
                 {post.date && <span className="item-date">{post.date}</span>}
               </div>
+              {post.search_snippet && (
+                <p className="search-snippet">{post.search_snippet}</p>
+              )}
               {post.url && (
                 <a href={post.url} target="_blank" rel="noopener noreferrer" className="item-link">
                   원문 보기 →

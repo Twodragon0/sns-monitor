@@ -74,6 +74,10 @@ class Config:
         "yes",
     )
 
+    # Naver Search API (for cafe article search: https://developers.naver.com/apps)
+    NAVER_SEARCH_CLIENT_ID = (os.environ.get("NAVER_SEARCH_CLIENT_ID") or "").strip()
+    NAVER_SEARCH_CLIENT_SECRET = (os.environ.get("NAVER_SEARCH_CLIENT_SECRET") or "").strip()
+
     NAVER_CAFE_COOKIE = os.environ.get("NAVER_CAFE_COOKIE", "")
     NAVER_CAFE_PROXY_URL = os.environ.get("NAVER_CAFE_PROXY_URL", "")
     NAVER_CAFE_PROXY_USERNAME = os.environ.get("NAVER_CAFE_PROXY_USERNAME", "")
