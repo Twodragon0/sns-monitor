@@ -252,6 +252,17 @@
   margin-top: 2px;
 }
 
+.comment-fetch-note {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-left: 4px solid #3b82f6;
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  font-size: 0.85rem;
+  color: #1e40af;
+}
+
 .api-usage-warning-banner {
   margin-bottom: 12px;
   animation: fadeIn 0.3s ease;

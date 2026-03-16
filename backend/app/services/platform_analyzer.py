@@ -876,18 +876,32 @@ class PlatformAnalyzer:
         fetch_comments = opts.get("fetch_comments", True)
         max_comment_posts = int(opts.get("max_comment_posts", 5))
         max_comment_posts = min(max(max_comment_posts, 0), 50)
+        # Time budget: prevent request timeout for large collections
+        comment_time_budget = min(max_comment_posts * 10, 180)  # ~10s per post, max 3min
 
+        comment_fetch_stats = {"attempted": 0, "collected": 0, "timed_out": False}
         if fetch_comments:
+            t_start = time.monotonic()
             for i, post in enumerate(posts):
                 if i >= max_comment_posts:
                     break
                 if not post.get("comment_count", 0):
                     continue
+                elapsed = time.monotonic() - t_start
+                if elapsed > comment_time_budget:
+                    logger.info(
+                        "DCInside comment collection time budget exceeded (%.1fs/%.0fs) after %d posts",
+                        elapsed, comment_time_budget, comment_fetch_stats["attempted"],
+                    )
+                    comment_fetch_stats["timed_out"] = True
+                    break
+                comment_fetch_stats["attempted"] += 1
                 try:
                     comments = self._fetch_dcinside_post_comments(
                         gallery_id, post["number"], gallery_type, headers
                     )
                     post["comments"] = comments if comments else []
+                    comment_fetch_stats["collected"] += len(post["comments"])
                     list_count = post.get("comment_count") or 0
                     collected = len(post["comments"])
                     if list_count > 0 and collected == 0:
@@ -904,7 +918,7 @@ class PlatformAnalyzer:
                         exc_info=False,
                     )
 
-        return {
+        result = {
             "type": "gallery",
             "gallery_id": gallery_id,
             "gallery_name": gallery_name,
@@ -914,6 +928,12 @@ class PlatformAnalyzer:
             "total_posts": len(posts),
             "posts": posts,
         }
+        if comment_fetch_stats["timed_out"]:
+            result["comment_fetch_note"] = (
+                f"시간 제한으로 {comment_fetch_stats['attempted']}개 게시글까지 댓글 수집 "
+                f"(총 {comment_fetch_stats['collected']}건)"
+            )
+        return result
 
     def _build_dcinside_view_url(self, gallery_type, gallery_id, post_no):
         if gallery_type in ("board", "major"):
@@ -2370,7 +2390,9 @@ class PlatformAnalyzer:
                     )
                 if len(raw) < 20:
                     break
-                time.sleep(0.3)
+                # Adaptive delay: increase with page depth to avoid rate limiting
+                delay = 0.5 + (page * 0.1)  # 0.6s, 0.7s, 0.8s...
+                time.sleep(min(delay, 2.0))
             except Exception as e:
                 logger.debug("DCInside comment API page %s: %s", page, e)
                 break
