@@ -50,8 +50,10 @@ def analyze_url():
     if not url.startswith(("http://", "https://")):
         return jsonify({"error": "Invalid URL format"}), 400
 
+    options = data.get("options") or {}
+
     try:
-        result = _get_analyzer().analyze(url)
+        result = _get_analyzer().analyze(url, options=options)
         return jsonify(result)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400

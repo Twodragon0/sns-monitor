@@ -124,6 +124,7 @@ function URLAnalyzer() {
   const [error, setError] = useState(null);
   const [apiUsage, setApiUsage] = useState(null);
   const [showUsage, setShowUsage] = useState(false);
+  const [dcOptions, setDcOptions] = useState({ fetchComments: true, maxCommentPosts: 5, maxComments: 500 });
   const [history, setHistory] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('sns-analyzer-history') || '[]');
@@ -176,7 +177,13 @@ function URLAnalyzer() {
         u.searchParams.set('q', searchQuery.trim());
         analyzeUrl = u.toString();
       }
-      const response = await axios.post(`${API_BASE}/api/analyze/url`, { url: analyzeUrl }, { timeout: 300000 });
+      const options = {};
+      if (detectPlatform(analyzeUrl) === 'dcinside') {
+        options.fetch_comments = dcOptions.fetchComments;
+        options.max_comment_posts = dcOptions.maxCommentPosts;
+        options.max_comments = dcOptions.maxComments;
+      }
+      const response = await axios.post(`${API_BASE}/api/analyze/url`, { url: analyzeUrl, options }, { timeout: 300000 });
       const trimmedUrl = url.trim();
       setResult(response.data);
       saveResultsCache(trimmedUrl, response.data);
@@ -258,6 +265,46 @@ function URLAnalyzer() {
           />
           {searchQuery && (
             <button type="button" className="search-query-clear" onClick={() => setSearchQuery('')} title="검색어 지우기">✕</button>
+          )}
+        </div>
+      )}
+
+      {detectedPlatform === 'dcinside' && (
+        <div className="dc-options-row">
+          <label className="dc-option-check">
+            <input
+              type="checkbox"
+              checked={dcOptions.fetchComments}
+              onChange={(e) => setDcOptions(prev => ({ ...prev, fetchComments: e.target.checked }))}
+              disabled={loading}
+            />
+            게시글 댓글 수집
+          </label>
+          {dcOptions.fetchComments && (
+            <>
+              <label className="dc-option-label">
+                댓글 수집 글 수
+                <select
+                  value={dcOptions.maxCommentPosts}
+                  onChange={(e) => setDcOptions(prev => ({ ...prev, maxCommentPosts: Number(e.target.value) }))}
+                  disabled={loading}
+                  className="dc-option-select"
+                >
+                  {[5, 10, 20, 30, 50].map(n => <option key={n} value={n}>{n}개</option>)}
+                </select>
+              </label>
+              <label className="dc-option-label">
+                글당 최대 댓글
+                <select
+                  value={dcOptions.maxComments}
+                  onChange={(e) => setDcOptions(prev => ({ ...prev, maxComments: Number(e.target.value) }))}
+                  disabled={loading}
+                  className="dc-option-select"
+                >
+                  {[100, 200, 500, 1000].map(n => <option key={n} value={n}>{n}건</option>)}
+                </select>
+              </label>
+            </>
           )}
         </div>
       )}
