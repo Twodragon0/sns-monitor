@@ -276,4 +276,8 @@ def summarize_analysis():
 @analyze_bp.route("/api/platforms", methods=["GET"])
 def list_platforms():
     """List supported platforms with example URLs."""
-    return jsonify({"platforms": _get_analyzer().list_platforms()})
+    analyzer = _get_analyzer()
+    return jsonify({
+        "platforms": analyzer.list_platforms(),
+        "api_usage": analyzer.get_api_usage(),
+    })

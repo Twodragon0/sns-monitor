@@ -128,6 +128,10 @@ class PlatformAnalyzer:
         # Naver Search API (optional; enables server-side cafe article search)
         self._naver_search_client_id = (os.environ.get("NAVER_SEARCH_CLIENT_ID") or "").strip()
         self._naver_search_client_secret = (os.environ.get("NAVER_SEARCH_CLIENT_SECRET") or "").strip()
+        # Rate limit tracking for Naver Open API (25,000 calls/day)
+        self._naver_api_daily_limit = 25000
+        self._naver_api_call_count = 0
+        self._naver_api_count_date = ""
 
         # Reddit OAuth2 (optional; avoids 403 when Reddit blocks unauthenticated requests)
         self._reddit_client_id = (os.environ.get("REDDIT_CLIENT_ID") or "").strip()
@@ -336,6 +340,23 @@ class PlatformAnalyzer:
                 "description": "TikTok profile or video info via oEmbed API",
             },
         ]
+
+    def get_api_usage(self):
+        """Return API usage stats for rate-limited services."""
+        today = datetime.now(KST).strftime("%Y-%m-%d")
+        if self._naver_api_count_date != today:
+            naver_count = 0
+        else:
+            naver_count = self._naver_api_call_count
+        return {
+            "naver_search": {
+                "configured": bool(self._naver_search_client_id),
+                "daily_limit": self._naver_api_daily_limit,
+                "used_today": naver_count,
+                "remaining": self._naver_api_daily_limit - naver_count,
+                "date": today,
+            },
+        }
 
     # ==========================================
     # YouTube Analyzer
@@ -1387,7 +1408,17 @@ class PlatformAnalyzer:
         if not self._naver_search_client_id or not self._naver_search_client_secret:
             return None
 
+        # Rate limit check (25,000 calls/day)
+        today = datetime.now(KST).strftime("%Y-%m-%d")
+        if self._naver_api_count_date != today:
+            self._naver_api_call_count = 0
+            self._naver_api_count_date = today
+        if self._naver_api_call_count >= self._naver_api_daily_limit:
+            logger.warning("Naver Search API daily limit reached (%d/%d)", self._naver_api_call_count, self._naver_api_daily_limit)
+            return None
+
         try:
+            self._naver_api_call_count += 1
             resp = self._session.get(
                 "https://openapi.naver.com/v1/search/cafearticle.json",
                 params={"query": query, "display": 50, "start": 1, "sort": "date"},

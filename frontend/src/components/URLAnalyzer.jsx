@@ -15,6 +15,7 @@ const PLATFORM_INFO = {
   twitter: { name: 'X (Twitter)', color: '#000000', icon: '𝕏' },
   instagram: { name: 'Instagram', color: '#E4405F', icon: '📸' },
   threads: { name: 'Threads', color: '#000000', icon: '🧵' },
+  tiktok: { name: 'TikTok', color: '#000000', icon: '🎵' },
 };
 
 const SENTIMENT_COLORS = {
@@ -111,11 +112,13 @@ function detectPlatform(url) {
   if (lower.includes('x.com') || lower.includes('twitter.com')) return 'twitter';
   if (lower.includes('instagram.com')) return 'instagram';
   if (lower.includes('threads.net') || lower.includes('threads.com')) return 'threads';
+  if (lower.includes('tiktok.com')) return 'tiktok';
   return null;
 }
 
 function URLAnalyzer() {
   const [url, setUrl] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
@@ -140,7 +143,14 @@ function URLAnalyzer() {
     setResult(null);
 
     try {
-      const response = await axios.post(`${API_BASE}/api/analyze/url`, { url: url.trim() }, { timeout: 300000 });
+      // Append search query to URL for Naver Cafe
+      let analyzeUrl = url.trim();
+      if (searchQuery.trim() && detectPlatform(analyzeUrl) === 'naver_cafe') {
+        const u = new URL(analyzeUrl);
+        u.searchParams.set('q', searchQuery.trim());
+        analyzeUrl = u.toString();
+      }
+      const response = await axios.post(`${API_BASE}/api/analyze/url`, { url: analyzeUrl }, { timeout: 300000 });
       const trimmedUrl = url.trim();
       setResult(response.data);
       saveResultsCache(trimmedUrl, response.data);
@@ -205,6 +215,25 @@ function URLAnalyzer() {
           {loading ? 'Analyzing...' : 'Analyze'}
         </button>
       </form>
+
+      {detectedPlatform === 'naver_cafe' && (
+        <div className="search-query-row">
+          <label htmlFor="cafe-search" className="search-query-label">☕ 카페 내 검색</label>
+          <input
+            id="cafe-search"
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="검색어 입력 (선택사항)"
+            className="search-query-input"
+            disabled={loading}
+            onKeyDown={(e) => { if (e.key === 'Enter' && url.trim()) { e.preventDefault(); handleAnalyze(e); } }}
+          />
+          {searchQuery && (
+            <button type="button" className="search-query-clear" onClick={() => setSearchQuery('')} title="검색어 지우기">✕</button>
+          )}
+        </div>
+      )}
 
       <div className="supported-platforms">
         {Object.entries(PLATFORM_INFO).map(([key, info]) => (
