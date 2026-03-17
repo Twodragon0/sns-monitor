@@ -5,7 +5,7 @@ GET  /api/platforms   - List supported platforms
 """
 
 import logging
-from flask import request, jsonify
+from flask import request, jsonify, session
 
 from . import analyze_bp
 from .. import limiter
@@ -151,7 +151,8 @@ def summarize_analysis():
 
     document = "\n".join(lines)
 
-    # Send to MiroFish for summarization
+    # Try MiroFish first, then LLM, then local fallback
+    # 1) MiroFish
     mirofish_endpoint = Config.MIROFISH_ENDPOINT
     try:
         import requests as req
@@ -182,6 +183,16 @@ def summarize_analysis():
             logger.warning(f"MiroFish returned {resp.status_code}: {resp.text[:200]}")
     except Exception as e:
         logger.warning(f"MiroFish summarization failed: {e}")
+
+    # 2) Local LLM (Claude / ChatGPT via API key or OAuth token)
+    try:
+        from ..services.llm_analyzer import summarize_with_llm
+        oauth_token = session.get("access_token")
+        llm_result = summarize_with_llm(document, oauth_token=oauth_token)
+        if llm_result and llm_result.get("summary"):
+            return jsonify(llm_result)
+    except Exception as e:
+        logger.warning(f"LLM summarization failed: {e}")
 
     # Fallback: generate a readable plain-text summary in Korean (no markdown)
     def _fmt_num(v):

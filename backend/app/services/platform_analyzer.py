@@ -3033,7 +3033,7 @@ class PlatformAnalyzer:
         resp = self._session.get(url, timeout=15)
         resp.raise_for_status()
 
-        profile_info = {"type": "kakao_profile", "url": url}
+        profile_info = {"type": "kakao_profile", "url": url, "posts": []}
         try:
             from bs4 import BeautifulSoup
 
@@ -3043,11 +3043,22 @@ class PlatformAnalyzer:
             meta_desc = soup.select_one('meta[name="description"]') or soup.select_one(
                 'meta[property="og:description"]'
             )
+            meta_image = soup.select_one('meta[property="og:image"]')
 
             profile_info["title"] = title_el.get_text(strip=True) if title_el else ""
             profile_info["description"] = (
                 meta_desc.get("content", "") if meta_desc else ""
             )
+            if meta_image:
+                profile_info["thumbnail"] = meta_image.get("content", "")
+
+            if profile_info.get("title") or profile_info.get("description"):
+                profile_info["posts"] = [{
+                    "text": profile_info.get("description") or profile_info.get("title") or "",
+                    "author": profile_info.get("title", "Kakao"),
+                    "url": url,
+                }]
+                profile_info["total_posts"] = 1
         except ImportError:
             pass
 
@@ -3058,7 +3069,7 @@ class PlatformAnalyzer:
         resp = self._session.get(url, timeout=15)
         resp.raise_for_status()
 
-        story_info = {"type": "kakao_story", "url": url}
+        story_info = {"type": "kakao_story", "url": url, "posts": []}
         try:
             from bs4 import BeautifulSoup
 
@@ -3066,11 +3077,22 @@ class PlatformAnalyzer:
 
             title_el = soup.select_one("title")
             meta_desc = soup.select_one('meta[property="og:description"]')
+            meta_image = soup.select_one('meta[property="og:image"]')
 
             story_info["title"] = title_el.get_text(strip=True) if title_el else ""
             story_info["description"] = (
                 meta_desc.get("content", "") if meta_desc else ""
             )
+            if meta_image:
+                story_info["thumbnail"] = meta_image.get("content", "")
+
+            if story_info.get("title") or story_info.get("description"):
+                story_info["posts"] = [{
+                    "text": story_info.get("description") or story_info.get("title") or "",
+                    "author": story_info.get("title", "Kakao Story"),
+                    "url": url,
+                }]
+                story_info["total_posts"] = 1
         except ImportError:
             pass
 
@@ -3081,7 +3103,7 @@ class PlatformAnalyzer:
         resp = self._session.get(url, timeout=15)
         resp.raise_for_status()
 
-        chat_info = {"type": "kakao_openchat", "url": url}
+        chat_info = {"type": "kakao_openchat", "url": url, "posts": []}
         try:
             from bs4 import BeautifulSoup
 
@@ -3094,6 +3116,27 @@ class PlatformAnalyzer:
             chat_info["title"] = title_el.get_text(strip=True) if title_el else ""
             chat_info["description"] = meta_desc.get("content", "") if meta_desc else ""
             chat_info["thumbnail"] = meta_image.get("content", "") if meta_image else ""
+
+            # Extract additional OpenChat metadata
+            og_type = soup.select_one('meta[property="og:type"]')
+            if og_type:
+                chat_info["og_type"] = og_type.get("content", "")
+
+            # Try to extract member count and other info from page content
+            page_text = soup.get_text(separator=" ", strip=True)
+            import re
+            member_match = re.search(r'(\d[\d,]*)\s*(?:명|members?)', page_text)
+            if member_match:
+                chat_info["member_count"] = int(member_match.group(1).replace(",", ""))
+
+            # Build a post entry for display consistency
+            if chat_info.get("title") or chat_info.get("description"):
+                chat_info["posts"] = [{
+                    "text": chat_info.get("description") or chat_info.get("title") or "",
+                    "author": "Kakao OpenChat",
+                    "url": url,
+                }]
+                chat_info["total_posts"] = 1
         except ImportError:
             pass
 
@@ -3343,7 +3386,50 @@ class PlatformAnalyzer:
         except Exception as e:
             logger.warning(f"FxTwitter tweet fetch failed for {tweet_id}: {e}")
 
-        # Method 2: Fallback to og:meta
+        # Method 2: Twitter API v2 direct tweet lookup (if bearer token available)
+        if not tweet_info["posts"]:
+            bearer_token = (os.environ.get("TWITTER_BEARER_TOKEN") or "").strip()
+            if bearer_token:
+                try:
+                    resp = self._session.get(
+                        f"https://api.twitter.com/2/tweets/{tweet_id}",
+                        params={
+                            "tweet.fields": "created_at,public_metrics,text,author_id",
+                            "expansions": "author_id",
+                            "user.fields": "username,name,profile_image_url",
+                        },
+                        headers={
+                            "Authorization": f"Bearer {bearer_token}",
+                            "User-Agent": "SNSMonitor/1.0",
+                        },
+                        timeout=15,
+                    )
+                    if resp.ok:
+                        data = resp.json()
+                        tweet_data = data.get("data", {})
+                        if tweet_data:
+                            text = tweet_data.get("text", "")
+                            metrics = tweet_data.get("public_metrics", {})
+                            tweet_info["title"] = text[:100] if text else f"Tweet by @{username}"
+                            tweet_info["description"] = text
+                            tweet_info["posts"].append({
+                                "text": text[:500],
+                                "author": f"@{username}",
+                                "like_count": metrics.get("like_count", 0),
+                                "date": tweet_data.get("created_at", ""),
+                            })
+                            tweet_info["reply_count"] = metrics.get("reply_count", 0)
+                            tweet_info["retweet_count"] = metrics.get("retweet_count", 0)
+                            tweet_info["view_count"] = metrics.get("impression_count", 0)
+                            # Author from expansions
+                            users = data.get("includes", {}).get("users", [])
+                            if users:
+                                tweet_info["author_name"] = users[0].get("name", "")
+                                tweet_info["thumbnail"] = users[0].get("profile_image_url", "")
+                except Exception as e:
+                    logger.warning("Twitter API v2 tweet lookup failed for %s: %s", tweet_id, e)
+
+        # Method 3: Fallback to og:meta
         if not tweet_info["posts"]:
             try:
                 page_resp = self._session.get(
@@ -3543,9 +3629,46 @@ class PlatformAnalyzer:
             ]
             out["total_posts"] = 1
 
+        # oEmbed fallback for Instagram posts
+        if is_post and not out.get("description"):
+            try:
+                oembed_url = f"https://graph.facebook.com/v18.0/instagram_oembed?url={quote(url, safe='')}&access_token={quote(url, safe='')}"
+                # Public oEmbed (no token needed for basic info)
+                oembed_resp = self._session.get(
+                    f"https://api.instagram.com/oembed/?url={quote(url, safe='')}",
+                    timeout=10,
+                    headers={"User-Agent": "SNSMonitor/1.0"},
+                )
+                if oembed_resp.ok:
+                    oembed_data = oembed_resp.json()
+                    if oembed_data.get("title"):
+                        out["title"] = oembed_data["title"][:200]
+                    if oembed_data.get("author_name"):
+                        out["username"] = oembed_data["author_name"]
+                    if oembed_data.get("thumbnail_url"):
+                        out["thumbnail"] = oembed_data["thumbnail_url"]
+                    # Extract text from embed HTML
+                    embed_html = oembed_data.get("html", "")
+                    if embed_html:
+                        out["embed_html"] = embed_html
+                        from bs4 import BeautifulSoup
+                        embed_soup = BeautifulSoup(embed_html, "html.parser")
+                        text = embed_soup.get_text(separator="\n", strip=True)
+                        if text and not out["description"]:
+                            out["description"] = text[:500]
+                            out["posts"] = [{
+                                "text": text[:500],
+                                "author": f"@{out.get('username', username)}",
+                                "url": url,
+                                "comments": [],
+                            }]
+                            out["total_posts"] = 1
+            except Exception as e:
+                logger.debug("Instagram oEmbed fallback failed: %s", e)
+
         if not out["posts"] and not out["description"]:
             out["description"] = (
-                "Instagram URL 분석은 og:meta로 제한됩니다. 댓글 수집은 공식 API가 필요합니다."
+                "Instagram URL 분석은 og:meta/oEmbed로 제한됩니다. 댓글 수집은 공식 API가 필요합니다."
             )
         return out
 

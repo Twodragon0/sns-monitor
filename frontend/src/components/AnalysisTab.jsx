@@ -5,6 +5,7 @@ import { API_BASE } from '../config';
 
 function AnalysisTab() {
   const [mirofishAvailable, setMirofishAvailable] = useState(false);
+  const [llmStatus, setLlmStatus] = useState({ available: false, provider: null, model: null });
   const [sources, setSources] = useState([]);
   const [selectedSources, setSelectedSources] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -16,13 +17,16 @@ function AnalysisTab() {
   const [error, setError] = useState(null);
   const [projects, setProjects] = useState([]);
   const [localResult, setLocalResult] = useState(null);
+  const [aiResult, setAiResult] = useState(null);
+  const [urlAnalysisData, setUrlAnalysisData] = useState(null); // Data from URL Analyzer
+  const [authInfo, setAuthInfo] = useState({ logged_in: false, auth_required: false });
 
   // Chat state
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
 
-  // Check MiroFish availability
+  // Check MiroFish, LLM, and auth status
   useEffect(() => {
     const checkStatus = async () => {
       try {
@@ -30,6 +34,18 @@ function AnalysisTab() {
         setMirofishAvailable(resp.data.mirofish_available);
       } catch {
         setMirofishAvailable(false);
+      }
+      try {
+        const llmResp = await axios.get(`${API_BASE}/api/analysis/llm/status`);
+        setLlmStatus(llmResp.data);
+      } catch {
+        setLlmStatus({ available: false, provider: null, model: null });
+      }
+      try {
+        const authResp = await axios.get(`${API_BASE}/api/auth/me`, { withCredentials: true });
+        setAuthInfo(authResp.data);
+      } catch {
+        setAuthInfo({ logged_in: false, auth_required: false });
       }
     };
     checkStatus();
@@ -64,6 +80,19 @@ function AnalysisTab() {
       if (toSelect.length > 0) setSelectedSources(toSelect);
     } catch (_) { /* ignore */ }
   }, [sources]);
+
+  // Receive URL analysis result from URLAnalyzer and auto-analyze
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('urlAnalysisResult');
+      if (!raw) return;
+      sessionStorage.removeItem('urlAnalysisResult');
+      const data = JSON.parse(raw);
+      if (data && (data.platform || data.title)) {
+        setUrlAnalysisData(data);
+      }
+    } catch (_) { /* ignore */ }
+  }, []);
 
   // Load existing projects
   useEffect(() => {
@@ -120,6 +149,114 @@ function AnalysisTab() {
     });
   }, []);
 
+  const startAiAnalysis = async () => {
+    if (selectedSources.length === 0) return;
+    setLoading(true);
+    setError(null);
+    setAiResult(null);
+    setLocalResult(null);
+    setAnalysisState('transforming');
+
+    try {
+      const resp = await axios.post(`${API_BASE}/api/analysis/ai-summary`, {
+        sources: selectedSources.map(s => ({ type: s.type, id: s.id })),
+      });
+      setAiResult(resp.data);
+      setAnalysisState('completed');
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || 'AI analysis failed');
+      setAnalysisState('error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // AI analysis of URL analysis result (from URLAnalyzer pass-through)
+  const startUrlAiAnalysis = useCallback(async (resultData) => {
+    setLoading(true);
+    setError(null);
+    setAiResult(null);
+    setLocalResult(null);
+    setAnalysisState('transforming');
+    setChatMessages([]);
+
+    try {
+      const resp = await axios.post(`${API_BASE}/api/analysis/ai-url-analyze`, {
+        result: resultData,
+      });
+      setAiResult(resp.data);
+      setAnalysisState('completed');
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || 'AI analysis failed');
+      setAnalysisState('error');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Auto-trigger AI analysis when URL result is passed
+  useEffect(() => {
+    if (!urlAnalysisData) return;
+    if (!llmStatus.available) return;
+    startUrlAiAnalysis(urlAnalysisData);
+  }, [urlAnalysisData, llmStatus.available, startUrlAiAnalysis]);
+
+  // Chat about URL analysis result
+  const sendUrlAiChat = async () => {
+    if (!chatInput.trim() || !urlAnalysisData) return;
+    const userMsg = chatInput.trim();
+    setChatInput('');
+    setChatMessages(prev => [...prev, { role: 'user', content: userMsg }]);
+    setChatLoading(true);
+
+    try {
+      const resp = await axios.post(`${API_BASE}/api/analysis/ai-url-chat`, {
+        result: urlAnalysisData,
+        message: userMsg,
+        chat_history: chatMessages,
+      });
+      if (resp.data.success) {
+        setChatMessages(prev => [...prev, { role: 'assistant', content: resp.data.response }]);
+      }
+    } catch (err) {
+      setChatMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `Error: ${err.response?.data?.error || err.message}`,
+      }]);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  const sendAiChat = async () => {
+    if (!chatInput.trim() || selectedSources.length === 0) return;
+
+    const userMsg = chatInput.trim();
+    setChatInput('');
+    setChatMessages(prev => [...prev, { role: 'user', content: userMsg }]);
+    setChatLoading(true);
+
+    try {
+      const resp = await axios.post(`${API_BASE}/api/analysis/ai-chat`, {
+        sources: selectedSources.map(s => ({ type: s.type, id: s.id })),
+        message: userMsg,
+        chat_history: chatMessages,
+      });
+
+      if (resp.data.success) {
+        const reply = resp.data.response || JSON.stringify(resp.data);
+        setChatMessages(prev => [...prev, { role: 'assistant', content: reply }]);
+      }
+    } catch (err) {
+      setChatMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `Error: ${err.response?.data?.error || err.message}`,
+      }]);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
   const startLocalAnalysis = async () => {
     if (selectedSources.length === 0) return;
     setLoading(true);
@@ -144,9 +281,9 @@ function AnalysisTab() {
   const startAnalysis = async () => {
     if (selectedSources.length === 0) return;
 
-    // When MiroFish is offline, use local analysis
+    // When MiroFish is offline, use AI analysis (if available) or local analysis
     if (!mirofishAvailable) {
-      return startLocalAnalysis();
+      return llmStatus.available ? startAiAnalysis() : startLocalAnalysis();
     }
 
     setLoading(true);
@@ -265,8 +402,8 @@ function AnalysisTab() {
           ← 대시보드로 돌아가기
         </button>
       </div>
-      <h2 style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-        수집 데이터 분석 · 요약 (MiroFish)
+      <h2 style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+        수집 데이터 분석 · 요약
         <span style={{
           fontSize: '12px',
           padding: '2px 8px',
@@ -274,24 +411,113 @@ function AnalysisTab() {
           backgroundColor: mirofishAvailable ? '#d4edda' : '#f8d7da',
           color: mirofishAvailable ? '#155724' : '#721c24',
         }}>
-          {mirofishAvailable ? '연결됨' : '오프라인'}
+          MiroFish {mirofishAvailable ? '연결됨' : '오프라인'}
         </span>
+        {llmStatus.available && (
+          <span style={{
+            fontSize: '12px',
+            padding: '2px 8px',
+            borderRadius: '12px',
+            backgroundColor: '#d4edda',
+            color: '#155724',
+          }}>
+            {llmStatus.provider === 'anthropic' ? 'Claude' : 'ChatGPT'} 사용 가능
+          </span>
+        )}
       </h2>
+
+      {/* URL Analysis Result context */}
+      {urlAnalysisData && (
+        <div style={{
+          padding: '14px 16px',
+          backgroundColor: '#f0f4ff',
+          border: '1px solid #c7d2fe',
+          borderRadius: '8px',
+          marginBottom: '16px',
+          fontSize: '14px',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <strong style={{ color: '#4338ca' }}>
+                URL 분석 결과 → AI 심화 분석
+              </strong>
+              <span style={{ marginLeft: '8px', color: '#6366f1' }}>
+                {urlAnalysisData.platform?.toUpperCase()} : {urlAnalysisData.title || urlAnalysisData.username || ''}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => { setUrlAnalysisData(null); setAiResult(null); setAnalysisState('idle'); setChatMessages([]); }}
+              style={{
+                padding: '4px 10px', fontSize: '12px', color: '#666',
+                background: '#e2e8f0', border: 'none', borderRadius: '4px', cursor: 'pointer',
+              }}
+            >
+              닫기
+            </button>
+          </div>
+          {loading && <p style={{ margin: '8px 0 0', color: '#4338ca' }}>AI 분석 진행 중...</p>}
+        </div>
+      )}
 
       {!mirofishAvailable && (
         <div style={{
           padding: '14px 16px',
-          backgroundColor: '#fff8e6',
-          border: '1px solid #f0c14b',
+          backgroundColor: llmStatus.available ? '#e8f5e9' : '#fff8e6',
+          border: `1px solid ${llmStatus.available ? '#a5d6a7' : '#f0c14b'}`,
           borderRadius: '8px',
           marginBottom: '20px',
           fontSize: '14px',
         }}>
-          <strong style={{ display: 'block', marginBottom: '6px' }}>MiroFish가 실행 중이 아닙니다.</strong>
-          <p style={{ margin: '0 0 6px', color: '#5a5a5a' }}>
-            터미널에서 <code style={{ background: '#eee', padding: '2px 6px', borderRadius: '4px' }}>docker-compose --profile analysis up -d</code> 로 서비스를 띄운 뒤,
-            <strong> OpenAI(OAuth) 로그인</strong>으로 API 키 없이 GPT로 분석할 수 있습니다.
-          </p>
+          {llmStatus.available ? (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <strong style={{ color: '#2e7d32' }}>
+                  AI 분석 사용 가능 ({llmStatus.provider === 'anthropic' ? 'Claude' : llmStatus.provider === 'openai_oauth' ? 'ChatGPT (OAuth)' : 'ChatGPT'} - {llmStatus.model})
+                </strong>
+                {authInfo.logged_in && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await axios.post(`${API_BASE}/api/auth/logout`, {}, { withCredentials: true });
+                      setAuthInfo({ logged_in: false, auth_required: false });
+                      window.location.reload();
+                    }}
+                    style={{ padding: '4px 10px', fontSize: '12px', color: '#666', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '4px', cursor: 'pointer' }}
+                  >
+                    로그아웃
+                  </button>
+                )}
+              </div>
+              <p style={{ margin: '4px 0 0', color: '#5a5a5a' }}>
+                {llmStatus.auth_mode === 'oauth' ? 'OAuth 인증으로' : 'API Key로'} AI 심화 분석을 수행합니다.
+              </p>
+            </>
+          ) : (
+            <>
+              <strong style={{ display: 'block', marginBottom: '6px' }}>MiroFish가 실행 중이 아닙니다.</strong>
+              <p style={{ margin: '0 0 6px', color: '#5a5a5a' }}>
+                AI 분석을 사용하려면:
+              </p>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => { window.location.href = `${API_BASE}/api/auth/openai?return_to=/analysis`; }}
+                  style={{
+                    padding: '6px 14px', fontSize: '13px', fontWeight: '600',
+                    background: '#10a37f', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer',
+                  }}
+                >
+                  OpenAI 로그인 (OAuth)
+                </button>
+                <span style={{ color: '#999', fontSize: '13px', alignSelf: 'center' }}>또는</span>
+                <span style={{ fontSize: '13px', color: '#5a5a5a' }}>
+                  <code style={{ background: '#eee', padding: '2px 6px', borderRadius: '4px' }}>OPENAI_API_KEY</code> /
+                  <code style={{ background: '#eee', padding: '2px 6px', borderRadius: '4px', marginLeft: '4px' }}>ANTHROPIC_API_KEY</code>를 .env에 설정
+                </span>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -357,11 +583,13 @@ function AnalysisTab() {
               fontWeight: 'bold',
             }}
           >
-            {loading ? '분석 중…' : selectedSources.length === 0 ? '소스 선택 후 분석' : mirofishAvailable ? `${selectedSources.length}개 소스 분석` : `${selectedSources.length}개 소스 기본 분석`}
+            {loading ? '분석 중…' : selectedSources.length === 0 ? '소스 선택 후 분석' : mirofishAvailable ? `${selectedSources.length}개 소스 분석` : llmStatus.available ? `${selectedSources.length}개 소스 AI 분석` : `${selectedSources.length}개 소스 기본 분석`}
           </button>
           {!mirofishAvailable && selectedSources.length > 0 && (
             <span style={{ marginLeft: '10px', fontSize: '12px', color: '#666' }}>
-              MiroFish 없이 로컬 감성 분석을 수행합니다
+              {llmStatus.available
+                ? `${llmStatus.provider === 'anthropic' ? 'Claude' : 'ChatGPT'}로 AI 분석을 수행합니다`
+                : 'MiroFish 없이 로컬 감성 분석을 수행합니다'}
             </span>
           )}
         </div>
@@ -513,8 +741,132 @@ function AnalysisTab() {
           )}
 
           <p style={{ marginTop: '16px', marginBottom: 0, fontSize: '12px', color: '#999' }}>
-            로컬 키워드 기반 분석입니다. MiroFish를 실행하면 AI 심화 분석과 대화가 가능합니다.
+            로컬 키워드 기반 분석입니다. OPENAI_API_KEY 또는 ANTHROPIC_API_KEY를 설정하면 AI 심화 분석이 가능합니다.
           </p>
+        </div>
+      )}
+
+      {/* AI Analysis Result */}
+      {aiResult && (
+        <div style={{
+          backgroundColor: 'white',
+          padding: '20px',
+          borderRadius: '8px',
+          border: '1px solid #dee2e6',
+          marginBottom: '20px',
+        }}>
+          <h3 style={{ marginTop: 0, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            AI 분석 결과
+            <span style={{
+              fontSize: '11px', padding: '2px 8px', borderRadius: '12px',
+              backgroundColor: '#e3f2fd', color: '#1565c0',
+            }}>
+              {aiResult.provider === 'anthropic' ? 'Claude' : 'ChatGPT'} ({aiResult.model})
+            </span>
+          </h3>
+
+          {/* Summary */}
+          {aiResult.summary && (
+            <div style={{
+              padding: '14px', backgroundColor: '#f8f9fa', borderRadius: '8px',
+              marginBottom: '16px', lineHeight: '1.7', whiteSpace: 'pre-wrap',
+            }}>
+              {aiResult.summary}
+            </div>
+          )}
+
+          {/* Sentiment from AI */}
+          {aiResult.sentiment && (
+            <div style={{ marginBottom: '16px' }}>
+              <h4 style={{ margin: '0 0 10px', fontSize: '14px', color: '#555' }}>AI 감성 분석</h4>
+              <div style={{ display: 'flex', gap: '12px', marginBottom: '8px' }}>
+                {[
+                  { key: 'positive_pct', label: '긍정', color: '#10b981' },
+                  { key: 'neutral_pct', label: '중립', color: '#9ca3af' },
+                  { key: 'negative_pct', label: '부정', color: '#ef4444' },
+                ].map(({ key, label, color }) => (
+                  <div key={key} style={{
+                    flex: 1, textAlign: 'center', padding: '12px',
+                    backgroundColor: `${color}15`, borderRadius: '8px',
+                    border: `1px solid ${color}40`,
+                  }}>
+                    <div style={{ fontSize: '24px', fontWeight: 'bold', color }}>
+                      {aiResult.sentiment[key] || 0}%
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#666' }}>{label}</div>
+                  </div>
+                ))}
+              </div>
+              {aiResult.sentiment.positive_keywords?.length > 0 && (
+                <div style={{ fontSize: '13px', marginTop: '8px' }}>
+                  <span style={{ color: '#10b981', fontWeight: '600' }}>긍정 키워드:</span>{' '}
+                  {aiResult.sentiment.positive_keywords.join(', ')}
+                </div>
+              )}
+              {aiResult.sentiment.negative_keywords?.length > 0 && (
+                <div style={{ fontSize: '13px', marginTop: '4px' }}>
+                  <span style={{ color: '#ef4444', fontWeight: '600' }}>부정 키워드:</span>{' '}
+                  {aiResult.sentiment.negative_keywords.join(', ')}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Topics */}
+          {aiResult.topics?.length > 0 && (
+            <div style={{ marginBottom: '16px' }}>
+              <h4 style={{ margin: '0 0 10px', fontSize: '14px', color: '#555' }}>주요 토픽</h4>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {aiResult.topics.map((t, i) => (
+                  <div key={i} style={{
+                    padding: '8px 14px', borderRadius: '8px',
+                    backgroundColor: i < 3 ? '#dbeafe' : '#f1f5f9',
+                    border: `1px solid ${i < 3 ? '#93c5fd' : '#e2e8f0'}`,
+                  }}>
+                    <div style={{ fontWeight: '600', fontSize: '13px', color: i < 3 ? '#1d4ed8' : '#475569' }}>
+                      {t.topic} {t.count ? `(${t.count})` : ''}
+                    </div>
+                    {t.description && (
+                      <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>{t.description}</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Key Opinions */}
+          {aiResult.key_opinions?.length > 0 && (
+            <div style={{ marginBottom: '16px' }}>
+              <h4 style={{ margin: '0 0 10px', fontSize: '14px', color: '#555' }}>주요 의견</h4>
+              {aiResult.key_opinions.map((op, i) => (
+                <div key={i} style={{
+                  padding: '10px 14px', marginBottom: '6px', borderRadius: '6px',
+                  backgroundColor: op.type === 'positive' ? '#f0fdf4' : op.type === 'negative' ? '#fef2f2' : '#f8f9fa',
+                  borderLeft: `3px solid ${op.type === 'positive' ? '#10b981' : op.type === 'negative' ? '#ef4444' : '#9ca3af'}`,
+                  fontSize: '13px',
+                }}>
+                  {op.text}
+                  {op.support && <span style={{ color: '#999', marginLeft: '8px', fontSize: '11px' }}>({op.support}건)</span>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Insights */}
+          {aiResult.insights?.length > 0 && (
+            <div>
+              <h4 style={{ margin: '0 0 10px', fontSize: '14px', color: '#555' }}>인사이트</h4>
+              {aiResult.insights.map((ins, i) => (
+                <div key={i} style={{
+                  padding: '8px 12px', marginBottom: '4px', fontSize: '13px',
+                  color: '#374151', lineHeight: '1.5',
+                }}>
+                  {ins}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -605,8 +957,8 @@ function AnalysisTab() {
         </div>
       )}
 
-      {/* Chat Interface */}
-      {analysisState === 'completed' && (
+      {/* Chat Interface - works with MiroFish, AI LLM, URL result, or all */}
+      {analysisState === 'completed' && (currentProject || aiResult || urlAnalysisData || llmStatus.available) && (
         <div style={{
           backgroundColor: 'white',
           padding: '16px',
@@ -614,7 +966,14 @@ function AnalysisTab() {
           border: '1px solid #dee2e6',
           marginBottom: '20px',
         }}>
-          <h3 style={{ marginTop: 0 }}>AI Chat</h3>
+          <h3 style={{ marginTop: 0 }}>
+            AI 대화
+            {aiResult && (
+              <span style={{ fontSize: '12px', fontWeight: 'normal', color: '#888', marginLeft: '8px' }}>
+                {aiResult.provider === 'anthropic' ? 'Claude' : 'ChatGPT'}
+              </span>
+            )}
+          </h3>
           <div style={{
             maxHeight: '400px',
             overflow: 'auto',
@@ -625,7 +984,7 @@ function AnalysisTab() {
           }}>
             {chatMessages.length === 0 && (
               <p style={{ color: '#999', textAlign: 'center', margin: '20px 0' }}>
-                Ask questions about the analysis results...
+                분석 결과에 대해 질문하세요...
               </p>
             )}
             {chatMessages.map((msg, i) => (
@@ -654,8 +1013,14 @@ function AnalysisTab() {
               type="text"
               value={chatInput}
               onChange={e => setChatInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && sendChatMessage()}
-              placeholder="Ask about the analysis..."
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  if (urlAnalysisData && llmStatus.available) sendUrlAiChat();
+                  else if (currentProject && mirofishAvailable) sendChatMessage();
+                  else if (llmStatus.available) sendAiChat();
+                }
+              }}
+              placeholder="분석 결과에 대해 질문하세요..."
               style={{
                 flex: 1,
                 padding: '10px 12px',
@@ -665,7 +1030,11 @@ function AnalysisTab() {
               }}
             />
             <button
-              onClick={sendChatMessage}
+              onClick={() => {
+                if (urlAnalysisData && llmStatus.available) sendUrlAiChat();
+                else if (currentProject && mirofishAvailable) sendChatMessage();
+                else if (llmStatus.available) sendAiChat();
+              }}
               disabled={chatLoading || !chatInput.trim()}
               style={{
                 padding: '10px 20px',
@@ -676,7 +1045,7 @@ function AnalysisTab() {
                 cursor: chatLoading ? 'not-allowed' : 'pointer',
               }}
             >
-              Send
+              전송
             </button>
           </div>
         </div>

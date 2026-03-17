@@ -83,6 +83,12 @@ class Config:
     NAVER_CAFE_PROXY_USERNAME = os.environ.get("NAVER_CAFE_PROXY_USERNAME", "")
     NAVER_CAFE_PROXY_PASSWORD = os.environ.get("NAVER_CAFE_PROXY_PASSWORD", "")
 
+    # LLM API (for local AI analysis without MiroFish)
+    OPENAI_API_KEY = (os.environ.get("OPENAI_API_KEY") or "").strip()
+    ANTHROPIC_API_KEY = (os.environ.get("ANTHROPIC_API_KEY") or "").strip()
+    LLM_PROVIDER = (os.environ.get("LLM_PROVIDER") or "").strip()  # "openai", "anthropic", or "" (auto-detect)
+    LLM_MODEL = (os.environ.get("LLM_MODEL") or "").strip()  # Override model name
+
     # AWS (only used when LOCAL_MODE=false)
     S3_BUCKET = os.environ.get("S3_BUCKET", "")
     DYNAMODB_TABLE = os.environ.get("DYNAMODB_TABLE", "")

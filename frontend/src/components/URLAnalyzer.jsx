@@ -655,13 +655,32 @@ function AnalysisResult({ result }) {
           onClick={handleSummarize}
           disabled={summaryLoading}
         >
-          {summaryLoading ? '🤖 분석 중...' : '🤖 AI 요약'}
+          {summaryLoading ? '분석 중...' : 'AI 요약'}
+        </button>
+        <button
+          className="summarize-button"
+          style={{ marginLeft: '8px', backgroundColor: '#6366f1' }}
+          onClick={() => {
+            const payload = trimResultForSummarize(result);
+            sessionStorage.setItem('urlAnalysisResult', JSON.stringify(payload));
+            window.history.pushState({}, '', '/analysis');
+            window.dispatchEvent(new PopStateEvent('popstate'));
+          }}
+        >
+          AI 심화 분석
         </button>
         {summaryError && <div className="error-message">{summaryError}</div>}
         {summary && (
           <div className="summary-content">
             <div className="summary-source">
-              {summary.source === 'mirofish' ? '🐟 MiroFish AI' : '📊 로컬 분석'}
+              {summary.source === 'mirofish'
+                ? 'MiroFish AI'
+                : summary.source === 'anthropic'
+                ? 'Claude AI'
+                : summary.source === 'openai' || summary.source === 'openai_oauth'
+                ? 'ChatGPT'
+                : '로컬 분석'}
+              {summary.model && <span style={{ fontSize: '11px', marginLeft: '6px', color: '#888' }}>({summary.model})</span>}
             </div>
             <div className="summary-text">{summary.summary}</div>
           </div>

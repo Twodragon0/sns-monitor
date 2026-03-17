@@ -495,3 +495,260 @@ def local_summary():
         'overall': overall_sentiment,
         'total_items': len(all_items),
     })
+
+
+@analysis_bp.route('/api/analysis/llm/status', methods=['GET'])
+def llm_status():
+    """Check local LLM availability (Claude / OpenAI / OAuth)."""
+    from ..services.llm_analyzer import get_llm_status
+    oauth_token = session.get('access_token')
+    status = get_llm_status(oauth_token=oauth_token)
+    return jsonify(status)
+
+
+@analysis_bp.route('/api/analysis/ai-summary', methods=['POST'])
+@limiter.limit("5 per minute")
+def ai_summary():
+    """
+    AI-powered analysis using local LLM (Claude or ChatGPT).
+    Works without MiroFish — calls LLM APIs directly.
+
+    Request JSON:
+    {
+        "sources": [{"type": "youtube", "id": "channel-handle"}, ...],
+        "question": "optional specific question"
+    }
+    """
+    from ..services.llm_analyzer import analyze_with_llm, get_available_provider
+
+    oauth_token = session.get('access_token')
+    provider = get_available_provider(oauth_token=oauth_token)
+    if not provider:
+        return jsonify({
+            'error': 'No LLM API key configured. Set OPENAI_API_KEY or ANTHROPIC_API_KEY in .env, or login with OAuth.'
+        }), 503
+
+    data = request.get_json() or {}
+    sources_list = data.get('sources', [])
+    question = data.get('question', '')
+
+    if not sources_list:
+        return jsonify({'error': 'No data sources specified'}), 400
+
+    # Build document from sources
+    documents = []
+    for src in sources_list:
+        src_type = src.get('type', '')
+        src_id = src.get('id', '')
+        if not _SAFE_ID_RE.match(src_id):
+            return jsonify({'error': 'Invalid source id'}), 400
+
+        if src_type == 'youtube':
+            doc = _transform_youtube_to_document(src_id)
+        elif src_type == 'dcinside':
+            doc = _transform_dcinside_to_document(src_id)
+        else:
+            continue
+
+        if doc:
+            documents.append(doc)
+
+    if not documents:
+        return jsonify({'error': 'No data found for specified sources'}), 404
+
+    full_document = '\n\n---\n\n'.join(documents)
+    result = analyze_with_llm(full_document, question if question else None, oauth_token=oauth_token)
+
+    if 'error' in result and not result.get('success'):
+        return jsonify(result), 500
+
+    return jsonify(result)
+
+
+@analysis_bp.route('/api/analysis/ai-chat', methods=['POST'])
+@limiter.limit("20 per minute")
+def ai_chat():
+    """
+    Chat with local LLM about SNS data.
+
+    Request JSON:
+    {
+        "sources": [{"type": "youtube", "id": "channel-handle"}, ...],
+        "message": "user question",
+        "chat_history": [{"role": "user", "content": "..."}, ...]
+    }
+    """
+    from ..services.llm_analyzer import chat_with_llm, get_available_provider
+
+    oauth_token = session.get('access_token')
+    provider = get_available_provider(oauth_token=oauth_token)
+    if not provider:
+        return jsonify({'error': 'No LLM API key configured. Login with OAuth or set API key.'}), 503
+
+    data = request.get_json() or {}
+    sources_list = data.get('sources', [])
+    message = (data.get('message') or '').strip()
+    chat_history = data.get('chat_history', [])
+
+    if not message:
+        return jsonify({'error': 'Message is required'}), 400
+    if not sources_list:
+        return jsonify({'error': 'No data sources specified'}), 400
+
+    # Build document from sources
+    documents = []
+    for src in sources_list:
+        src_type = src.get('type', '')
+        src_id = src.get('id', '')
+        if not _SAFE_ID_RE.match(src_id):
+            return jsonify({'error': 'Invalid source id'}), 400
+
+        if src_type == 'youtube':
+            doc = _transform_youtube_to_document(src_id)
+        elif src_type == 'dcinside':
+            doc = _transform_dcinside_to_document(src_id)
+        else:
+            continue
+
+        if doc:
+            documents.append(doc)
+
+    if not documents:
+        return jsonify({'error': 'No data found for specified sources'}), 404
+
+    full_document = '\n\n---\n\n'.join(documents)
+    result = chat_with_llm(full_document, message, chat_history, oauth_token=oauth_token)
+
+    if 'error' in result and not result.get('success'):
+        return jsonify(result), 500
+
+    return jsonify(result)
+
+
+@analysis_bp.route('/api/analysis/ai-url-analyze', methods=['POST'])
+@limiter.limit("5 per minute")
+def ai_url_analyze():
+    """
+    AI analysis of URL analyzer results (direct pass-through from URLAnalyzer).
+    Accepts pre-built analysis result and sends to LLM for deep analysis.
+
+    Request JSON:
+    {
+        "result": { ... URL analyzer result ... },
+        "question": "optional question"
+    }
+    """
+    from ..services.llm_analyzer import analyze_with_llm, get_available_provider
+
+    oauth_token = session.get('access_token')
+    provider = get_available_provider(oauth_token=oauth_token)
+    if not provider:
+        return jsonify({
+            'error': 'No LLM available. Set OPENAI_API_KEY or ANTHROPIC_API_KEY, or login with OAuth.'
+        }), 503
+
+    data = request.get_json() or {}
+    url_result = data.get('result')
+    question = data.get('question', '')
+
+    if not url_result:
+        return jsonify({'error': 'Analysis result is required'}), 400
+
+    # Build document from URL analysis result
+    lines = []
+    platform = url_result.get('platform', 'unknown')
+    title = url_result.get('title', url_result.get('username', 'Unknown'))
+    lines.append(f"# {platform.upper()} Analysis: {title}")
+    if url_result.get('description'):
+        lines.append(f"\n## Description\n{url_result['description']}")
+    if url_result.get('content'):
+        lines.append(f"\n## Content\n{str(url_result['content'])[:3000]}")
+
+    # Stats
+    stat_keys = ['view_count', 'like_count', 'comment_count', 'subscriber_count',
+                 'follower_count', 'tweet_count', 'total_posts', 'score']
+    stats = {k: url_result[k] for k in stat_keys if url_result.get(k) is not None}
+    if stats:
+        lines.append("\n## Stats")
+        for k, v in stats.items():
+            lines.append(f"- {k}: {v}")
+
+    # Posts/Comments
+    items = (url_result.get('comments') or url_result.get('replies')
+             or url_result.get('posts') or url_result.get('recent_videos') or [])
+    if items:
+        label = 'Comments' if url_result.get('comments') else 'Posts'
+        lines.append(f"\n## {label} ({len(items)} items)")
+        for i, item in enumerate(items[:50]):
+            text = item.get('text', item.get('title', ''))
+            author = item.get('author', '')
+            if text:
+                lines.append(f"{i+1}. [{author}] {str(text)[:200]}")
+
+    # Existing sentiment
+    analysis = url_result.get('analysis')
+    if analysis:
+        lines.append("\n## Existing Sentiment Analysis")
+        lines.append(f"- Overall: {analysis.get('overall', 'N/A')}")
+        s = analysis.get('sentiment', {})
+        lines.append(f"- Positive: {s.get('positive', 0)}, Neutral: {s.get('neutral', 0)}, Negative: {s.get('negative', 0)}")
+
+    document = '\n'.join(lines)
+    result = analyze_with_llm(document, question if question else None, oauth_token=oauth_token)
+
+    if 'error' in result and not result.get('success'):
+        return jsonify(result), 500
+
+    return jsonify(result)
+
+
+@analysis_bp.route('/api/analysis/ai-url-chat', methods=['POST'])
+@limiter.limit("20 per minute")
+def ai_url_chat():
+    """
+    Chat about URL analysis results with LLM.
+
+    Request JSON:
+    {
+        "result": { ... URL analyzer result ... },
+        "message": "user question",
+        "chat_history": [...]
+    }
+    """
+    from ..services.llm_analyzer import chat_with_llm, get_available_provider
+
+    oauth_token = session.get('access_token')
+    provider = get_available_provider(oauth_token=oauth_token)
+    if not provider:
+        return jsonify({'error': 'No LLM available'}), 503
+
+    data = request.get_json() or {}
+    url_result = data.get('result')
+    message = (data.get('message') or '').strip()
+    chat_history = data.get('chat_history', [])
+
+    if not message:
+        return jsonify({'error': 'Message is required'}), 400
+    if not url_result:
+        return jsonify({'error': 'Analysis result is required'}), 400
+
+    # Build context from URL result
+    lines = [f"# {url_result.get('platform', '').upper()} Analysis: {url_result.get('title', '')}"]
+    if url_result.get('description'):
+        lines.append(url_result['description'][:1000])
+    items = (url_result.get('comments') or url_result.get('replies')
+             or url_result.get('posts') or [])
+    if items:
+        lines.append(f"\n{len(items)} items collected:")
+        for i, item in enumerate(items[:30]):
+            text = item.get('text', item.get('title', ''))
+            if text:
+                lines.append(f"- {str(text)[:150]}")
+
+    document = '\n'.join(lines)
+    result = chat_with_llm(document, message, chat_history, oauth_token=oauth_token)
+
+    if 'error' in result and not result.get('success'):
+        return jsonify(result), 500
+
+    return jsonify(result)
