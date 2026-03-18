@@ -24,11 +24,11 @@ from ..config import Config
 
 logger = logging.getLogger(__name__)
 
-# Anthropic Console OAuth (same as Claude Code)
+# Anthropic OAuth (Claude Code compatible)
 _ANTHROPIC_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
-_ANTHROPIC_AUTHORIZE_URL = "https://console.anthropic.com/oauth/authorize"
-_ANTHROPIC_TOKEN_URL = "https://console.anthropic.com/oauth/token"
-_ANTHROPIC_SCOPES = "org:create_api_key user:profile user:inference"
+_ANTHROPIC_AUTHORIZE_URL = "https://claude.ai/oauth/authorize"
+_ANTHROPIC_TOKEN_URL = "https://claude.ai/oauth/token"
+_ANTHROPIC_SCOPES = "org:create_api_key user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload"
 
 
 def require_analysis_auth(f):
@@ -111,29 +111,46 @@ def auth_anthropic_start():
         session["oauth_return_to"] = "/analysis"
 
     params = {
-        "response_type": "code",
+        "code": "true",
         "client_id": _ANTHROPIC_CLIENT_ID,
+        "response_type": "code",
         "redirect_uri": _get_redirect_uri(),
         "scope": _ANTHROPIC_SCOPES,
-        "state": state,
         "code_challenge": code_challenge,
         "code_challenge_method": "S256",
+        "state": state,
     }
     url = f"{_ANTHROPIC_AUTHORIZE_URL}?{urlencode(params)}"
     return redirect(url)
 
 
 # ==========================================
-# OpenAI OAuth
+# OpenAI OAuth (PKCE)
 # ==========================================
+# OpenAI OAuth endpoints (configurable via env, defaults to chatgpt.com)
+_OPENAI_DEFAULT_AUTHORIZE_URL = "https://auth.openai.com/authorize"
+_OPENAI_DEFAULT_TOKEN_URL = "https://auth.openai.com/oauth/token"
+_OPENAI_DEFAULT_SCOPES = "openid profile email"
+
+
 @auth_bp.route("/api/auth/openai", methods=["GET"])
 @limiter.limit("10 per minute")
 def auth_openai_start():
-    """Redirect to OpenAI OAuth authorize URL."""
-    if not _oauth_configured():
-        return jsonify({"error": "OpenAI OAuth not configured. Use Anthropic OAuth or set API key.", "auth_url": None}), 503
+    """Redirect to OpenAI OAuth authorize URL (PKCE or standard)."""
+    # Use configured client ID or fall back to error
+    client_id = Config.OPENAI_OAUTH_CLIENT_ID
+    if not client_id:
+        return jsonify({"error": "OpenAI OAuth not configured. Set OPENAI_OAUTH_CLIENT_ID in .env or use Anthropic OAuth."}), 503
+
+    # PKCE for OpenAI
+    code_verifier = secrets.token_urlsafe(64)[:128]
+    code_challenge = urlsafe_b64encode(
+        hashlib.sha256(code_verifier.encode("ascii")).digest()
+    ).rstrip(b"=").decode("ascii")
+
     state = secrets.token_urlsafe(32)
     session["oauth_state"] = state
+    session["pkce_verifier"] = code_verifier
     session["oauth_provider"] = "openai"
 
     return_to = request.args.get("return_to", "").strip() or "/analysis"
@@ -143,14 +160,20 @@ def auth_openai_start():
     else:
         session["oauth_return_to"] = "/analysis"
 
+    authorize_url = Config.OAUTH_AUTHORIZE_URL or _OPENAI_DEFAULT_AUTHORIZE_URL
+    scopes = Config.OAUTH_SCOPES or _OPENAI_DEFAULT_SCOPES
+
     params = {
+        "code": "true",
+        "client_id": client_id,
         "response_type": "code",
-        "client_id": Config.OPENAI_OAUTH_CLIENT_ID,
-        "redirect_uri": Config.OAUTH_REDIRECT_URI,
-        "scope": Config.OAUTH_SCOPES,
+        "redirect_uri": _get_redirect_uri(),
+        "scope": scopes,
+        "code_challenge": code_challenge,
+        "code_challenge_method": "S256",
         "state": state,
     }
-    url = f"{Config.OAUTH_AUTHORIZE_URL}?{urlencode(params)}"
+    url = f"{authorize_url}?{urlencode(params)}"
     return redirect(url)
 
 
@@ -228,22 +251,31 @@ def _handle_anthropic_callback(code):
 
 
 def _handle_openai_callback(code):
-    """Exchange OpenAI OAuth code for tokens."""
-    if not _oauth_configured():
+    """Exchange OpenAI OAuth code for tokens (PKCE or client_secret)."""
+    client_id = Config.OPENAI_OAUTH_CLIENT_ID
+    if not client_id:
         return redirect(_frontend_redirect("/analysis?auth_error=openai_oauth_not_configured"))
+
+    token_url = Config.OAUTH_TOKEN_URL or _OPENAI_DEFAULT_TOKEN_URL
+    code_verifier = session.pop("pkce_verifier", None)
 
     data = {
         "grant_type": "authorization_code",
         "code": code,
-        "redirect_uri": Config.OAUTH_REDIRECT_URI,
-        "client_id": Config.OPENAI_OAUTH_CLIENT_ID,
-        "client_secret": Config.OPENAI_OAUTH_CLIENT_SECRET,
+        "redirect_uri": _get_redirect_uri(),
+        "client_id": client_id,
     }
+    # Use PKCE verifier if available, otherwise use client_secret
+    if code_verifier:
+        data["code_verifier"] = code_verifier
+    elif Config.OPENAI_OAUTH_CLIENT_SECRET:
+        data["client_secret"] = Config.OPENAI_OAUTH_CLIENT_SECRET
+
     try:
         resp = http_requests.post(
-            Config.OAUTH_TOKEN_URL,
+            token_url,
             data=data,
-            headers={"Accept": "application/json"},
+            headers={"Accept": "application/json", "Content-Type": "application/x-www-form-urlencoded"},
             timeout=15,
         )
         resp.raise_for_status()
@@ -258,6 +290,8 @@ def _handle_openai_callback(code):
 
     session["access_token"] = access_token
     session["token_provider"] = "openai"
+    if token_data.get("refresh_token"):
+        session["refresh_token"] = token_data["refresh_token"]
     session["user"] = {
         "id": token_data.get("id") or token_data.get("sub") or "openai-user",
         "provider": "openai",
