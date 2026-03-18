@@ -43,83 +43,64 @@ function AuthPanel({ apiBase, onKeySet, openaiOAuthAvailable }) {
 
   return (
     <>
-      <strong style={{ display: 'block', marginBottom: '10px' }}>AI 분석을 사용하려면 로그인하세요</strong>
+      <strong style={{ display: 'block', marginBottom: '10px' }}>API Key를 입력하면 AI 분석이 활성화됩니다</strong>
 
-      {/* OAuth buttons */}
-      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '12px' }}>
+      {/* API Key input (primary) */}
+      <div style={{ padding: '12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '10px' }}>
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
+          <select
+            value={keyProvider}
+            onChange={e => setKeyProvider(e.target.value)}
+            style={{ padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+          >
+            <option value="openai">OpenAI (ChatGPT)</option>
+            <option value="anthropic">Anthropic (Claude)</option>
+          </select>
+          <input
+            type="password"
+            value={apiKey}
+            onChange={e => setApiKey(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && submitKey()}
+            placeholder={keyProvider === 'anthropic' ? 'sk-ant-api03-...' : 'sk-proj-...'}
+            style={{ flex: 1, padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+          />
+          <button
+            type="button" onClick={submitKey} disabled={keySaving || !apiKey.trim()}
+            style={{
+              padding: '8px 18px', fontSize: '13px', fontWeight: '600',
+              background: keySaving ? '#94a3b8' : '#3b82f6', color: 'white',
+              border: 'none', borderRadius: '6px', cursor: keySaving ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {keySaving ? '...' : '연결'}
+          </button>
+        </div>
+        {keyError && <div style={{ color: '#dc2626', fontSize: '12px', marginTop: '4px' }}>{keyError}</div>}
+        <p style={{ margin: '6px 0 0', fontSize: '11px', color: '#94a3b8' }}>
+          세션에만 저장됩니다 (브라우저 종료 시 삭제).
+          {keyProvider === 'openai' && <> <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" style={{ color: '#64748b' }}>OpenAI Key 발급</a></>}
+          {keyProvider === 'anthropic' && <> <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer" style={{ color: '#64748b' }}>Anthropic Key 발급</a></>}
+        </p>
+      </div>
+
+      {/* OAuth (secondary) */}
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: '12px', color: '#94a3b8' }}>또는 OAuth 로그인:</span>
         <button
           type="button"
           onClick={() => { window.location.href = `${apiBase}/api/auth/anthropic?return_to=/analysis`; }}
-          style={{
-            padding: '10px 20px', fontSize: '14px', fontWeight: '600',
-            background: '#d97706', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', gap: '6px',
-          }}
+          style={{ padding: '5px 12px', fontSize: '12px', background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', cursor: 'pointer' }}
         >
-          Claude 로그인
+          Claude
         </button>
         <button
           type="button"
           onClick={() => { window.location.href = `${apiBase}/api/auth/openai?return_to=/analysis`; }}
-          style={{
-            padding: '10px 20px', fontSize: '14px', fontWeight: '600',
-            background: '#10a37f', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', gap: '6px',
-          }}
+          style={{ padding: '5px 12px', fontSize: '12px', background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', cursor: 'pointer' }}
         >
-          ChatGPT 로그인
+          ChatGPT
         </button>
       </div>
-
-      <p style={{ margin: '0 0 8px', fontSize: '12px', color: '#64748b' }}>
-        Anthropic/OpenAI 계정으로 브라우저 인증 후 AI 분석이 활성화됩니다.
-      </p>
-
-      {/* API Key fallback (collapsible) */}
-      <button
-        type="button"
-        onClick={() => setShowApiKey(!showApiKey)}
-        style={{
-          padding: '4px 10px', fontSize: '11px', color: '#94a3b8',
-          background: 'transparent', border: 'none', cursor: 'pointer', textDecoration: 'underline',
-        }}
-      >
-        {showApiKey ? 'API Key 입력 닫기' : 'API Key 직접 입력'}
-      </button>
-
-      {showApiKey && (
-        <div style={{ padding: '10px', marginTop: '6px', background: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-          <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
-            <select
-              value={keyProvider}
-              onChange={e => setKeyProvider(e.target.value)}
-              style={{ padding: '6px 8px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '12px' }}
-            >
-              <option value="openai">OpenAI</option>
-              <option value="anthropic">Anthropic</option>
-            </select>
-            <input
-              type="password"
-              value={apiKey}
-              onChange={e => setApiKey(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && submitKey()}
-              placeholder={keyProvider === 'anthropic' ? 'sk-ant-...' : 'sk-...'}
-              style={{ flex: 1, padding: '6px 8px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '12px' }}
-            />
-            <button
-              type="button" onClick={submitKey} disabled={keySaving || !apiKey.trim()}
-              style={{
-                padding: '6px 12px', fontSize: '12px', fontWeight: '600',
-                background: keySaving ? '#94a3b8' : '#3b82f6', color: 'white',
-                border: 'none', borderRadius: '4px', cursor: keySaving ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {keySaving ? '...' : '연결'}
-            </button>
-          </div>
-          {keyError && <div style={{ color: '#dc2626', fontSize: '11px' }}>{keyError}</div>}
-        </div>
-      )}
     </>
   );
 }
@@ -525,24 +506,13 @@ function AnalysisTab() {
       </div>
       <h2 style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
         수집 데이터 분석 · 요약
-        <span style={{
-          fontSize: '12px',
-          padding: '2px 8px',
-          borderRadius: '12px',
-          backgroundColor: mirofishAvailable ? '#d4edda' : '#f8d7da',
-          color: mirofishAvailable ? '#155724' : '#721c24',
-        }}>
-          SNS AI {mirofishAvailable ? '연결됨' : '오프라인'}
-        </span>
-        {llmStatus.available && (
-          <span style={{
-            fontSize: '12px',
-            padding: '2px 8px',
-            borderRadius: '12px',
-            backgroundColor: '#d4edda',
-            color: '#155724',
-          }}>
-            {providerLabel(llmStatus.provider)} 사용 가능
+        {llmStatus.available ? (
+          <span style={{ fontSize: '12px', padding: '2px 8px', borderRadius: '12px', backgroundColor: '#d4edda', color: '#155724' }}>
+            {providerLabel(llmStatus.provider)} 연결됨
+          </span>
+        ) : (
+          <span style={{ fontSize: '12px', padding: '2px 8px', borderRadius: '12px', backgroundColor: '#fef3c7', color: '#92400e' }}>
+            AI 미연결 — 아래에서 API Key를 입력하세요
           </span>
         )}
       </h2>
@@ -581,49 +551,43 @@ function AnalysisTab() {
         </div>
       )}
 
-      {!mirofishAvailable && (
-        <div style={{
-          padding: '14px 16px',
-          backgroundColor: llmStatus.available ? '#e8f5e9' : '#fff8e6',
-          border: `1px solid ${llmStatus.available ? '#a5d6a7' : '#f0c14b'}`,
-          borderRadius: '8px',
-          marginBottom: '20px',
-          fontSize: '14px',
-        }}>
-          {llmStatus.available ? (
-            <>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <strong style={{ color: '#2e7d32' }}>
-                  AI 분석 사용 가능 ({providerLabel(llmStatus.provider)} - {llmStatus.model})
-                </strong>
-                {authInfo.logged_in && (
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      await axios.post(`${API_BASE}/api/auth/logout`, {}, { withCredentials: true });
-                      setAuthInfo({ logged_in: false, auth_required: false });
-                      window.location.reload();
-                    }}
-                    style={{ padding: '4px 10px', fontSize: '12px', color: '#666', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '4px', cursor: 'pointer' }}
-                  >
-                    로그아웃
-                  </button>
-                )}
-              </div>
-              <p style={{ margin: '4px 0 0', color: '#5a5a5a' }}>
-                {llmStatus.auth_mode === 'cli' ? 'Docker CLI로' : llmStatus.auth_mode === 'oauth' ? 'OAuth 인증으로' : 'API Key로'} AI 심화 분석을 수행합니다.
-                {llmStatus.cli_tools?.length > 0 && (
-                  <span style={{ fontSize: '11px', color: '#888', marginLeft: '6px' }}>
-                    (CLI: {llmStatus.cli_tools.join(', ')})
-                  </span>
-                )}
-              </p>
-            </>
-          ) : (
-            <AuthPanel apiBase={API_BASE} onKeySet={() => window.location.reload()} openaiOAuthAvailable={authInfo.openai_oauth_available} />
-          )}
-        </div>
-      )}
+      {/* AI connection status / auth panel */}
+      <div style={{
+        padding: '14px 16px',
+        backgroundColor: llmStatus.available ? '#e8f5e9' : '#fff8e6',
+        border: `1px solid ${llmStatus.available ? '#a5d6a7' : '#f0c14b'}`,
+        borderRadius: '8px',
+        marginBottom: '20px',
+        fontSize: '14px',
+      }}>
+        {llmStatus.available ? (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <strong style={{ color: '#2e7d32' }}>
+                {providerLabel(llmStatus.provider)} ({llmStatus.model}) 연결됨
+              </strong>
+              {authInfo.logged_in && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await axios.post(`${API_BASE}/api/auth/logout`, {}, { withCredentials: true });
+                    setAuthInfo({ logged_in: false, auth_required: false });
+                    window.location.reload();
+                  }}
+                  style={{ padding: '4px 10px', fontSize: '12px', color: '#666', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                  로그아웃
+                </button>
+              )}
+            </div>
+            <p style={{ margin: '4px 0 0', color: '#5a5a5a', fontSize: '13px' }}>
+              {llmStatus.auth_mode === 'cli' ? 'Docker 내부 SDK' : llmStatus.auth_mode === 'oauth' ? 'OAuth 인증' : llmStatus.auth_mode === 'api_key_session' ? '브라우저 API Key' : 'API Key'}로 AI 분석을 수행합니다.
+            </p>
+          </>
+        ) : (
+          <AuthPanel apiBase={API_BASE} onKeySet={() => window.location.reload()} openaiOAuthAvailable={authInfo.openai_oauth_available} />
+        )}
+      </div>
 
       {/* Data Source Selection */}
       <div style={{
@@ -687,13 +651,13 @@ function AnalysisTab() {
               fontWeight: 'bold',
             }}
           >
-            {loading ? '분석 중…' : selectedSources.length === 0 ? '소스 선택 후 분석' : mirofishAvailable ? `${selectedSources.length}개 소스 분석` : llmStatus.available ? `${selectedSources.length}개 소스 AI 분석` : `${selectedSources.length}개 소스 기본 분석`}
+            {loading ? '분석 중…' : selectedSources.length === 0 ? '소스 선택 후 분석' : llmStatus.available ? `${selectedSources.length}개 소스 AI 분석` : `${selectedSources.length}개 소스 기본 분석`}
           </button>
-          {!mirofishAvailable && selectedSources.length > 0 && (
+          {selectedSources.length > 0 && (
             <span style={{ marginLeft: '10px', fontSize: '12px', color: '#666' }}>
               {llmStatus.available
-                ? `${providerLabel(llmStatus.provider)}로 AI 분석을 수행합니다`
-                : '로컬 감성 분석을 수행합니다'}
+                ? `${providerLabel(llmStatus.provider)}로 AI 분석`
+                : 'AI 미연결 — 키워드 기반 로컬 분석'}
             </span>
           )}
         </div>
