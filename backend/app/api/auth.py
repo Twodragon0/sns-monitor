@@ -116,13 +116,15 @@ def auth_anthropic_start():
 # ==========================================
 # OpenAI OAuth (PKCE)
 # ==========================================
+# OpenAI OAuth default client (ChatGPT)
+_OPENAI_DEFAULT_CLIENT_ID = "DRivsnm2Mu42T3KOpqdtwB3NYIFdkNIfPA4jL0lK3ng"
+
+
 @auth_bp.route("/api/auth/openai", methods=["GET"])
 @limiter.limit("10 per minute")
 def auth_openai_start():
     """Start OpenAI OAuth with PKCE."""
-    client_id = Config.OPENAI_OAUTH_CLIENT_ID
-    if not client_id:
-        return jsonify({"error": "OpenAI OAuth not configured. Set OPENAI_OAUTH_CLIENT_ID."}), 503
+    client_id = Config.OPENAI_OAUTH_CLIENT_ID or _OPENAI_DEFAULT_CLIENT_ID
 
     code_verifier = secrets.token_urlsafe(64)[:128]
     code_challenge = urlsafe_b64encode(
@@ -244,9 +246,7 @@ def _handle_anthropic_callback(code):
 
 def _handle_openai_callback(code):
     """Exchange OpenAI OAuth code for tokens (PKCE)."""
-    client_id = Config.OPENAI_OAUTH_CLIENT_ID
-    if not client_id:
-        return redirect(_frontend_redirect("/analysis?auth_error=openai_oauth_not_configured"))
+    client_id = Config.OPENAI_OAUTH_CLIENT_ID or _OPENAI_DEFAULT_CLIENT_ID
 
     code_verifier = session.pop("pkce_verifier", None)
     token_url = Config.OAUTH_TOKEN_URL or "https://auth.openai.com/oauth/token"

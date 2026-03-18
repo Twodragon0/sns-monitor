@@ -48,19 +48,17 @@ function AuthPanel({ apiBase, onKeySet, openaiOAuthAvailable }) {
         >
           Claude 로그인
         </button>
-        {openaiOAuthAvailable && (
-          <button
-            type="button"
-            onClick={() => { window.location.href = `${apiBase}/api/auth/openai?return_to=/analysis`; }}
-            style={{
-              padding: '10px 20px', fontSize: '14px', fontWeight: '600',
-              background: '#10a37f', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: '6px',
-            }}
-          >
-            ChatGPT 로그인
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => { window.location.href = `${apiBase}/api/auth/openai?return_to=/analysis`; }}
+          style={{
+            padding: '10px 20px', fontSize: '14px', fontWeight: '600',
+            background: '#10a37f', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: '6px',
+          }}
+        >
+          ChatGPT 로그인
+        </button>
       </div>
 
       <p style={{ margin: '0 0 8px', fontSize: '12px', color: '#64748b' }}>
