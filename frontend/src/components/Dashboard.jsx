@@ -1418,9 +1418,35 @@ function GalleryMonitorPanel() {
   if (loading) return null;
   if (dcSources.length === 0) return null;
 
+  // Detect negative sentiment alerts (neg > 5% of total)
+  const alerts = Object.entries(sentiments)
+    .map(([id, s]) => {
+      if (!s) return null;
+      const total = (s.positive || 0) + (s.neutral || 0) + (s.negative || 0);
+      const negPct = total > 0 ? Math.round((s.negative || 0) / total * 100) : 0;
+      return negPct >= 5 ? { id, name: dcSources.find(d => d.id === id)?.name || id, negPct, negative: s.negative } : null;
+    })
+    .filter(Boolean);
+
   return (
     <div style={{ marginTop: 20 }}>
       <h4 className="dash__section-title" style={{ marginBottom: 12 }}>DCInside 갤러리 모니터링</h4>
+
+      {/* Negative alert banner */}
+      {alerts.length > 0 && (
+        <div style={{
+          padding: '10px 14px', marginBottom: 12,
+          background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8,
+          fontSize: '0.8rem',
+        }}>
+          <strong style={{ color: '#dc2626' }}>부정 감성 경고</strong>
+          {alerts.map(a => (
+            <span key={a.id} style={{ marginLeft: 10, color: '#7f1d1d' }}>
+              {a.name}: <strong>{a.negPct}%</strong> ({a.negative}건)
+            </span>
+          ))}
+        </div>
+      )}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',

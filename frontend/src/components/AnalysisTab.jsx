@@ -4,9 +4,11 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 
 
 import { API_BASE } from '../config';
 
-/** Word Cloud: CSS-based (no extra lib) + Gallery Comparison BarChart */
+/** Word Cloud + Gallery Comparison + Negative Alert */
 function WordCloudAndCompare({ keywords }) {
   const [compareData, setCompareData] = useState([]);
+  const [selectedGallery, setSelectedGallery] = useState(null);
+  const [trendData, setTrendData] = useState([]);
 
   useEffect(() => {
     axios.get(`${API_BASE}/api/analysis/compare`)
@@ -14,60 +16,127 @@ function WordCloudAndCompare({ keywords }) {
       .catch(() => {});
   }, []);
 
+  // Load trend when gallery is clicked
+  useEffect(() => {
+    if (!selectedGallery) { setTrendData([]); return; }
+    axios.get(`${API_BASE}/api/analysis/trend?type=dcinside&id=${selectedGallery}`)
+      .then(({ data }) => setTrendData(data.trend || []))
+      .catch(() => setTrendData([]));
+  }, [selectedGallery]);
+
   const maxCount = keywords.length > 0 ? Math.max(...keywords.map(k => k.count)) : 1;
 
+  // Negative alerts: galleries with neg_pct >= 5%
+  const alerts = compareData.filter(g => g.neg_pct >= 5);
+
   return (
-    <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '20px' }}>
-      {/* Word Cloud */}
-      {keywords.length > 0 && (
+    <>
+      {/* Negative sentiment alert */}
+      {alerts.length > 0 && (
         <div style={{
-          flex: '1 1 340px', backgroundColor: 'white', padding: '16px',
-          borderRadius: '8px', border: '1px solid #dee2e6',
+          padding: '12px 16px', marginBottom: '16px',
+          backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px',
         }}>
-          <h4 style={{ margin: '0 0 12px', fontSize: '14px', color: '#555' }}>키워드 클라우드</h4>
-          <div style={{
-            display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'center',
-            padding: '10px', minHeight: '100px',
-          }}>
-            {keywords.slice(0, 25).map((kw, i) => {
-              const ratio = kw.count / maxCount;
-              const size = Math.max(12, Math.round(ratio * 32 + 10));
-              const colors = ['#1d4ed8', '#7c3aed', '#0891b2', '#059669', '#d97706', '#dc2626', '#6366f1', '#0d9488'];
-              return (
-                <span key={i} style={{
-                  fontSize: `${size}px`,
-                  fontWeight: ratio > 0.5 ? 700 : 400,
-                  color: colors[i % colors.length],
-                  lineHeight: 1.3,
-                  cursor: 'default',
-                }} title={`${kw.word}: ${kw.count}회`}>
-                  {kw.word}
-                </span>
-              );
-            })}
-          </div>
+          <strong style={{ color: '#dc2626', fontSize: '13px' }}>부정 감성 경고</strong>
+          {alerts.map(g => (
+            <p key={g.id} style={{ margin: '4px 0 0', fontSize: '12px', color: '#7f1d1d' }}>
+              <strong>{g.name}</strong>: 부정 {g.neg_pct}% ({g.negative}건)
+              {g.keywords?.length > 0 && <span style={{ color: '#9ca3af' }}> — {g.keywords.slice(0, 3).join(', ')}</span>}
+            </p>
+          ))}
         </div>
       )}
 
-      {/* Gallery Comparison */}
-      {compareData.length > 1 && (
+      <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '20px' }}>
+        {/* Word Cloud */}
+        {keywords.length > 0 && (
+          <div style={{
+            flex: '1 1 340px', backgroundColor: 'white', padding: '16px',
+            borderRadius: '8px', border: '1px solid #dee2e6',
+          }}>
+            <h4 style={{ margin: '0 0 12px', fontSize: '14px', color: '#555' }}>키워드 클라우드</h4>
+            <div style={{
+              display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'center',
+              padding: '10px', minHeight: '100px',
+            }}>
+              {keywords.slice(0, 25).map((kw, i) => {
+                const ratio = kw.count / maxCount;
+                const size = Math.max(12, Math.round(ratio * 32 + 10));
+                const colors = ['#1d4ed8', '#7c3aed', '#0891b2', '#059669', '#d97706', '#dc2626', '#6366f1', '#0d9488'];
+                return (
+                  <span key={i} style={{
+                    fontSize: `${size}px`,
+                    fontWeight: ratio > 0.5 ? 700 : 400,
+                    color: colors[i % colors.length],
+                    lineHeight: 1.3,
+                    cursor: 'default',
+                  }} title={`${kw.word}: ${kw.count}회`}>
+                    {kw.word}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Gallery Comparison (clickable bars) */}
+        {compareData.length > 1 && (
+          <div style={{
+            flex: '1 1 340px', backgroundColor: 'white', padding: '16px',
+            borderRadius: '8px', border: '1px solid #dee2e6',
+          }}>
+            <h4 style={{ margin: '0 0 4px', fontSize: '14px', color: '#555' }}>갤러리간 감성 비교</h4>
+            <p style={{ margin: '0 0 8px', fontSize: '11px', color: '#9ca3af' }}>클릭하면 트렌드를 표시합니다</p>
+            <ResponsiveContainer width="100%" height={compareData.length * 40 + 30}>
+              <BarChart data={compareData} layout="vertical" margin={{ left: 10, right: 10, top: 5, bottom: 5 }}
+                onClick={(e) => { if (e?.activePayload?.[0]?.payload?.id) setSelectedGallery(prev => prev === e.activePayload[0].payload.id ? null : e.activePayload[0].payload.id); }}
+                style={{ cursor: 'pointer' }}
+              >
+                <XAxis type="number" tick={{ fontSize: 11 }} unit="%" />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={100} />
+                <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v, name) => [v + '%', name === 'pos_pct' ? '긍정' : '부정']} />
+                <Bar dataKey="pos_pct" name="긍정" stackId="s" fill="#10b981" />
+                <Bar dataKey="neg_pct" name="부정" stackId="s" fill="#ef4444" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
+
+      {/* Inline trend chart for clicked gallery */}
+      {selectedGallery && trendData.length >= 2 && (
         <div style={{
-          flex: '1 1 340px', backgroundColor: 'white', padding: '16px',
-          borderRadius: '8px', border: '1px solid #dee2e6',
+          backgroundColor: 'white', padding: '16px', borderRadius: '8px',
+          border: '1px solid #c7d2fe', marginBottom: '20px',
         }}>
-          <h4 style={{ margin: '0 0 12px', fontSize: '14px', color: '#555' }}>갤러리간 감성 비교</h4>
-          <ResponsiveContainer width="100%" height={compareData.length * 40 + 30}>
-            <BarChart data={compareData} layout="vertical" margin={{ left: 10, right: 10, top: 5, bottom: 5 }}>
-              <XAxis type="number" tick={{ fontSize: 11 }} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={100} />
-              <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v, name) => [v + '%', name === 'pos_pct' ? '긍정' : '부정']} />
-              <Bar dataKey="pos_pct" name="긍정" stackId="s" fill="#10b981" />
-              <Bar dataKey="neg_pct" name="부정" stackId="s" fill="#ef4444" />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <h4 style={{ margin: 0, fontSize: '14px', color: '#4338ca' }}>
+              {compareData.find(g => g.id === selectedGallery)?.name || selectedGallery} 감성 트렌드
+            </h4>
+            <button type="button" onClick={() => setSelectedGallery(null)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: '12px' }}>닫기</button>
+          </div>
+          <ResponsiveContainer width="100%" height={140}>
+            <BarChart data={trendData.map(t => ({
+              time: t.timestamp?.slice(5, 16).replace('T', ' ') || '',
+              positive: t.positive,
+              negative: t.negative,
+            }))} margin={{ left: -10, right: 10, top: 5, bottom: 5 }}>
+              <XAxis dataKey="time" tick={{ fontSize: 10 }} />
+              <YAxis tick={{ fontSize: 10 }} />
+              <Tooltip contentStyle={{ fontSize: 11 }} />
+              <Bar dataKey="positive" fill="#10b981" name="긍정" />
+              <Bar dataKey="negative" fill="#ef4444" name="부정" />
             </BarChart>
           </ResponsiveContainer>
         </div>
       )}
-    </div>
+      {selectedGallery && trendData.length < 2 && (
+        <p style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '16px' }}>
+          {compareData.find(g => g.id === selectedGallery)?.name}: 트렌드 데이터 부족 (2회 이상 수집 필요)
+        </p>
+      )}
+    </>
   );
 }
 
