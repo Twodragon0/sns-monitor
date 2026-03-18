@@ -433,9 +433,13 @@ def _read_source_items(src_type, src_id):
                     with open(json_file, 'r', encoding='utf-8') as f:
                         data = json.load(f)
                     stats['gallery_name'] = data.get('gallery_name', src_id)
-                    for post in data.get('posts', data.get('data', []))[:20]:
+                    for post in data.get('posts', data.get('data', []))[:200]:
                         p = post.get('post', post)
-                        items.append({'text': p.get('title', '') + ' ' + (post.get('content', p.get('content', ''))[:300]), 'author': p.get('author', '')})
+                        text = p.get('text', '') or p.get('title', '')
+                        content = post.get('content', p.get('content', ''))
+                        full_text = f"{text} {(content or '')[:300]}".strip()
+                        if full_text:
+                            items.append({'text': full_text, 'author': p.get('author', '')})
                         for c in post.get('comments', [])[:10]:
                             items.append({'text': c.get('text', c.get('content', '')), 'author': c.get('author', '')})
                 except Exception:
