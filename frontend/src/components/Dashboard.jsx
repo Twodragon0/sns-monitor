@@ -1317,6 +1317,79 @@ function MiniStat({ icon, value, label }) {
   );
 }
 
+/* --- Gallery Monitor Panel (DCInside 갤러리 모니터링) --- */
+function GalleryMonitorPanel() {
+  const [dcSources, setDcSources] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    axios.get(`${API_BASE}/api/analysis/sources`)
+      .then(({ data }) => {
+        const dc = (data.sources || []).filter(s => s.type === 'dcinside');
+        setDcSources(dc);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  function parseLatestDate(latest) {
+    if (!latest) return '—';
+    // filename format: 2026-03-18-11-40-25.json
+    const m = latest.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return `${m[1]}.${m[2]}.${m[3]}`;
+    return latest.replace('.json', '');
+  }
+
+  function goAnalysis(source) {
+    try {
+      sessionStorage.setItem('analysisPreselect', JSON.stringify([{ type: 'dcinside', id: source.id }]));
+    } catch (_) { /* ignore */ }
+    window.history.pushState({}, '', '/analysis');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  }
+
+  if (loading) return null;
+  if (dcSources.length === 0) return null;
+
+  return (
+    <div style={{ marginTop: 20 }}>
+      <h4 className="dash__section-title" style={{ marginBottom: 12 }}>DCInside 갤러리 모니터링</h4>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+        gap: 12,
+      }}>
+        {dcSources.map(src => (
+          <div key={src.id} className="panel-card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <h5 className="panel-card__title" style={{ margin: 0 }}>{src.name || src.id}</h5>
+            <div className="panel-card__body" style={{ flex: 1 }}>
+              <p style={{ margin: '0 0 2px' }}>파일 <strong>{src.files || 0}</strong>개</p>
+              <p style={{ margin: 0 }}>최신 수집 <strong>{parseLatestDate(src.latest)}</strong></p>
+            </div>
+            <button
+              type="button"
+              onClick={() => goAnalysis(src)}
+              style={{
+                padding: '6px 14px',
+                background: 'var(--c-primary)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 6,
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                alignSelf: 'flex-start',
+              }}
+            >
+              분석
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* --- Overview Panel (stats는 Dashboard에서 계산된 단일 소스 사용) --- */
 function OverviewPanel({ stats, channels }) {
   const goAnalysis = (e) => {
@@ -1375,6 +1448,7 @@ function OverviewPanel({ stats, channels }) {
           </div>
         </div>
       </div>
+      <GalleryMonitorPanel />
     </div>
   );
 }

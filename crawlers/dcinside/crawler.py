@@ -795,14 +795,14 @@ def lambda_handler(event, context):
 
         try:
             # 게시글 수집 (더 많이 가져오기)
-            posts = get_gallery_posts(gallery_id, max_posts=50)
+            posts = get_gallery_posts(gallery_id, max_posts=200)
 
             # 키워드로 필터링
             keywords = GALLERIES[gallery_id]['keywords']
             filtered_posts = filter_posts_by_keywords(posts, keywords)
 
-            # 최소 10개 게시글 보장
-            min_posts = 10
+            # 최소 30개 게시글 보장
+            min_posts = 30
             if len(filtered_posts) < min_posts and len(posts) >= min_posts:
                 logger.info("Filtered posts (%d) < minimum (%d), adding more posts", len(filtered_posts), min_posts)
                 # 필터링된 게시글이 부족하면 필터링되지 않은 게시글도 추가
@@ -832,7 +832,7 @@ def lambda_handler(event, context):
             # 갤러리 타입 가져오기
             gallery_type = GALLERIES[gallery_id].get('type', 'mini')
 
-            for post in filtered_posts[:30]:  # 최대 30개 게시글
+            for post in filtered_posts[:100]:  # 최대 100개 게시글
                 logger.info("Processing post: %s - %s", post['post_id'], post.get('title', '')[:30])
 
                 # 게시글 목록에서 이미 가져온 댓글 수
