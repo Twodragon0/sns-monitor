@@ -61,6 +61,44 @@ COMMON_KEYWORDS = [
 ]
 
 GALLERIES = {
+    # === Active galleries ===
+    'ivnit': {
+        'url': 'https://gall.dcinside.com/mini/board/lists/?id=ivnit',
+        'name': '이브닛 갤러리',
+        'type': 'mini',
+        'keywords': COMMON_KEYWORDS + ['이브닛', '쿠우', '사미', '퍼지데이', 'ivnit']
+    },
+    'akaiv': {
+        'url': 'https://gall.dcinside.com/mini/board/lists/?id=akaiv',
+        'name': '아카이브 갤러리',
+        'type': 'mini',
+        'keywords': COMMON_KEYWORDS + ['아카이브', '여르미', '결이', '몽이', 'akaiv']
+    },
+    'soopvirtualstreamer': {
+        'url': 'https://gall.dcinside.com/mini/board/lists/?id=soopvirtualstreamer',
+        'name': 'SOOP 버추얼 스트리머 갤러리',
+        'type': 'mini',
+        'keywords': COMMON_KEYWORDS + ['버추얼', '챠니', '챱츄', '기원', 'vtuber', 'soop']
+    },
+    'spv': {
+        'url': 'https://gall.dcinside.com/mini/board/lists/?id=spv',
+        'name': 'SPV 갤러리',
+        'type': 'mini',
+        'keywords': COMMON_KEYWORDS + ['버시', '버추얼', 'spv', 'soop']
+    },
+    'soopstreaming': {
+        'url': 'https://gall.dcinside.com/mini/board/lists/?id=soopstreaming',
+        'name': 'SOOP 스트리밍 갤러리',
+        'type': 'mini',
+        'keywords': COMMON_KEYWORDS + ['세구', '와우', '제우스', 'soop', '스트리밍']
+    },
+    'skoshism': {
+        'url': 'https://gall.dcinside.com/mgallery/board/lists/?id=skoshism',
+        'name': '스코시즘 갤러리',
+        'type': 'mgallery',
+        'keywords': COMMON_KEYWORDS + ['스코시즘', '방송', 'skoshism']
+    },
+    # === Example galleries (kept for testing) ===
     'example-gallery-1': {
         'url': 'https://gall.dcinside.com/mini/board/lists/?id=example-gallery-1',
         'name': 'Example Gallery 1',
@@ -73,28 +111,6 @@ GALLERIES = {
         'type': 'mini',
         'keywords': COMMON_KEYWORDS + ['examplegallery2', 'gallery2']
     },
-    'example-gallery-3': {
-        'url': 'https://gall.dcinside.com/mini/board/lists?id=example-gallery-3',
-        'name': 'Example Gallery 3',
-        'type': 'mini',
-        'keywords': COMMON_KEYWORDS + ['examplegallery3', 'gallery3', 'vtuber', 'virtual']
-    },
-    'example-gallery-4': {
-        'url': 'https://gall.dcinside.com/mini/board/lists/?id=example-gallery-4',
-        'name': 'Example Gallery 4',
-        'type': 'mini',
-        'keywords': COMMON_KEYWORDS + ['examplegallery4', 'gallery4', 'streaming']
-    },
-    'example-gallery-5': {
-        'url': 'https://gall.dcinside.com/mgallery/board/lists/?id=example-gallery-5',
-        'name': 'Example Gallery 5',
-        'type': 'mgallery',
-        'keywords': COMMON_KEYWORDS + [
-            'examplegallery5', 'gallery5',
-            'creatorbrandshop', 'creatorbrand shop', 'creatorbrand.io',
-            'creatorbrand popup'
-        ]
-    }
 }
 
 def get_gallery_posts(gallery_id, max_posts=20):
