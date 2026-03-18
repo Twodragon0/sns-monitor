@@ -501,6 +501,72 @@ def local_summary():
     })
 
 
+@analysis_bp.route('/api/analysis/trend', methods=['GET'])
+def sentiment_trend():
+    """Return sentiment over time for a gallery (one data point per crawl file).
+
+    Query params: type=dcinside&id=skoshism
+    """
+    from ..services.platform_analyzer import PlatformAnalyzer
+
+    src_type = request.args.get('type', 'dcinside')
+    src_id = request.args.get('id', '')
+    if not src_id or not _SAFE_ID_RE.match(src_id):
+        return jsonify({'error': 'Invalid source id'}), 400
+
+    data_dir = _get_local_data_dir()
+    analyzer = PlatformAnalyzer(data_dir=str(data_dir))
+    trend = []
+
+    if src_type == 'dcinside':
+        dc_dir = data_dir / 'dcinside' / src_id
+        if not dc_dir.exists():
+            return jsonify({'error': 'Source not found'}), 404
+
+        for json_file in sorted(dc_dir.glob('*.json'))[-20:]:  # last 20 files
+            try:
+                with open(json_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+
+                # Parse timestamp from filename (2026-03-18-12-30-05.json)
+                fname = json_file.stem
+                parts = fname.split('-')
+                if len(parts) >= 5:
+                    ts = f"{parts[0]}-{parts[1]}-{parts[2]}T{parts[3]}:{parts[4]}:00"
+                else:
+                    ts = data.get('collected_at', fname)
+
+                # Quick sentiment on posts
+                items = []
+                for post in data.get('posts', [])[:200]:
+                    p = post.get('post', post)
+                    text = p.get('text', '') or p.get('title', '')
+                    if text:
+                        items.append({'text': text})
+                    for c in post.get('comments', [])[:5]:
+                        if c.get('text'):
+                            items.append(c)
+
+                if items:
+                    sentiment = analyzer._analyze_sentiment(items)
+                    trend.append({
+                        'timestamp': ts,
+                        'total': sentiment['total'],
+                        'positive': sentiment['sentiment']['positive'],
+                        'neutral': sentiment['sentiment']['neutral'],
+                        'negative': sentiment['sentiment']['negative'],
+                        'keywords': [k['word'] for k in sentiment.get('top_keywords', [])[:5]],
+                    })
+            except Exception as e:
+                logger.warning("Failed to process trend file %s: %s", json_file, e)
+
+    return jsonify({
+        'source_id': src_id,
+        'source_type': src_type,
+        'trend': trend,
+    })
+
+
 def _session_llm_kwargs():
     """Extract LLM credentials from Flask session."""
     return {

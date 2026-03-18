@@ -4305,6 +4305,35 @@ class PlatformAnalyzer:
             return result.get("replies", [])
         return []
 
+    # Kiwi morphological analyzer (lazy-loaded singleton)
+    _kiwi = None
+    # POS tags to extract as keywords (nouns, verbs, adjectives)
+    _KEYWORD_POS = frozenset({"NNG", "NNP", "VV", "VA", "SL"})  # 일반명사, 고유명사, 동사, 형용사, 외국어
+
+    @classmethod
+    def _get_kiwi(cls):
+        if cls._kiwi is None:
+            try:
+                from kiwipiepy import Kiwi
+                cls._kiwi = Kiwi()
+                logger.info("Kiwi morphological analyzer loaded")
+            except ImportError:
+                logger.info("kiwipiepy not available, using regex keyword extraction")
+                cls._kiwi = False  # Mark as unavailable
+        return cls._kiwi if cls._kiwi is not False else None
+
+    def _extract_keywords(self, text):
+        """Extract meaningful keywords using Kiwi morphological analyzer (or regex fallback)."""
+        kiwi = self._get_kiwi()
+        if kiwi:
+            try:
+                tokens = kiwi.tokenize(text)
+                return [t.form for t in tokens if t.tag in self._KEYWORD_POS and len(t.form) >= 2]
+            except Exception:
+                pass
+        # Regex fallback
+        return re.findall(r"[가-힣]{2,}|[a-zA-Z]{3,}", text)
+
     # Stopwords: UI noise, DCInside markup, common particles
     _STOPWORDS = frozenset({
         # DCInside UI / markup noise
@@ -4394,8 +4423,8 @@ class PlatformAnalyzer:
             else:
                 sentiment_counts["neutral"] += 1
 
-            # Extract keywords with stopword filtering
-            words = re.findall(r"[가-힣]{2,}|[a-zA-Z]{3,}", text)
+            # Extract keywords via morphological analysis (Kiwi) or regex fallback
+            words = self._extract_keywords(text)
             for w in words:
                 if w not in self._STOPWORDS and len(w) >= 2:
                     keywords[w] += 1

@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis,
   Tooltip, ResponsiveContainer, Legend,
+  LineChart, Line,
 } from 'recharts';
 import './Dashboard.css';
 import { API_BASE } from '../config';
@@ -1341,17 +1342,50 @@ function SentimentMiniBar({ sentiment }) {
   );
 }
 
+/** Trend mini chart for a single gallery */
+function GalleryTrendChart({ galleryId }) {
+  const [trend, setTrend] = useState(null);
+  useEffect(() => {
+    axios.get(`${API_BASE}/api/analysis/trend?type=dcinside&id=${galleryId}`)
+      .then(({ data }) => setTrend(data.trend || []))
+      .catch(() => setTrend([]));
+  }, [galleryId]);
+
+  if (!trend || trend.length < 2) return <p style={{ fontSize: '0.7rem', color: '#9ca3af', margin: '4px 0' }}>트렌드 데이터 부족 (2회 이상 수집 필요)</p>;
+
+  const chartData = trend.map(t => ({
+    time: t.timestamp?.slice(5, 16).replace('T', ' ') || '',
+    pos: t.positive,
+    neg: t.negative,
+    total: t.total,
+  }));
+
+  return (
+    <div style={{ marginTop: 6 }}>
+      <ResponsiveContainer width="100%" height={80}>
+        <LineChart data={chartData} margin={{ top: 2, right: 4, bottom: 0, left: -20 }}>
+          <XAxis dataKey="time" tick={{ fontSize: 9 }} interval="preserveStartEnd" />
+          <YAxis tick={{ fontSize: 9 }} />
+          <Tooltip contentStyle={{ fontSize: 11 }} />
+          <Line type="monotone" dataKey="pos" stroke="#10b981" strokeWidth={2} dot={false} name="긍정" />
+          <Line type="monotone" dataKey="neg" stroke="#ef4444" strokeWidth={2} dot={false} name="부정" />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 function GalleryMonitorPanel() {
   const [dcSources, setDcSources] = useState([]);
   const [sentiments, setSentiments] = useState({});
   const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState(null); // gallery ID for trend chart
 
   useEffect(() => {
     axios.get(`${API_BASE}/api/analysis/sources`)
       .then(({ data }) => {
         const dc = (data.sources || []).filter(s => s.type === 'dcinside' && !s.id.startsWith('example'));
         setDcSources(dc);
-        // Fetch sentiment for each gallery
         if (dc.length > 0) {
           axios.post(`${API_BASE}/api/analysis/local-summary`, {
             sources: dc.map(s => ({ type: 'dcinside', id: s.id })),
@@ -1389,17 +1423,27 @@ function GalleryMonitorPanel() {
       <h4 className="dash__section-title" style={{ marginBottom: 12 }}>DCInside 갤러리 모니터링</h4>
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
         gap: 12,
       }}>
         {dcSources.map(src => (
           <div key={src.id} className="panel-card" style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 14 }}>
-            <h5 className="panel-card__title" style={{ margin: 0, fontSize: '0.85rem' }}>{src.name || src.id}</h5>
-            <div className="panel-card__body" style={{ flex: 1, fontSize: '0.75rem', color: '#6b7280' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h5 className="panel-card__title" style={{ margin: 0, fontSize: '0.85rem' }}>{src.name || src.id}</h5>
+              <button
+                type="button"
+                onClick={() => setExpanded(expanded === src.id ? null : src.id)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.7rem', color: '#6366f1' }}
+              >
+                {expanded === src.id ? '닫기' : '트렌드'}
+              </button>
+            </div>
+            <div className="panel-card__body" style={{ fontSize: '0.75rem', color: '#6b7280' }}>
               <span>수집 {src.files || 0}회</span>
               <span style={{ marginLeft: 8 }}>{parseLatestDate(src.latest)}</span>
             </div>
             <SentimentMiniBar sentiment={sentiments[src.id]} />
+            {expanded === src.id && <GalleryTrendChart galleryId={src.id} />}
             <button
               type="button"
               onClick={() => goAnalysis(src)}
