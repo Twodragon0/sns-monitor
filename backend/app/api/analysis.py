@@ -497,12 +497,21 @@ def local_summary():
     })
 
 
+def _session_llm_kwargs():
+    """Extract LLM credentials from Flask session."""
+    return {
+        'oauth_token': session.get('access_token'),
+        'token_provider': session.get('token_provider'),
+        'session_api_key': session.get('session_api_key'),
+        'session_api_provider': session.get('session_api_provider'),
+    }
+
+
 @analysis_bp.route('/api/analysis/llm/status', methods=['GET'])
 def llm_status():
     """Check local LLM availability (Claude / OpenAI / OAuth)."""
     from ..services.llm_analyzer import get_llm_status
-    oauth_token = session.get('access_token')
-    status = get_llm_status(oauth_token=oauth_token)
+    status = get_llm_status(**_session_llm_kwargs())
     return jsonify(status)
 
 
@@ -521,11 +530,10 @@ def ai_summary():
     """
     from ..services.llm_analyzer import analyze_with_llm, get_available_provider
 
-    oauth_token = session.get('access_token')
-    provider = get_available_provider(oauth_token=oauth_token)
+    provider = get_available_provider(**_session_llm_kwargs())
     if not provider:
         return jsonify({
-            'error': 'No LLM API key configured. Set OPENAI_API_KEY or ANTHROPIC_API_KEY in .env, or login with OAuth.'
+            'error': 'LLM 인증이 필요합니다. Anthropic OAuth 로그인 또는 API Key를 입력하세요.'
         }), 503
 
     data = request.get_json() or {}
@@ -557,7 +565,7 @@ def ai_summary():
         return jsonify({'error': 'No data found for specified sources'}), 404
 
     full_document = '\n\n---\n\n'.join(documents)
-    result = analyze_with_llm(full_document, question if question else None, oauth_token=oauth_token)
+    result = analyze_with_llm(full_document, question if question else None, **_session_llm_kwargs())
 
     if 'error' in result and not result.get('success'):
         return jsonify(result), 500
@@ -580,10 +588,9 @@ def ai_chat():
     """
     from ..services.llm_analyzer import chat_with_llm, get_available_provider
 
-    oauth_token = session.get('access_token')
-    provider = get_available_provider(oauth_token=oauth_token)
+    provider = get_available_provider(**_session_llm_kwargs())
     if not provider:
-        return jsonify({'error': 'No LLM API key configured. Login with OAuth or set API key.'}), 503
+        return jsonify({'error': 'LLM 인증이 필요합니다. OAuth 로그인 또는 API Key를 입력하세요.'}), 503
 
     data = request.get_json() or {}
     sources_list = data.get('sources', [])
@@ -617,7 +624,7 @@ def ai_chat():
         return jsonify({'error': 'No data found for specified sources'}), 404
 
     full_document = '\n\n---\n\n'.join(documents)
-    result = chat_with_llm(full_document, message, chat_history, oauth_token=oauth_token)
+    result = chat_with_llm(full_document, message, chat_history, **_session_llm_kwargs())
 
     if 'error' in result and not result.get('success'):
         return jsonify(result), 500
@@ -694,7 +701,7 @@ def ai_url_analyze():
         lines.append(f"- Positive: {s.get('positive', 0)}, Neutral: {s.get('neutral', 0)}, Negative: {s.get('negative', 0)}")
 
     document = '\n'.join(lines)
-    result = analyze_with_llm(document, question if question else None, oauth_token=oauth_token)
+    result = analyze_with_llm(document, question if question else None, **_session_llm_kwargs())
 
     if 'error' in result and not result.get('success'):
         return jsonify(result), 500
@@ -746,7 +753,7 @@ def ai_url_chat():
                 lines.append(f"- {str(text)[:150]}")
 
     document = '\n'.join(lines)
-    result = chat_with_llm(document, message, chat_history, oauth_token=oauth_token)
+    result = chat_with_llm(document, message, chat_history, **_session_llm_kwargs())
 
     if 'error' in result and not result.get('success'):
         return jsonify(result), 500

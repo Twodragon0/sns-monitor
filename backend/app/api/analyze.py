@@ -187,8 +187,13 @@ def summarize_analysis():
     # 2) Local LLM (Claude / ChatGPT via API key or OAuth token)
     try:
         from ..services.llm_analyzer import summarize_with_llm
-        oauth_token = session.get("access_token")
-        llm_result = summarize_with_llm(document, oauth_token=oauth_token)
+        llm_kwargs = {
+            'oauth_token': session.get('access_token'),
+            'token_provider': session.get('token_provider'),
+            'session_api_key': session.get('session_api_key'),
+            'session_api_provider': session.get('session_api_provider'),
+        }
+        llm_result = summarize_with_llm(document, **llm_kwargs)
         if llm_result and llm_result.get("summary"):
             return jsonify(llm_result)
     except Exception as e:

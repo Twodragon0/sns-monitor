@@ -3,6 +3,103 @@ import axios from 'axios';
 
 import { API_BASE } from '../config';
 
+/** Inline auth panel: OAuth login + API key input */
+function AuthPanel({ apiBase, onKeySet }) {
+  const [showKeyInput, setShowKeyInput] = useState(false);
+  const [keyProvider, setKeyProvider] = useState('anthropic');
+  const [apiKey, setApiKey] = useState('');
+  const [keyError, setKeyError] = useState('');
+  const [keySaving, setKeySaving] = useState(false);
+
+  const submitKey = async () => {
+    if (!apiKey.trim()) return;
+    setKeySaving(true);
+    setKeyError('');
+    try {
+      const resp = await axios.post(`${apiBase}/api/auth/apikey`, {
+        provider: keyProvider,
+        api_key: apiKey.trim(),
+      }, { withCredentials: true });
+      if (resp.data.ok) {
+        setApiKey('');
+        onKeySet();
+      }
+    } catch (err) {
+      setKeyError(err.response?.data?.error || err.message);
+    } finally {
+      setKeySaving(false);
+    }
+  };
+
+  return (
+    <>
+      <strong style={{ display: 'block', marginBottom: '8px' }}>AI 분석을 사용하려면 인증이 필요합니다</strong>
+
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' }}>
+        <button
+          type="button"
+          onClick={() => { window.location.href = `${apiBase}/api/auth/anthropic?return_to=/analysis`; }}
+          style={{
+            padding: '8px 16px', fontSize: '13px', fontWeight: '600',
+            background: '#d97706', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer',
+          }}
+        >
+          Anthropic 로그인 (Claude)
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowKeyInput(!showKeyInput)}
+          style={{
+            padding: '8px 16px', fontSize: '13px', fontWeight: '500',
+            background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1', borderRadius: '6px', cursor: 'pointer',
+          }}
+        >
+          API Key 직접 입력
+        </button>
+      </div>
+
+      {showKeyInput && (
+        <div style={{ padding: '12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+            <select
+              value={keyProvider}
+              onChange={e => setKeyProvider(e.target.value)}
+              style={{ padding: '6px 10px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+            >
+              <option value="anthropic">Anthropic (Claude)</option>
+              <option value="openai">OpenAI (ChatGPT)</option>
+            </select>
+            <input
+              type="password"
+              value={apiKey}
+              onChange={e => setApiKey(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && submitKey()}
+              placeholder={keyProvider === 'anthropic' ? 'sk-ant-...' : 'sk-...'}
+              style={{ flex: 1, padding: '6px 10px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+            />
+            <button
+              type="button"
+              onClick={submitKey}
+              disabled={keySaving || !apiKey.trim()}
+              style={{
+                padding: '6px 14px', fontSize: '13px', fontWeight: '600',
+                background: keySaving ? '#94a3b8' : '#3b82f6', color: 'white',
+                border: 'none', borderRadius: '4px', cursor: keySaving ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {keySaving ? '...' : '설정'}
+            </button>
+          </div>
+          {keyError && <div style={{ color: '#dc2626', fontSize: '12px' }}>{keyError}</div>}
+          <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#94a3b8' }}>
+            API Key는 서버 세션에만 저장되며, 브라우저 종료 시 삭제됩니다.
+          </p>
+        </div>
+      )}
+    </>
+  );
+}
+
 function AnalysisTab() {
   const [mirofishAvailable, setMirofishAvailable] = useState(false);
   const [llmStatus, setLlmStatus] = useState({ available: false, provider: null, model: null });
@@ -494,29 +591,7 @@ function AnalysisTab() {
               </p>
             </>
           ) : (
-            <>
-              <strong style={{ display: 'block', marginBottom: '6px' }}>MiroFish가 실행 중이 아닙니다.</strong>
-              <p style={{ margin: '0 0 6px', color: '#5a5a5a' }}>
-                AI 분석을 사용하려면:
-              </p>
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
-                <button
-                  type="button"
-                  onClick={() => { window.location.href = `${API_BASE}/api/auth/openai?return_to=/analysis`; }}
-                  style={{
-                    padding: '6px 14px', fontSize: '13px', fontWeight: '600',
-                    background: '#10a37f', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer',
-                  }}
-                >
-                  OpenAI 로그인 (OAuth)
-                </button>
-                <span style={{ color: '#999', fontSize: '13px', alignSelf: 'center' }}>또는</span>
-                <span style={{ fontSize: '13px', color: '#5a5a5a' }}>
-                  <code style={{ background: '#eee', padding: '2px 6px', borderRadius: '4px' }}>OPENAI_API_KEY</code> /
-                  <code style={{ background: '#eee', padding: '2px 6px', borderRadius: '4px', marginLeft: '4px' }}>ANTHROPIC_API_KEY</code>를 .env에 설정
-                </span>
-              </div>
-            </>
+            <AuthPanel apiBase={API_BASE} onKeySet={() => window.location.reload()} />
           )}
         </div>
       )}

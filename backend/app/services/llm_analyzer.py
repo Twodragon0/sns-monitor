@@ -61,10 +61,18 @@ _SUMMARIZE_PROMPT = """당신은 SNS 데이터 분석 전문가입니다.
 마크다운 형식으로 작성하세요."""
 
 
-def get_available_provider(oauth_token: Optional[str] = None) -> Optional[str]:
+def get_available_provider(oauth_token: Optional[str] = None,
+                           token_provider: Optional[str] = None,
+                           session_api_key: Optional[str] = None,
+                           session_api_provider: Optional[str] = None) -> Optional[str]:
     """Detect which LLM provider is available.
 
-    Priority: explicit LLM_PROVIDER > Anthropic API key > OpenAI API key > OAuth token.
+    Priority:
+    1. explicit LLM_PROVIDER env
+    2. .env ANTHROPIC_API_KEY
+    3. .env OPENAI_API_KEY
+    4. Session API key (browser input)
+    5. OAuth token (Anthropic or OpenAI)
     """
     if Config.LLM_PROVIDER:
         return Config.LLM_PROVIDER
@@ -73,19 +81,34 @@ def get_available_provider(oauth_token: Optional[str] = None) -> Optional[str]:
         return "anthropic"
     if Config.OPENAI_API_KEY:
         return "openai"
+    if session_api_key and session_api_provider:
+        return f"{session_api_provider}_session"
+    if oauth_token and token_provider == "anthropic":
+        return "anthropic_oauth"
     if oauth_token:
         return "openai_oauth"
     return None
 
 
-def get_llm_status(oauth_token: Optional[str] = None) -> dict:
+def get_llm_status(oauth_token: Optional[str] = None,
+                   token_provider: Optional[str] = None,
+                   session_api_key: Optional[str] = None,
+                   session_api_provider: Optional[str] = None) -> dict:
     """Return LLM availability status."""
-    provider = get_available_provider(oauth_token)
+    provider = get_available_provider(oauth_token, token_provider, session_api_key, session_api_provider)
+    auth_mode = None
+    if provider and provider.endswith("_session"):
+        auth_mode = "api_key_session"
+    elif provider and provider.endswith("_oauth"):
+        auth_mode = "oauth"
+    elif provider:
+        auth_mode = "api_key_env"
+
     return {
         "available": provider is not None,
         "provider": provider,
         "model": _get_model_name(provider) if provider else None,
-        "auth_mode": "oauth" if provider == "openai_oauth" else ("api_key" if provider else None),
+        "auth_mode": auth_mode,
     }
 
 
@@ -93,35 +116,55 @@ def _get_model_name(provider: Optional[str]) -> str:
     """Get model name for the provider."""
     if Config.LLM_MODEL:
         return Config.LLM_MODEL
-    if provider == "anthropic":
+    if provider in ("anthropic", "anthropic_oauth", "anthropic_session"):
         return "claude-sonnet-4-20250514"
-    if provider in ("openai", "openai_oauth"):
+    if provider in ("openai", "openai_oauth", "openai_session"):
         return "gpt-4o-mini"
     return ""
 
 
+def _resolve_credentials(provider: Optional[str], oauth_token: Optional[str] = None,
+                         session_api_key: Optional[str] = None) -> tuple:
+    """Resolve API key and provider base type from provider string."""
+    if provider in ("anthropic",):
+        return Config.ANTHROPIC_API_KEY, "anthropic"
+    if provider in ("openai",):
+        return Config.OPENAI_API_KEY, "openai"
+    if provider == "anthropic_session":
+        return session_api_key, "anthropic"
+    if provider == "openai_session":
+        return session_api_key, "openai"
+    if provider == "anthropic_oauth":
+        return oauth_token, "anthropic"
+    if provider == "openai_oauth":
+        return oauth_token, "openai"
+    return None, None
+
+
 def analyze_with_llm(document: str, question: Optional[str] = None,
-                     oauth_token: Optional[str] = None) -> dict:
+                     oauth_token: Optional[str] = None,
+                     token_provider: Optional[str] = None,
+                     session_api_key: Optional[str] = None,
+                     session_api_provider: Optional[str] = None) -> dict:
     """
-    Analyze SNS data using local LLM (Claude or ChatGPT).
+    Analyze SNS data using LLM (Claude or ChatGPT).
     Returns structured analysis result.
     """
-    provider = get_available_provider(oauth_token)
+    provider = get_available_provider(oauth_token, token_provider, session_api_key, session_api_provider)
     if not provider:
-        return {"error": "No LLM API key configured. Set OPENAI_API_KEY or ANTHROPIC_API_KEY, or login with OAuth."}
+        return {"error": "LLM 인증이 필요합니다. Anthropic OAuth 로그인 또는 API Key를 입력하세요."}
 
+    api_key, base_provider = _resolve_credentials(provider, oauth_token, session_api_key)
     model = _get_model_name(provider)
     user_prompt = f"다음 SNS 수집 데이터를 분석해 주세요:\n\n{document[:15000]}\n\n{_RESPONSE_FORMAT_HINT}"
     if question:
         user_prompt = f"다음 SNS 수집 데이터에 대해 질문에 답해주세요.\n\n질문: {question}\n\n데이터:\n{document[:15000]}"
 
     try:
-        if provider == "anthropic":
-            return _call_anthropic(model, user_prompt, bool(question))
-        elif provider == "openai":
-            return _call_openai(model, user_prompt, bool(question))
-        elif provider == "openai_oauth":
-            return _call_openai(model, user_prompt, bool(question), oauth_token=oauth_token)
+        if base_provider == "anthropic":
+            return _call_anthropic(model, user_prompt, bool(question), api_key=api_key)
+        elif base_provider == "openai":
+            return _call_openai(model, user_prompt, bool(question), api_key=api_key)
         else:
             return {"error": f"Unknown LLM provider: {provider}"}
     except Exception as e:
@@ -129,24 +172,27 @@ def analyze_with_llm(document: str, question: Optional[str] = None,
         return {"error": f"LLM analysis failed: {str(e)}"}
 
 
-def summarize_with_llm(document: str, oauth_token: Optional[str] = None) -> dict:
+def summarize_with_llm(document: str, oauth_token: Optional[str] = None,
+                       token_provider: Optional[str] = None,
+                       session_api_key: Optional[str] = None,
+                       session_api_provider: Optional[str] = None) -> dict:
     """
     Summarize SNS data using LLM. Returns markdown summary (for URL analyzer).
     Falls back gracefully if no LLM is available.
     """
-    provider = get_available_provider(oauth_token)
+    provider = get_available_provider(oauth_token, token_provider, session_api_key, session_api_provider)
     if not provider:
-        return None  # Caller should use local fallback
+        return None
 
+    api_key, base_provider = _resolve_credentials(provider, oauth_token, session_api_key)
     model = _get_model_name(provider)
     user_prompt = f"다음 SNS 수집 데이터를 분석·요약해 주세요:\n\n{document[:15000]}"
 
     try:
-        if provider == "anthropic":
-            return _call_summarize_anthropic(model, user_prompt)
-        elif provider in ("openai", "openai_oauth"):
-            token = oauth_token if provider == "openai_oauth" else None
-            return _call_summarize_openai(model, user_prompt, oauth_token=token)
+        if base_provider == "anthropic":
+            return _call_summarize_anthropic(model, user_prompt, api_key=api_key)
+        elif base_provider == "openai":
+            return _call_summarize_openai(model, user_prompt, api_key=api_key)
         return None
     except Exception as e:
         logger.warning("LLM summarize failed (%s): %s", provider, e)
@@ -154,21 +200,24 @@ def summarize_with_llm(document: str, oauth_token: Optional[str] = None) -> dict
 
 
 def chat_with_llm(document: str, message: str, chat_history: list,
-                  oauth_token: Optional[str] = None) -> dict:
-    """Chat about SNS data using local LLM."""
-    provider = get_available_provider(oauth_token)
+                  oauth_token: Optional[str] = None,
+                  token_provider: Optional[str] = None,
+                  session_api_key: Optional[str] = None,
+                  session_api_provider: Optional[str] = None) -> dict:
+    """Chat about SNS data using LLM."""
+    provider = get_available_provider(oauth_token, token_provider, session_api_key, session_api_provider)
     if not provider:
-        return {"error": "No LLM API key configured. Set OPENAI_API_KEY or ANTHROPIC_API_KEY, or login with OAuth."}
+        return {"error": "LLM 인증이 필요합니다. OAuth 로그인 또는 API Key를 입력하세요."}
 
+    api_key, base_provider = _resolve_credentials(provider, oauth_token, session_api_key)
     model = _get_model_name(provider)
     context = f"분석 대상 SNS 데이터:\n\n{document[:12000]}"
 
     try:
-        if provider == "anthropic":
-            return _chat_anthropic(model, context, message, chat_history)
-        elif provider in ("openai", "openai_oauth"):
-            token = oauth_token if provider == "openai_oauth" else None
-            return _chat_openai(model, context, message, chat_history, oauth_token=token)
+        if base_provider == "anthropic":
+            return _chat_anthropic(model, context, message, chat_history, api_key=api_key)
+        elif base_provider == "openai":
+            return _chat_openai(model, context, message, chat_history, api_key=api_key)
         else:
             return {"error": f"Unknown provider: {provider}"}
     except Exception as e:
@@ -176,11 +225,12 @@ def chat_with_llm(document: str, message: str, chat_history: list,
         return {"error": f"LLM chat failed: {str(e)}"}
 
 
-def _call_anthropic(model: str, user_prompt: str, is_question: bool) -> dict:
+def _call_anthropic(model: str, user_prompt: str, is_question: bool,
+                    api_key: Optional[str] = None) -> dict:
     """Call Anthropic Claude API."""
     import anthropic
 
-    client = anthropic.Anthropic(api_key=Config.ANTHROPIC_API_KEY)
+    client = anthropic.Anthropic(api_key=api_key or Config.ANTHROPIC_API_KEY)
     response = client.messages.create(
         model=model,
         max_tokens=4096,
@@ -196,12 +246,11 @@ def _call_anthropic(model: str, user_prompt: str, is_question: bool) -> dict:
 
 
 def _call_openai(model: str, user_prompt: str, is_question: bool,
-                 oauth_token: Optional[str] = None) -> dict:
-    """Call OpenAI ChatGPT API (API key or OAuth token)."""
+                 api_key: Optional[str] = None) -> dict:
+    """Call OpenAI ChatGPT API."""
     from openai import OpenAI
 
-    api_key = oauth_token or Config.OPENAI_API_KEY
-    client = OpenAI(api_key=api_key)
+    client = OpenAI(api_key=api_key or Config.OPENAI_API_KEY)
     response = client.chat.completions.create(
         model=model,
         messages=[
@@ -213,18 +262,18 @@ def _call_openai(model: str, user_prompt: str, is_question: bool,
     )
 
     text = response.choices[0].message.content
-    source = "openai_oauth" if oauth_token else "openai"
     if is_question:
-        return {"success": True, "response": text, "provider": source, "model": model}
+        return {"success": True, "response": text, "provider": "openai", "model": model}
 
-    return _parse_analysis_response(text, source, model)
+    return _parse_analysis_response(text, "openai", model)
 
 
-def _call_summarize_anthropic(model: str, user_prompt: str) -> dict:
-    """Summarize with Anthropic (returns markdown)."""
+def _call_summarize_anthropic(model: str, user_prompt: str,
+                              api_key: Optional[str] = None) -> dict:
+    """Summarize with Anthropic."""
     import anthropic
 
-    client = anthropic.Anthropic(api_key=Config.ANTHROPIC_API_KEY)
+    client = anthropic.Anthropic(api_key=api_key or Config.ANTHROPIC_API_KEY)
     response = client.messages.create(
         model=model,
         max_tokens=2048,
@@ -232,20 +281,15 @@ def _call_summarize_anthropic(model: str, user_prompt: str) -> dict:
         messages=[{"role": "user", "content": user_prompt}],
     )
 
-    return {
-        "summary": response.content[0].text,
-        "source": "anthropic",
-        "model": model,
-    }
+    return {"summary": response.content[0].text, "source": "anthropic", "model": model}
 
 
 def _call_summarize_openai(model: str, user_prompt: str,
-                           oauth_token: Optional[str] = None) -> dict:
-    """Summarize with OpenAI (returns markdown)."""
+                           api_key: Optional[str] = None) -> dict:
+    """Summarize with OpenAI."""
     from openai import OpenAI
 
-    api_key = oauth_token or Config.OPENAI_API_KEY
-    client = OpenAI(api_key=api_key)
+    client = OpenAI(api_key=api_key or Config.OPENAI_API_KEY)
     response = client.chat.completions.create(
         model=model,
         messages=[
@@ -256,19 +300,15 @@ def _call_summarize_openai(model: str, user_prompt: str,
         temperature=0.3,
     )
 
-    source = "openai_oauth" if oauth_token else "openai"
-    return {
-        "summary": response.choices[0].message.content,
-        "source": source,
-        "model": model,
-    }
+    return {"summary": response.choices[0].message.content, "source": "openai", "model": model}
 
 
-def _chat_anthropic(model: str, context: str, message: str, chat_history: list) -> dict:
+def _chat_anthropic(model: str, context: str, message: str, chat_history: list,
+                    api_key: Optional[str] = None) -> dict:
     """Chat with Anthropic Claude."""
     import anthropic
 
-    client = anthropic.Anthropic(api_key=Config.ANTHROPIC_API_KEY)
+    client = anthropic.Anthropic(api_key=api_key or Config.ANTHROPIC_API_KEY)
 
     messages = []
     for msg in chat_history[-10:]:
@@ -283,21 +323,15 @@ def _chat_anthropic(model: str, context: str, message: str, chat_history: list) 
         messages=messages,
     )
 
-    return {
-        "success": True,
-        "response": response.content[0].text,
-        "provider": "anthropic",
-        "model": model,
-    }
+    return {"success": True, "response": response.content[0].text, "provider": "anthropic", "model": model}
 
 
 def _chat_openai(model: str, context: str, message: str, chat_history: list,
-                 oauth_token: Optional[str] = None) -> dict:
-    """Chat with OpenAI ChatGPT (API key or OAuth token)."""
+                 api_key: Optional[str] = None) -> dict:
+    """Chat with OpenAI ChatGPT."""
     from openai import OpenAI
 
-    api_key = oauth_token or Config.OPENAI_API_KEY
-    client = OpenAI(api_key=api_key)
+    client = OpenAI(api_key=api_key or Config.OPENAI_API_KEY)
 
     messages = [{"role": "system", "content": f"{_SYSTEM_PROMPT}\n\n{context}"}]
     for msg in chat_history[-10:]:
@@ -311,13 +345,7 @@ def _chat_openai(model: str, context: str, message: str, chat_history: list,
         temperature=0.5,
     )
 
-    source = "openai_oauth" if oauth_token else "openai"
-    return {
-        "success": True,
-        "response": response.choices[0].message.content,
-        "provider": source,
-        "model": model,
-    }
+    return {"success": True, "response": response.choices[0].message.content, "provider": "openai", "model": model}
 
 
 def _parse_analysis_response(text: str, provider: str, model: str) -> dict:
