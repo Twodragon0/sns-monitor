@@ -27,8 +27,8 @@ logger = logging.getLogger(__name__)
 # Anthropic OAuth (Claude Code compatible)
 # redirect_uri MUST be http://localhost:{port}/callback (Claude Code pattern)
 _ANTHROPIC_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
-_ANTHROPIC_AUTHORIZE_URL = "https://console.anthropic.com/oauth/authorize"
-_ANTHROPIC_TOKEN_URL = "https://console.anthropic.com/oauth/token"
+_ANTHROPIC_AUTHORIZE_URL = "https://claude.ai/oauth/authorize"
+_ANTHROPIC_TOKEN_URL = "https://claude.ai/oauth/token"
 _ANTHROPIC_SCOPES = "org:create_api_key user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload"
 
 
