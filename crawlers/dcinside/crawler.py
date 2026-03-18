@@ -978,6 +978,21 @@ if __name__ == '__main__':
             body = json.loads(result.get('body', '{}'))
             for r in body.get('results', []):
                 logger.info("  %s: %s (posts=%s)", r.get('gallery_id'), r.get('status'), r.get('posts_found', '?'))
+
+            # Trigger daily report generation after crawl
+            try:
+                api_base = os.environ.get('API_BASE_URL', 'http://api-backend:8080')
+                resp = requests.post(f'{api_base}/api/analysis/report/generate-daily', timeout=60)
+                if resp.ok:
+                    rdata = resp.json()
+                    logger.info("Daily report generated: %s items, %s galleries",
+                                rdata.get('summary', {}).get('total_items', '?'),
+                                rdata.get('summary', {}).get('total_galleries', '?'))
+                else:
+                    logger.warning("Report generation failed: %s", resp.status_code)
+            except Exception as re:
+                logger.warning("Report trigger failed: %s", re)
+
         except Exception as e:
             logger.error("Crawler run failed: %s", e, exc_info=True)
 

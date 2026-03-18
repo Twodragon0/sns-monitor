@@ -630,6 +630,145 @@ def gallery_compare():
     return jsonify({'galleries': galleries})
 
 
+@analysis_bp.route('/api/analysis/report/generate-daily', methods=['POST'])
+def generate_daily_report():
+    """Generate a daily sentiment report for all galleries.
+
+    Saves to local-data/analysis/reports/YYYY-MM-DD.json
+    Can be triggered by cron or manually.
+    """
+    from ..services.platform_analyzer import PlatformAnalyzer
+
+    data_dir = _get_local_data_dir()
+    analyzer = PlatformAnalyzer(data_dir=str(data_dir))
+    dc_dir = data_dir / 'dcinside'
+
+    today = datetime.now().strftime('%Y-%m-%d')
+    galleries_report = []
+
+    for gallery_dir in sorted(dc_dir.iterdir()):
+        if not gallery_dir.is_dir() or gallery_dir.name.startswith('example'):
+            continue
+        json_files = sorted(gallery_dir.glob('*.json'))
+        if not json_files:
+            continue
+
+        # Today's files only
+        today_files = [f for f in json_files if f.stem.startswith(today)]
+        target_files = today_files if today_files else json_files[-3:]  # fallback to latest 3
+
+        all_items = []
+        for jf in target_files:
+            try:
+                with open(jf, 'r', encoding='utf-8') as f:
+                    fdata = json.load(f)
+                for post in fdata.get('posts', fdata.get('data', []))[:200]:
+                    p = post.get('post', post)
+                    text = p.get('text', '') or p.get('title', '')
+                    content = post.get('content', p.get('content', ''))
+                    if text:
+                        all_items.append({'text': f"{text} {(content or '')[:200]}".strip()})
+                    for c in post.get('comments', [])[:5]:
+                        ct = c.get('text', c.get('content', ''))
+                        if ct:
+                            all_items.append({'text': ct})
+            except Exception:
+                pass
+
+        if not all_items:
+            continue
+
+        name = gallery_dir.name
+        try:
+            with open(json_files[-1], 'r', encoding='utf-8') as f:
+                name = json.load(f).get('gallery_name', name)
+        except Exception:
+            pass
+
+        sentiment = analyzer._analyze_sentiment(all_items)
+        s = sentiment['sentiment']
+        total = s['positive'] + s['neutral'] + s['negative']
+
+        galleries_report.append({
+            'id': gallery_dir.name,
+            'name': name,
+            'total': total,
+            'positive': s['positive'],
+            'neutral': s['neutral'],
+            'negative': s['negative'],
+            'pos_pct': round(s['positive'] / total * 100) if total else 0,
+            'neg_pct': round(s['negative'] / total * 100) if total else 0,
+            'keywords': [k['word'] for k in sentiment.get('top_keywords', [])[:10]],
+            'files_analyzed': len(target_files),
+        })
+
+    # Build report
+    total_items = sum(g['total'] for g in galleries_report)
+    total_pos = sum(g['positive'] for g in galleries_report)
+    total_neg = sum(g['negative'] for g in galleries_report)
+    alerts = [g for g in galleries_report if g['neg_pct'] >= 5]
+
+    report = {
+        'date': today,
+        'generated_at': datetime.now().isoformat(),
+        'summary': {
+            'total_items': total_items,
+            'total_positive': total_pos,
+            'total_negative': total_neg,
+            'total_galleries': len(galleries_report),
+            'pos_pct': round(total_pos / total_items * 100) if total_items else 0,
+            'neg_pct': round(total_neg / total_items * 100) if total_items else 0,
+            'alerts': len(alerts),
+        },
+        'galleries': galleries_report,
+        'alerts': alerts,
+    }
+
+    # Save report
+    report_dir = data_dir / 'analysis' / 'reports'
+    report_dir.mkdir(parents=True, exist_ok=True)
+    report_file = report_dir / f'{today}.json'
+    with open(report_file, 'w', encoding='utf-8') as f:
+        json.dump(report, f, ensure_ascii=False, indent=2)
+
+    logger.info("Daily report generated: %s (%d galleries, %d items)", today, len(galleries_report), total_items)
+    return jsonify(report)
+
+
+@analysis_bp.route('/api/analysis/reports', methods=['GET'])
+def list_reports():
+    """List available daily reports."""
+    report_dir = _get_local_data_dir() / 'analysis' / 'reports'
+    if not report_dir.exists():
+        return jsonify({'reports': []})
+
+    reports = []
+    for f in sorted(report_dir.glob('*.json'), reverse=True)[:30]:
+        try:
+            with open(f, 'r', encoding='utf-8') as fp:
+                data = json.load(fp)
+            reports.append({
+                'date': data.get('date', f.stem),
+                'summary': data.get('summary', {}),
+            })
+        except Exception:
+            pass
+
+    return jsonify({'reports': reports})
+
+
+@analysis_bp.route('/api/analysis/reports/<date>', methods=['GET'])
+def get_report(date):
+    """Get a specific daily report."""
+    if not _SAFE_ID_RE.match(date):
+        return jsonify({'error': 'Invalid date'}), 400
+    report_file = _get_local_data_dir() / 'analysis' / 'reports' / f'{date}.json'
+    if not report_file.exists():
+        return jsonify({'error': 'Report not found'}), 404
+    with open(report_file, 'r', encoding='utf-8') as f:
+        return jsonify(json.load(f))
+
+
 def _session_llm_kwargs():
     """Extract LLM credentials from Flask session."""
     return {

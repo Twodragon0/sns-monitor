@@ -122,8 +122,9 @@ services:
       - REDIS_PORT=6379
       - LOCAL_MODE=true
       - LOCAL_DATA_DIR=/app/local-data
-      - CRAWL_INTERVAL=${CRAWL_INTERVAL:-7200}
+      - CRAWL_INTERVAL=${CRAWL_INTERVAL:-3600}
       - DCINSIDE_GALLERIES=ivnit,akaiv,soopvirtualstreamer,spv,soopstreaming,skoshism
+      - API_BASE_URL=http://api-backend:8080
     volumes:
       - ./local-data:/app/local-data:rw
     depends_on:
