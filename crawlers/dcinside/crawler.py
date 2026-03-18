@@ -947,3 +947,46 @@ def lambda_handler(event, context):
             'results': results
         })
     }
+
+
+if __name__ == '__main__':
+    """Docker entrypoint: run crawler once, then repeat every CRAWL_INTERVAL seconds."""
+    import signal
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+    )
+
+    interval = int(os.environ.get('CRAWL_INTERVAL', 7200))  # default 2 hours
+    galleries = os.environ.get('DCINSIDE_GALLERIES', '').strip()
+    event = {}
+    if galleries:
+        event['galleries'] = [g.strip() for g in galleries.split(',') if g.strip()]
+
+    stop = [False]
+    def _sig(sig, frame):
+        stop[0] = True
+    signal.signal(signal.SIGTERM, _sig)
+    signal.signal(signal.SIGINT, _sig)
+
+    while not stop[0]:
+        logger.info("=== DCInside crawler run starting (galleries=%s) ===",
+                     event.get('galleries', 'all'))
+        try:
+            result = lambda_handler(event, None)
+            body = json.loads(result.get('body', '{}'))
+            for r in body.get('results', []):
+                logger.info("  %s: %s (posts=%s)", r.get('gallery_id'), r.get('status'), r.get('posts_found', '?'))
+        except Exception as e:
+            logger.error("Crawler run failed: %s", e, exc_info=True)
+
+        if interval <= 0:
+            break
+        logger.info("Sleeping %d seconds until next run...", interval)
+        for _ in range(interval):
+            if stop[0]:
+                break
+            time.sleep(1)
+
+    logger.info("Crawler stopped.")
