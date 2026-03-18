@@ -119,16 +119,26 @@ def auth_anthropic_start():
 # ==========================================
 # OpenAI OAuth (PKCE)
 # ==========================================
+# OpenAI OAuth (OpenCode / Codex CLI compatible)
+_OPENAI_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann"
+_OPENAI_AUTHORIZE_URL = "https://auth.openai.com/oauth/authorize"
+_OPENAI_TOKEN_URL = "https://auth.openai.com/oauth/token"
+_OPENAI_SCOPES = "openid profile email offline_access"
+
+
+def _get_openai_callback_uri():
+    """OpenAI callback uses /auth/callback path (OpenCode pattern)."""
+    if Config.OAUTH_REDIRECT_URI:
+        return Config.OAUTH_REDIRECT_URI
+    port = os.environ.get("API_EXTERNAL_PORT") or os.environ.get("API_PORT") or "8888"
+    return f"http://localhost:{port}/auth/callback"
+
+
 @auth_bp.route("/api/auth/openai", methods=["GET"])
 @limiter.limit("10 per minute")
 def auth_openai_start():
-    """Start OpenAI OAuth with PKCE. Requires OPENAI_OAUTH_CLIENT_ID in .env."""
-    client_id = Config.OPENAI_OAUTH_CLIENT_ID
-    if not client_id:
-        return jsonify({
-            "error": "OpenAI OAuth를 사용하려면 .env에 OPENAI_OAUTH_CLIENT_ID를 설정하세요. "
-                     "https://platform.openai.com/settings 에서 OAuth 앱을 생성할 수 있습니다."
-        }), 503
+    """Start OpenAI OAuth with PKCE (OpenCode compatible)."""
+    client_id = Config.OPENAI_OAUTH_CLIENT_ID or _OPENAI_CLIENT_ID
 
     code_verifier = secrets.token_urlsafe(64)[:128]
     code_challenge = urlsafe_b64encode(
@@ -147,18 +157,19 @@ def auth_openai_start():
     else:
         session["oauth_return_to"] = "/analysis"
 
-    authorize_url = Config.OAUTH_AUTHORIZE_URL or "https://auth.openai.com/authorize"
-    scopes = Config.OAUTH_SCOPES or "openid profile email"
+    authorize_url = Config.OAUTH_AUTHORIZE_URL or _OPENAI_AUTHORIZE_URL
 
     params = {
-        "code": "true",
-        "client_id": client_id,
         "response_type": "code",
-        "redirect_uri": _get_callback_uri(),
-        "scope": scopes,
+        "client_id": client_id,
+        "redirect_uri": _get_openai_callback_uri(),
+        "scope": _OPENAI_SCOPES,
         "code_challenge": code_challenge,
         "code_challenge_method": "S256",
+        "id_token_add_organizations": "true",
+        "codex_cli_simplified_flow": "true",
         "state": state,
+        "originator": "sns-monitor",
     }
     url = f"{authorize_url}?{urlencode(params)}"
     return redirect(url)
@@ -195,11 +206,19 @@ def auth_callback():
         return _handle_openai_callback(code)
 
 
-# Keep legacy path for backward compatibility
+# OpenAI callback path: /auth/callback (OpenCode pattern)
+@auth_bp.route("/auth/callback", methods=["GET"])
+@limiter.limit("10 per minute")
+def auth_openai_callback():
+    """OpenAI OAuth callback at /auth/callback (OpenCode compatible)."""
+    return auth_callback()
+
+
+# Legacy path for backward compatibility
 @auth_bp.route("/api/auth/callback", methods=["GET"])
 @limiter.limit("10 per minute")
 def auth_callback_legacy():
-    """Legacy callback path — redirect to /callback handler."""
+    """Legacy callback path."""
     return auth_callback()
 
 
@@ -250,17 +269,14 @@ def _handle_anthropic_callback(code):
 
 def _handle_openai_callback(code):
     """Exchange OpenAI OAuth code for tokens (PKCE)."""
-    client_id = Config.OPENAI_OAUTH_CLIENT_ID
-    if not client_id:
-        return redirect(_frontend_redirect("/analysis?auth_error=openai_not_configured"))
-
+    client_id = Config.OPENAI_OAUTH_CLIENT_ID or _OPENAI_CLIENT_ID
     code_verifier = session.pop("pkce_verifier", None)
-    token_url = Config.OAUTH_TOKEN_URL or "https://auth.openai.com/oauth/token"
+    token_url = Config.OAUTH_TOKEN_URL or _OPENAI_TOKEN_URL
 
     data = {
         "grant_type": "authorization_code",
         "code": code,
-        "redirect_uri": _get_callback_uri(),
+        "redirect_uri": _get_openai_callback_uri(),
         "client_id": client_id,
     }
     if code_verifier:
