@@ -71,43 +71,60 @@ _CLI_CACHE = {}
 
 
 def _detect_cli_tools() -> dict:
-    """Detect available AI CLI tools in the environment."""
-    if _CLI_CACHE:
-        return _CLI_CACHE
+    """Detect available AI tools (CLI binaries or Python SDK with credentials).
 
+    Returns tools that can actually make API calls.
+    """
+    if _CLI_CACHE.get("_checked"):
+        return {k: v for k, v in _CLI_CACHE.items() if k != "_checked"}
+
+    import os
     tools = {}
-    for name, cmd in [("claude", "claude"), ("opencode", "opencode"), ("openai", "openai"), ("gemini", "gemini")]:
+
+    # CLI binaries (if installed, e.g., via npm)
+    for name, cmd, env_key in [
+        ("claude", "claude", "ANTHROPIC_API_KEY"),
+        ("opencode", "opencode", "OPENAI_API_KEY"),
+        ("gemini", "gemini", "GOOGLE_API_KEY"),
+    ]:
         path = shutil.which(cmd)
-        if path:
+        if path and os.environ.get(env_key):
             tools[name] = path
 
+    # Python SDK availability (always installed via requirements.txt)
+    # These are detected as "sdk" tools when API keys are present
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        tools["claude_sdk"] = "python:anthropic"
+    if os.environ.get("OPENAI_API_KEY"):
+        tools["openai_sdk"] = "python:openai"
+
     _CLI_CACHE.update(tools)
-    return tools
+    _CLI_CACHE["_checked"] = True
+    return {k: v for k, v in _CLI_CACHE.items() if k != "_checked"}
 
 
 def _call_cli(tool_name: str, prompt: str, timeout: int = 120) -> Optional[str]:
-    """Call an AI CLI tool via subprocess and return the output."""
+    """Call an AI tool via CLI binary or Python SDK."""
     tools = _detect_cli_tools()
+
+    # SDK-based tools: use Python packages directly (no subprocess needed)
+    if tool_name in ("claude_sdk", "claude") and "claude_sdk" in tools:
+        return _call_sdk_anthropic(prompt)
+    if tool_name in ("openai_sdk", "openai", "opencode") and "openai_sdk" in tools:
+        return _call_sdk_openai(prompt)
+
+    # CLI binary-based tools
     tool_path = tools.get(tool_name)
-    if not tool_path:
+    if not tool_path or tool_path.startswith("python:"):
         return None
 
     try:
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
-            f.write(prompt)
-            prompt_file = f.name
-
         if tool_name == "claude":
-            cmd = [tool_path, "--print", "-p", prompt]
+            cmd = [tool_path, "--print", "-p", prompt[:8000]]
         elif tool_name == "opencode":
-            cmd = [tool_path, "--print", "-p", prompt]
-        elif tool_name == "openai":
-            # openai CLI: openai api chat.completions.create -m gpt-4o-mini -g user prompt
-            cmd = [tool_path, "api", "chat.completions.create",
-                   "-m", Config.LLM_MODEL or "gpt-4o-mini",
-                   "-g", "user", prompt[:8000]]
+            cmd = [tool_path, "--print", "-p", prompt[:8000]]
         elif tool_name == "gemini":
-            cmd = [tool_path, "--print", "-p", prompt]
+            cmd = [tool_path, "--print", "-p", prompt[:8000]]
         else:
             return None
 
@@ -115,10 +132,6 @@ def _call_cli(tool_name: str, prompt: str, timeout: int = 120) -> Optional[str]:
             cmd, capture_output=True, text=True, timeout=timeout,
             env={**__import__('os').environ}
         )
-
-        import os
-        os.unlink(prompt_file)
-
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
         if result.stderr:
@@ -129,6 +142,38 @@ def _call_cli(tool_name: str, prompt: str, timeout: int = 120) -> Optional[str]:
         return None
     except Exception as e:
         logger.warning("CLI %s failed: %s", tool_name, e)
+        return None
+
+
+def _call_sdk_anthropic(prompt: str) -> Optional[str]:
+    """Call Anthropic SDK directly (Docker-internal, uses ANTHROPIC_API_KEY env)."""
+    try:
+        import anthropic
+        client = anthropic.Anthropic()  # uses ANTHROPIC_API_KEY env
+        response = client.messages.create(
+            model=Config.LLM_MODEL or "claude-sonnet-4-20250514",
+            max_tokens=4096,
+            messages=[{"role": "user", "content": prompt[:15000]}],
+        )
+        return response.content[0].text
+    except Exception as e:
+        logger.warning("SDK anthropic failed: %s", e)
+        return None
+
+
+def _call_sdk_openai(prompt: str) -> Optional[str]:
+    """Call OpenAI SDK directly (Docker-internal, uses OPENAI_API_KEY env)."""
+    try:
+        from openai import OpenAI
+        client = OpenAI()  # uses OPENAI_API_KEY env
+        response = client.chat.completions.create(
+            model=Config.LLM_MODEL or "gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt[:15000]}],
+            max_tokens=4096,
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        logger.warning("SDK openai failed: %s", e)
         return None
 
 
@@ -163,13 +208,11 @@ def get_available_provider(oauth_token: Optional[str] = None,
     if oauth_token:
         return "openai_oauth"
 
-    # CLI fallback
+    # CLI / SDK fallback (Docker-internal, uses env API keys)
     tools = _detect_cli_tools()
-    if "claude" in tools:
+    if "claude_sdk" in tools or "claude" in tools:
         return "cli_claude"
-    if "opencode" in tools:
-        return "cli_opencode"
-    if "openai" in tools:
+    if "openai_sdk" in tools or "opencode" in tools:
         return "cli_openai"
     if "gemini" in tools:
         return "cli_gemini"
