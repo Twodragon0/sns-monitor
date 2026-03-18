@@ -27,8 +27,8 @@ logger = logging.getLogger(__name__)
 # Anthropic OAuth (Claude Code compatible)
 # redirect_uri MUST be http://localhost:{port}/callback (Claude Code pattern)
 _ANTHROPIC_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
-_ANTHROPIC_AUTHORIZE_URL = "https://claude.ai/oauth/authorize"
-_ANTHROPIC_TOKEN_URL = "https://claude.ai/oauth/token"
+_ANTHROPIC_AUTHORIZE_URL = "https://console.anthropic.com/oauth/authorize"
+_ANTHROPIC_TOKEN_URL = "https://console.anthropic.com/oauth/token"
 _ANTHROPIC_SCOPES = "org:create_api_key user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload"
 
 
@@ -50,7 +50,10 @@ def _oauth_configured():
 
 def _get_callback_uri():
     """Build callback URI in Claude Code format: http://localhost:PORT/callback"""
-    port = request.host.split(":")[-1] if ":" in request.host else "8888"
+    if Config.OAUTH_REDIRECT_URI:
+        return Config.OAUTH_REDIRECT_URI
+    # Use external port (Docker maps 8888->8080 internally)
+    port = os.environ.get("API_EXTERNAL_PORT") or os.environ.get("API_PORT") or "8888"
     return f"http://localhost:{port}/callback"
 
 
@@ -116,15 +119,16 @@ def auth_anthropic_start():
 # ==========================================
 # OpenAI OAuth (PKCE)
 # ==========================================
-# OpenAI OAuth default client (ChatGPT)
-_OPENAI_DEFAULT_CLIENT_ID = "DRivsnm2Mu42T3KOpqdtwB3NYIFdkNIfPA4jL0lK3ng"
-
-
 @auth_bp.route("/api/auth/openai", methods=["GET"])
 @limiter.limit("10 per minute")
 def auth_openai_start():
-    """Start OpenAI OAuth with PKCE."""
-    client_id = Config.OPENAI_OAUTH_CLIENT_ID or _OPENAI_DEFAULT_CLIENT_ID
+    """Start OpenAI OAuth with PKCE. Requires OPENAI_OAUTH_CLIENT_ID in .env."""
+    client_id = Config.OPENAI_OAUTH_CLIENT_ID
+    if not client_id:
+        return jsonify({
+            "error": "OpenAI OAuth를 사용하려면 .env에 OPENAI_OAUTH_CLIENT_ID를 설정하세요. "
+                     "https://platform.openai.com/settings 에서 OAuth 앱을 생성할 수 있습니다."
+        }), 503
 
     code_verifier = secrets.token_urlsafe(64)[:128]
     code_challenge = urlsafe_b64encode(
@@ -246,7 +250,9 @@ def _handle_anthropic_callback(code):
 
 def _handle_openai_callback(code):
     """Exchange OpenAI OAuth code for tokens (PKCE)."""
-    client_id = Config.OPENAI_OAUTH_CLIENT_ID or _OPENAI_DEFAULT_CLIENT_ID
+    client_id = Config.OPENAI_OAUTH_CLIENT_ID
+    if not client_id:
+        return redirect(_frontend_redirect("/analysis?auth_error=openai_not_configured"))
 
     code_verifier = session.pop("pkce_verifier", None)
     token_url = Config.OAUTH_TOKEN_URL or "https://auth.openai.com/oauth/token"

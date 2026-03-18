@@ -55,9 +55,12 @@ function AuthPanel({ apiBase, onKeySet, openaiOAuthAvailable }) {
             padding: '10px 20px', fontSize: '14px', fontWeight: '600',
             background: '#10a37f', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer',
             display: 'flex', alignItems: 'center', gap: '6px',
+            opacity: openaiOAuthAvailable ? 1 : 0.5,
           }}
+          title={openaiOAuthAvailable ? '' : 'OPENAI_OAUTH_CLIENT_ID 설정 필요'}
         >
           ChatGPT 로그인
+          {!openaiOAuthAvailable && <span style={{ fontSize: '10px' }}>(설정 필요)</span>}
         </button>
       </div>
 
