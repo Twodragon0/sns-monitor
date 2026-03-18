@@ -4402,6 +4402,14 @@ class PlatformAnalyzer:
                 "sentiment": {"positive": 0, "neutral": 0, "negative": 0},
             }
 
+        # Build lemma sets for Kiwi-based sentiment (verb/adj stems)
+        pos_lemmas = {"좋다", "멋지다", "예쁘다", "귀엽다", "재미있다", "재밌다",
+                      "감동하다", "행복하다", "기대하다", "부럽다", "잘생기다",
+                      "신기하다", "고맙다", "수고하다", "웃기다", "즐겁다"}
+        neg_lemmas = {"싫다", "나쁘다", "짜증나다", "실망하다", "역겹다",
+                      "불쾌하다", "답답하다", "후회하다", "지겹다", "불편하다",
+                      "한심하다", "어이없다", "아쉽다", "안타깝다", "못생기다"}
+
         sentiment_counts = {"positive": 0, "neutral": 0, "negative": 0}
         keywords = Counter()
 
@@ -4410,9 +4418,24 @@ class PlatformAnalyzer:
             if not text or len(text) < 2:
                 continue
 
-            # Score-based sentiment (accumulate matches)
+            # Score-based sentiment: keyword substring match + Kiwi lemma match
             pos_score = sum(1 for kw in self._POSITIVE_KW if kw in text)
             neg_score = sum(1 for kw in self._NEGATIVE_KW if kw in text)
+
+            # Kiwi morphological sentiment boost (matches verb/adj stems accurately)
+            kiwi = self._get_kiwi()
+            if kiwi:
+                try:
+                    tokens = kiwi.tokenize(text)
+                    for t in tokens:
+                        if t.tag in ("VV", "VA", "XR"):  # verb, adjective, root
+                            lemma = t.form + "다"
+                            if lemma in pos_lemmas:
+                                pos_score += 2
+                            elif lemma in neg_lemmas:
+                                neg_score += 2
+                except Exception:
+                    pass
 
             if pos_score > neg_score:
                 sentiment_counts["positive"] += 1

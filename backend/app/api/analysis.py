@@ -536,16 +536,18 @@ def sentiment_trend():
                 else:
                     ts = data.get('collected_at', fname)
 
-                # Quick sentiment on posts
+                # Quick sentiment on posts (supports both URL analyzer and crawler formats)
                 items = []
-                for post in data.get('posts', [])[:200]:
+                for post in data.get('posts', data.get('data', []))[:200]:
                     p = post.get('post', post)
                     text = p.get('text', '') or p.get('title', '')
+                    content = post.get('content', p.get('content', ''))
                     if text:
-                        items.append({'text': text})
+                        items.append({'text': f"{text} {(content or '')[:200]}".strip()})
                     for c in post.get('comments', [])[:5]:
-                        if c.get('text'):
-                            items.append(c)
+                        ctext = c.get('text', c.get('content', ''))
+                        if ctext:
+                            items.append({'text': ctext})
 
                 if items:
                     sentiment = analyzer._analyze_sentiment(items)
