@@ -4310,16 +4310,40 @@ class PlatformAnalyzer:
     # POS tags to extract as keywords (nouns, verbs, adjectives)
     _KEYWORD_POS = frozenset({"NNG", "NNP", "VV", "VA", "SL"})  # 일반명사, 고유명사, 동사, 형용사, 외국어
 
+    # Custom dictionary: streamer/vtuber/community terms Kiwi doesn't know
+    _CUSTOM_WORDS = [
+        # Vtuber / streamer names (NNP = proper noun)
+        ("이브닛", "NNP"), ("아카이브", "NNP"), ("여르미", "NNP"), ("결이", "NNP"),
+        ("몽이", "NNP"), ("챠니", "NNP"), ("챱츄", "NNP"), ("세구", "NNP"),
+        ("버시", "NNP"), ("쿠우", "NNP"), ("사미", "NNP"), ("기원", "NNP"),
+        # Platform names
+        ("버디", "NNP"), ("숲", "NNP"), ("치지직", "NNP"),
+        # Community slang (NNG = common noun)
+        ("개추", "NNG"), ("비추", "NNG"), ("꿀잼", "NNG"), ("노잼", "NNG"),
+        ("입덕", "NNG"), ("탈덕", "NNG"), ("덕질", "NNG"), ("최애", "NNG"),
+        ("갓겜", "NNG"), ("핵노잼", "NNG"), ("개꿀", "NNG"),
+        ("방셀", "NNG"), ("디시콘", "NNG"),
+        # Sentiment adjectives Kiwi may not parse correctly
+        ("존잘", "VA"), ("존예", "VA"), ("킹왕짱", "NNG"),
+    ]
+
     @classmethod
     def _get_kiwi(cls):
         if cls._kiwi is None:
             try:
                 from kiwipiepy import Kiwi
-                cls._kiwi = Kiwi()
-                logger.info("Kiwi morphological analyzer loaded")
+                kiwi = Kiwi()
+                # Register custom words for better tokenization
+                for word, tag in cls._CUSTOM_WORDS:
+                    try:
+                        kiwi.add_user_word(word, tag)
+                    except Exception:
+                        pass
+                cls._kiwi = kiwi
+                logger.info("Kiwi morphological analyzer loaded with %d custom words", len(cls._CUSTOM_WORDS))
             except ImportError:
                 logger.info("kiwipiepy not available, using regex keyword extraction")
-                cls._kiwi = False  # Mark as unavailable
+                cls._kiwi = False
         return cls._kiwi if cls._kiwi is not False else None
 
     def _extract_keywords(self, text):
