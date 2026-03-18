@@ -73,6 +73,9 @@ class PlatformAnalyzer:
             r"(?:www\.)?tiktok\.com",
             r"vm\.tiktok\.com",
         ],
+        "vuddy": [
+            r"(?:www\.)?vuddy\.io",
+        ],
     }
 
     def __init__(self, data_dir="/app/local-data"):
@@ -4150,6 +4153,113 @@ class PlatformAnalyzer:
             "embed_html": embed_html,
             "comments": [],
         }
+
+    # ==========================================
+    # Vuddy.io (creator goods platform)
+    # ==========================================
+    def _analyze_vuddy(self, url):
+        """Analyze vuddy.io creator/product page via og:meta + HTML scraping."""
+        parsed = urlparse(url)
+        path = (parsed.path or "").strip("/").rstrip("/")
+        segments = [s for s in path.split("/") if s]
+
+        out = {
+            "type": "platform",
+            "title": "Vuddy",
+            "description": "",
+            "url": url,
+            "posts": [],
+            "thumbnail": "",
+        }
+
+        headers = {
+            "User-Agent": self._session.headers["User-Agent"],
+            "Accept": "text/html,application/xhtml+xml",
+            "Accept-Language": "ko-KR,ko;q=0.9",
+        }
+        try:
+            resp = self._session.get(url, headers=headers, timeout=15)
+            resp.raise_for_status()
+            from bs4 import BeautifulSoup
+
+            soup = BeautifulSoup(resp.text, "html.parser")
+
+            # og:meta extraction
+            og_title = soup.select_one('meta[property="og:title"]')
+            og_desc = soup.select_one('meta[property="og:description"]')
+            og_image = soup.select_one('meta[property="og:image"]')
+
+            if og_title and og_title.get("content"):
+                out["title"] = og_title["content"].strip()[:200]
+            if og_desc and og_desc.get("content"):
+                out["description"] = og_desc["content"].strip()[:500]
+            if og_image and og_image.get("content"):
+                out["thumbnail"] = og_image["content"].strip()
+
+            # Detect page type from URL path
+            if segments and segments[0] == "creator":
+                out["type"] = "creator"
+                if len(segments) >= 2:
+                    out["creator_id"] = segments[1]
+            elif segments and segments[0] in ("product", "goods"):
+                out["type"] = "product"
+            elif segments and segments[0] == "store":
+                out["type"] = "store"
+
+            # Extract visible text content from Next.js rendered page
+            # Look for product cards, creator info, etc.
+            for script in soup.select("script#__NEXT_DATA__"):
+                try:
+                    import json as _json
+                    next_data = _json.loads(script.string or "")
+                    page_props = next_data.get("props", {}).get("pageProps", {})
+                    if page_props:
+                        # Extract creator info
+                        creator = page_props.get("creator") or page_props.get("data", {}).get("creator")
+                        if creator and isinstance(creator, dict):
+                            out["title"] = creator.get("name") or out["title"]
+                            out["description"] = creator.get("description") or out["description"]
+                            out["thumbnail"] = creator.get("profileImageUrl") or out["thumbnail"]
+                            if creator.get("followerCount"):
+                                out["follower_count"] = creator["followerCount"]
+
+                        # Extract products
+                        products = page_props.get("products") or page_props.get("data", {}).get("products")
+                        if products and isinstance(products, list):
+                            for p in products[:50]:
+                                out["posts"].append({
+                                    "text": p.get("name", p.get("title", "")),
+                                    "author": p.get("creatorName", "Vuddy"),
+                                    "url": f"https://vuddy.io/product/{p.get('id', '')}",
+                                })
+                except Exception:
+                    pass
+
+            # Fallback: extract from visible elements
+            if not out["posts"]:
+                for card in soup.select("[class*='product'], [class*='card'], [class*='item']")[:30]:
+                    title_el = card.select_one("h3, h4, [class*='title'], [class*='name']")
+                    if title_el:
+                        out["posts"].append({
+                            "text": title_el.get_text(strip=True)[:200],
+                            "author": "Vuddy",
+                        })
+
+            # Build a summary post if no products found
+            if not out["posts"] and out["description"]:
+                out["posts"] = [{
+                    "text": out["description"],
+                    "author": "Vuddy",
+                    "url": url,
+                }]
+
+            out["total_posts"] = len(out["posts"])
+
+        except Exception as e:
+            logger.warning("Vuddy analysis failed: %s", e)
+            out["description"] = "Vuddy 페이지를 불러오지 못했습니다."
+
+        return out
 
     # ==========================================
     # Sentiment Analysis

@@ -16,6 +16,7 @@ const PLATFORM_INFO = {
   instagram: { name: 'Instagram', color: '#E4405F', icon: '📸' },
   threads: { name: 'Threads', color: '#000000', icon: '🧵' },
   tiktok: { name: 'TikTok', color: '#000000', icon: '🎵' },
+  vuddy: { name: 'Vuddy', color: '#7C3AED', icon: '🎁' },
 };
 
 const SENTIMENT_COLORS = {
@@ -113,6 +114,7 @@ function detectPlatform(url) {
   if (lower.includes('instagram.com')) return 'instagram';
   if (lower.includes('threads.net') || lower.includes('threads.com')) return 'threads';
   if (lower.includes('tiktok.com')) return 'tiktok';
+  if (lower.includes('vuddy.io')) return 'vuddy';
   return null;
 }
 
