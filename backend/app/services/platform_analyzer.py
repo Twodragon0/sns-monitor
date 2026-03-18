@@ -4305,6 +4305,66 @@ class PlatformAnalyzer:
             return result.get("replies", [])
         return []
 
+    # Stopwords: UI noise, DCInside markup, common particles
+    _STOPWORDS = frozenset({
+        # DCInside UI / markup noise
+        "디시콘", "보기", "이전다음", "이전", "다음", "갤러리", "마이너갤",
+        "답글", "추천수", "조회수", "댓글수", "작성일", "말머리",
+        "전체글", "개념글", "공지", "설정", "검색", "정렬",
+        "로그인", "닉네임", "아이디", "비밀번호", "회원",
+        "삭제", "수정", "신고", "차단", "답변",
+        # Common Korean particles / fillers
+        "그래서", "그런데", "하지만", "그리고", "그래도", "그러면",
+        "이거", "저거", "거기", "여기", "어디", "언제", "뭐가",
+        "진짜", "근데", "아니", "그냥", "이게", "좀",
+        "ㅇㅇ", "ㄴㄴ", "ㄱㄱ", "ㅇㅋ",
+        # App / platform noise
+        "app", "com", "http", "https", "www", "gall",
+        "dcinside", "youtube", "naver", "kakao",
+        # Short meaningless
+        "해서", "했는데", "하는", "되는", "있는", "없는",
+        "같은", "라는", "이런", "저런", "어떤",
+    })
+
+    _POSITIVE_KW = [
+        # Korean - emotions
+        "좋아", "좋다", "좋은", "최고", "감사", "사랑", "축하", "대박",
+        "멋지", "예쁘", "귀엽", "화이팅", "응원", "기대", "감동", "행복",
+        "설렌", "좋겠", "부럽", "멋있", "잘생", "이쁘", "신기",
+        # Korean - community slang
+        "개추", "추천", "인정", "재밌", "꿀잼", "웃긴", "레전드", "갓",
+        "존잘", "존예", "개꿀", "찐이", "역대급", "헐대박", "쩐다",
+        "짱", "굿", "미쳤", "실화냐", "킹왕짱",
+        "ㅋㅋㅋ", "ㅎㅎㅎ", "ㅋㅋ", "ㅎㅎ",
+        # Korean - streamer/vtuber specific
+        "겐끼", "방송잘", "잘봤", "잘본", "존버", "떡상", "개꿀잼",
+        "고마워", "수고", "힘내", "잘했", "축하", "재밌었",
+        "최애", "덕질", "입덕", "갓겜", "꿀보이스", "존좋",
+        # English
+        "good", "great", "love", "amazing", "awesome", "best",
+        "nice", "cool", "beautiful", "wonderful", "excellent", "perfect",
+        "cute", "funny", "lol", "lmao",
+    ]
+
+    _NEGATIVE_KW = [
+        # Korean - emotions
+        "싫어", "싫다", "나쁘", "최악", "짜증", "실망", "별로",
+        "역겹", "징그", "불쾌", "화난", "빡치", "열받", "답답",
+        "못생", "꼴불견", "어이없", "한심", "쪽팔", "후회", "지겹",
+        "시끄", "거슬", "불편", "아쉽", "안타깝",
+        # Korean - community slang
+        "노잼", "재미없", "쓰레기", "망했", "구라", "거짓",
+        "비추", "노답", "헛소리", "뻘소리", "허접",
+        "ㅂㅅ", "ㅄ", "ㅡㅡ", "ㅠㅠ", "ㅜㅜ",
+        # Korean - stronger negatives
+        "꺼져", "닥쳐", "병맛", "구역질", "혐오", "극혐",
+        "개별로", "개망", "쓸모없", "폭망", "완전망",
+        "탈덕", "안티", "악플", "욕설",
+        # English
+        "bad", "worst", "hate", "terrible", "awful", "boring",
+        "ugly", "trash", "waste", "stupid", "sucks", "cringe",
+    ]
+
     def _analyze_sentiment(self, items):
         """Analyze sentiment distribution from text items."""
         if not items:
@@ -4313,52 +4373,32 @@ class PlatformAnalyzer:
                 "sentiment": {"positive": 0, "neutral": 0, "negative": 0},
             }
 
-        positive_kw = [
-            # Korean general
-            "좋아", "좋다", "좋은", "굿", "최고", "감사", "사랑", "축하", "대박",
-            "멋지", "예쁘", "귀엽", "화이팅", "응원", "레전드", "갓", "존잘",
-            "개추", "추천", "인정", "ㅋㅋㅋ", "ㅎㅎ", "재밌", "꿀잼", "웃긴",
-            "감동", "행복", "기대", "설렌", "좋겠", "부럽", "멋있", "잘생",
-            "이쁘", "짱", "쩐다", "미쳤", "찐이", "역대급", "신기",
-            "존예", "개꿀", "ㄹㅇ", "실화", "헐대박",
-            # English
-            "good", "great", "love", "amazing", "awesome", "best",
-            "nice", "cool", "beautiful", "wonderful", "excellent", "perfect",
-        ]
-        negative_kw = [
-            # Korean general
-            "싫어", "싫다", "나쁘", "최악", "짜증", "실망", "별로", "노잼",
-            "재미없", "쓰레기", "망했", "구라", "거짓", "ㅂㅅ", "ㅄ",
-            "역겹", "징그", "불쾌", "화난", "빡치", "열받", "답답",
-            "못생", "꼴불견", "어이없", "한심", "쪽팔", "후회", "지겹",
-            "시끄", "거슬", "불편", "아쉽", "안타깝",
-            "비추", "노답", "ㅡㅡ", "ㅠㅠ", "ㅜㅜ",
-            # English
-            "bad", "worst", "hate", "terrible", "awful", "boring",
-            "ugly", "trash", "waste", "stupid", "sucks",
-        ]
-
         sentiment_counts = {"positive": 0, "neutral": 0, "negative": 0}
         keywords = Counter()
 
         for item in items:
             text = (item.get("text", "") or "").lower()
-            if not text:
+            if not text or len(text) < 2:
                 continue
 
-            has_pos = any(kw in text for kw in positive_kw)
-            has_neg = any(kw in text for kw in negative_kw)
+            # Score-based sentiment (accumulate matches)
+            pos_score = sum(1 for kw in self._POSITIVE_KW if kw in text)
+            neg_score = sum(1 for kw in self._NEGATIVE_KW if kw in text)
 
-            if has_pos and not has_neg:
+            if pos_score > neg_score:
                 sentiment_counts["positive"] += 1
-            elif has_neg and not has_pos:
+            elif neg_score > pos_score:
                 sentiment_counts["negative"] += 1
+            elif pos_score > 0 and neg_score > 0:
+                sentiment_counts["neutral"] += 1  # mixed
             else:
                 sentiment_counts["neutral"] += 1
 
-            # Extract keywords (simple word frequency)
+            # Extract keywords with stopword filtering
             words = re.findall(r"[가-힣]{2,}|[a-zA-Z]{3,}", text)
-            keywords.update(words)
+            for w in words:
+                if w not in self._STOPWORDS and len(w) >= 2:
+                    keywords[w] += 1
 
         total = sum(sentiment_counts.values())
         distribution = {

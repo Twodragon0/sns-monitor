@@ -1318,15 +1318,49 @@ function MiniStat({ icon, value, label }) {
 }
 
 /* --- Gallery Monitor Panel (DCInside 갤러리 모니터링) --- */
+/** Mini sentiment bar (inline, no chart library needed) */
+function SentimentMiniBar({ sentiment }) {
+  if (!sentiment) return null;
+  const { positive = 0, neutral = 0, negative = 0 } = sentiment;
+  const total = positive + neutral + negative;
+  if (total === 0) return null;
+  const pct = (v) => Math.round((v / total) * 100);
+  return (
+    <div style={{ marginTop: 6 }}>
+      <div style={{ display: 'flex', height: 6, borderRadius: 3, overflow: 'hidden', background: '#e5e7eb' }}>
+        {positive > 0 && <div style={{ width: `${pct(positive)}%`, background: '#10b981' }} />}
+        {neutral > 0 && <div style={{ width: `${pct(neutral)}%`, background: '#9ca3af' }} />}
+        {negative > 0 && <div style={{ width: `${pct(negative)}%`, background: '#ef4444' }} />}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: '#6b7280', marginTop: 2 }}>
+        <span style={{ color: '#10b981' }}>+{positive}</span>
+        <span>{total}건</span>
+        <span style={{ color: '#ef4444' }}>-{negative}</span>
+      </div>
+    </div>
+  );
+}
+
 function GalleryMonitorPanel() {
   const [dcSources, setDcSources] = useState([]);
+  const [sentiments, setSentiments] = useState({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     axios.get(`${API_BASE}/api/analysis/sources`)
       .then(({ data }) => {
-        const dc = (data.sources || []).filter(s => s.type === 'dcinside');
+        const dc = (data.sources || []).filter(s => s.type === 'dcinside' && !s.id.startsWith('example'));
         setDcSources(dc);
+        // Fetch sentiment for each gallery
+        if (dc.length > 0) {
+          axios.post(`${API_BASE}/api/analysis/local-summary`, {
+            sources: dc.map(s => ({ type: 'dcinside', id: s.id })),
+          }).then(({ data: result }) => {
+            const map = {};
+            (result.sources || []).forEach(s => { map[s.id] = s.sentiment?.sentiment; });
+            setSentiments(map);
+          }).catch(() => {});
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -1334,9 +1368,8 @@ function GalleryMonitorPanel() {
 
   function parseLatestDate(latest) {
     if (!latest) return '—';
-    // filename format: 2026-03-18-11-40-25.json
-    const m = latest.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (m) return `${m[1]}.${m[2]}.${m[3]}`;
+    const m = latest.match(/^(\d{4})-(\d{2})-(\d{2})-(\d{2})-(\d{2})/);
+    if (m) return `${m[2]}.${m[3]} ${m[4]}:${m[5]}`;
     return latest.replace('.json', '');
   }
 
@@ -1356,29 +1389,26 @@ function GalleryMonitorPanel() {
       <h4 className="dash__section-title" style={{ marginBottom: 12 }}>DCInside 갤러리 모니터링</h4>
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
         gap: 12,
       }}>
         {dcSources.map(src => (
-          <div key={src.id} className="panel-card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <h5 className="panel-card__title" style={{ margin: 0 }}>{src.name || src.id}</h5>
-            <div className="panel-card__body" style={{ flex: 1 }}>
-              <p style={{ margin: '0 0 2px' }}>파일 <strong>{src.files || 0}</strong>개</p>
-              <p style={{ margin: 0 }}>최신 수집 <strong>{parseLatestDate(src.latest)}</strong></p>
+          <div key={src.id} className="panel-card" style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 14 }}>
+            <h5 className="panel-card__title" style={{ margin: 0, fontSize: '0.85rem' }}>{src.name || src.id}</h5>
+            <div className="panel-card__body" style={{ flex: 1, fontSize: '0.75rem', color: '#6b7280' }}>
+              <span>수집 {src.files || 0}회</span>
+              <span style={{ marginLeft: 8 }}>{parseLatestDate(src.latest)}</span>
             </div>
+            <SentimentMiniBar sentiment={sentiments[src.id]} />
             <button
               type="button"
               onClick={() => goAnalysis(src)}
               style={{
-                padding: '6px 14px',
-                background: 'var(--c-primary)',
-                color: '#fff',
-                border: 'none',
-                borderRadius: 6,
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                alignSelf: 'flex-start',
+                padding: '5px 12px', marginTop: 4,
+                background: 'var(--c-primary)', color: '#fff',
+                border: 'none', borderRadius: 6,
+                fontSize: '0.75rem', fontWeight: 700,
+                cursor: 'pointer', alignSelf: 'flex-start',
               }}
             >
               분석
