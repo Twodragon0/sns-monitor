@@ -1,15 +1,18 @@
 """
-Local LLM analysis service.
-Supports OpenAI (ChatGPT) and Anthropic (Claude) APIs directly,
-without requiring an external AI analysis service.
+LLM analysis service for SNS data.
 
-Authentication modes:
+Supports multiple modes (in priority order):
 1. Direct API keys (OPENAI_API_KEY, ANTHROPIC_API_KEY)
-2. OAuth access token (from OpenAI OAuth login flow)
+2. Session API key (browser input)
+3. OAuth access token
+4. Docker CLI tools (claude, openai/opencode, gemini) via subprocess
 """
 
 import json
 import logging
+import shutil
+import subprocess
+import tempfile
 from typing import Optional
 
 from ..config import Config
@@ -61,6 +64,77 @@ _SUMMARIZE_PROMPT = """당신은 SNS 데이터 분석 전문가입니다.
 마크다운 형식으로 작성하세요."""
 
 
+# ==========================================
+# CLI tool detection (Docker-internal)
+# ==========================================
+_CLI_CACHE = {}
+
+
+def _detect_cli_tools() -> dict:
+    """Detect available AI CLI tools in the environment."""
+    if _CLI_CACHE:
+        return _CLI_CACHE
+
+    tools = {}
+    for name, cmd in [("claude", "claude"), ("opencode", "opencode"), ("openai", "openai"), ("gemini", "gemini")]:
+        path = shutil.which(cmd)
+        if path:
+            tools[name] = path
+
+    _CLI_CACHE.update(tools)
+    return tools
+
+
+def _call_cli(tool_name: str, prompt: str, timeout: int = 120) -> Optional[str]:
+    """Call an AI CLI tool via subprocess and return the output."""
+    tools = _detect_cli_tools()
+    tool_path = tools.get(tool_name)
+    if not tool_path:
+        return None
+
+    try:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
+            f.write(prompt)
+            prompt_file = f.name
+
+        if tool_name == "claude":
+            cmd = [tool_path, "--print", "-p", prompt]
+        elif tool_name == "opencode":
+            cmd = [tool_path, "--print", "-p", prompt]
+        elif tool_name == "openai":
+            # openai CLI: openai api chat.completions.create -m gpt-4o-mini -g user prompt
+            cmd = [tool_path, "api", "chat.completions.create",
+                   "-m", Config.LLM_MODEL or "gpt-4o-mini",
+                   "-g", "user", prompt[:8000]]
+        elif tool_name == "gemini":
+            cmd = [tool_path, "--print", "-p", prompt]
+        else:
+            return None
+
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=timeout,
+            env={**__import__('os').environ}
+        )
+
+        import os
+        os.unlink(prompt_file)
+
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+        if result.stderr:
+            logger.warning("CLI %s stderr: %s", tool_name, result.stderr[:200])
+        return None
+    except subprocess.TimeoutExpired:
+        logger.warning("CLI %s timed out after %ds", tool_name, timeout)
+        return None
+    except Exception as e:
+        logger.warning("CLI %s failed: %s", tool_name, e)
+        return None
+
+
+# ==========================================
+# Provider detection
+# ==========================================
 def get_available_provider(oauth_token: Optional[str] = None,
                            token_provider: Optional[str] = None,
                            session_api_key: Optional[str] = None,
@@ -73,6 +147,7 @@ def get_available_provider(oauth_token: Optional[str] = None,
     3. .env OPENAI_API_KEY
     4. Session API key (browser input)
     5. OAuth token (Anthropic or OpenAI)
+    6. CLI tools (claude, opencode, openai, gemini)
     """
     if Config.LLM_PROVIDER:
         return Config.LLM_PROVIDER
@@ -87,6 +162,17 @@ def get_available_provider(oauth_token: Optional[str] = None,
         return "anthropic_oauth"
     if oauth_token:
         return "openai_oauth"
+
+    # CLI fallback
+    tools = _detect_cli_tools()
+    if "claude" in tools:
+        return "cli_claude"
+    if "opencode" in tools:
+        return "cli_opencode"
+    if "openai" in tools:
+        return "cli_openai"
+    if "gemini" in tools:
+        return "cli_gemini"
     return None
 
 
@@ -97,18 +183,24 @@ def get_llm_status(oauth_token: Optional[str] = None,
     """Return LLM availability status."""
     provider = get_available_provider(oauth_token, token_provider, session_api_key, session_api_provider)
     auth_mode = None
-    if provider and provider.endswith("_session"):
+    if provider and provider.startswith("cli_"):
+        auth_mode = "cli"
+    elif provider and provider.endswith("_session"):
         auth_mode = "api_key_session"
     elif provider and provider.endswith("_oauth"):
         auth_mode = "oauth"
     elif provider:
         auth_mode = "api_key_env"
 
+    # Report available CLI tools
+    cli_tools = list(_detect_cli_tools().keys())
+
     return {
         "available": provider is not None,
         "provider": provider,
         "model": _get_model_name(provider) if provider else None,
         "auth_mode": auth_mode,
+        "cli_tools": cli_tools,
     }
 
 
@@ -116,10 +208,12 @@ def _get_model_name(provider: Optional[str]) -> str:
     """Get model name for the provider."""
     if Config.LLM_MODEL:
         return Config.LLM_MODEL
-    if provider in ("anthropic", "anthropic_oauth", "anthropic_session"):
+    if provider in ("anthropic", "anthropic_oauth", "anthropic_session", "cli_claude"):
         return "claude-sonnet-4-20250514"
-    if provider in ("openai", "openai_oauth", "openai_session"):
+    if provider in ("openai", "openai_oauth", "openai_session", "cli_opencode", "cli_openai"):
         return "gpt-4o-mini"
+    if provider == "cli_gemini":
+        return "gemini-2.5-flash"
     return ""
 
 
@@ -138,6 +232,8 @@ def _resolve_credentials(provider: Optional[str], oauth_token: Optional[str] = N
         return oauth_token, "anthropic"
     if provider == "openai_oauth":
         return oauth_token, "openai"
+    if provider and provider.startswith("cli_"):
+        return None, "cli"
     return None, None
 
 
@@ -165,6 +261,8 @@ def analyze_with_llm(document: str, question: Optional[str] = None,
             return _call_anthropic(model, user_prompt, bool(question), api_key=api_key)
         elif base_provider == "openai":
             return _call_openai(model, user_prompt, bool(question), api_key=api_key)
+        elif base_provider == "cli":
+            return _call_cli_analyze(provider, user_prompt, bool(question))
         else:
             return {"error": f"Unknown LLM provider: {provider}"}
     except Exception as e:
@@ -193,6 +291,8 @@ def summarize_with_llm(document: str, oauth_token: Optional[str] = None,
             return _call_summarize_anthropic(model, user_prompt, api_key=api_key)
         elif base_provider == "openai":
             return _call_summarize_openai(model, user_prompt, api_key=api_key)
+        elif base_provider == "cli":
+            return _call_cli_summarize(provider, user_prompt)
         return None
     except Exception as e:
         logger.warning("LLM summarize failed (%s): %s", provider, e)
@@ -218,6 +318,8 @@ def chat_with_llm(document: str, message: str, chat_history: list,
             return _chat_anthropic(model, context, message, chat_history, api_key=api_key)
         elif base_provider == "openai":
             return _chat_openai(model, context, message, chat_history, api_key=api_key)
+        elif base_provider == "cli":
+            return _call_cli_chat(provider, context, message, chat_history)
         else:
             return {"error": f"Unknown provider: {provider}"}
     except Exception as e:
@@ -346,6 +448,60 @@ def _chat_openai(model: str, context: str, message: str, chat_history: list,
     )
 
     return {"success": True, "response": response.choices[0].message.content, "provider": "openai", "model": model}
+
+
+# ==========================================
+# CLI-based analysis functions
+# ==========================================
+def _cli_tool_name(provider: str) -> str:
+    """Extract CLI tool name from provider string (e.g., cli_claude → claude)."""
+    return provider.replace("cli_", "")
+
+
+def _call_cli_analyze(provider: str, user_prompt: str, is_question: bool) -> dict:
+    """Analyze using CLI tool."""
+    tool = _cli_tool_name(provider)
+    model = _get_model_name(provider)
+    full_prompt = f"{_SYSTEM_PROMPT}\n\n{user_prompt}"
+
+    output = _call_cli(tool, full_prompt)
+    if not output:
+        return {"error": f"CLI tool '{tool}' returned no output. Check if it is authenticated."}
+
+    if is_question:
+        return {"success": True, "response": output, "provider": f"cli:{tool}", "model": model}
+    return _parse_analysis_response(output, f"cli:{tool}", model)
+
+
+def _call_cli_summarize(provider: str, user_prompt: str) -> dict:
+    """Summarize using CLI tool."""
+    tool = _cli_tool_name(provider)
+    model = _get_model_name(provider)
+    full_prompt = f"{_SUMMARIZE_PROMPT}\n\n{user_prompt}"
+
+    output = _call_cli(tool, full_prompt)
+    if not output:
+        return None
+    return {"summary": output, "source": f"cli:{tool}", "model": model}
+
+
+def _call_cli_chat(provider: str, context: str, message: str, chat_history: list) -> dict:
+    """Chat using CLI tool."""
+    tool = _cli_tool_name(provider)
+    model = _get_model_name(provider)
+
+    # Build conversation context
+    history_text = ""
+    for msg in chat_history[-5:]:
+        role = "사용자" if msg["role"] == "user" else "AI"
+        history_text += f"\n{role}: {msg['content']}"
+
+    full_prompt = f"{_SYSTEM_PROMPT}\n\n{context}\n\n대화 기록:{history_text}\n\n사용자: {message}\n\nAI:"
+
+    output = _call_cli(tool, full_prompt)
+    if not output:
+        return {"error": f"CLI tool '{tool}' returned no output."}
+    return {"success": True, "response": output, "provider": f"cli:{tool}", "model": model}
 
 
 def _parse_analysis_response(text: str, provider: str, model: str) -> dict:

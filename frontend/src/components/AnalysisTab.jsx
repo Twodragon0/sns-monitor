@@ -3,6 +3,16 @@ import axios from 'axios';
 
 import { API_BASE } from '../config';
 
+/** Map provider string to display name */
+function providerLabel(provider) {
+  if (!provider) return 'AI';
+  if (provider.includes('anthropic') || provider.includes('claude')) return 'Claude';
+  if (provider.includes('openai') || provider.includes('opencode')) return 'ChatGPT';
+  if (provider.includes('gemini')) return 'Gemini';
+  if (provider.startsWith('cli:')) return provider.replace('cli:', '').toUpperCase();
+  return provider;
+}
+
 /** Inline auth panel: OAuth login + API key input */
 function AuthPanel({ apiBase, onKeySet, openaiOAuthAvailable }) {
   const [showApiKey, setShowApiKey] = useState(false);
@@ -532,7 +542,7 @@ function AnalysisTab() {
             backgroundColor: '#d4edda',
             color: '#155724',
           }}>
-            {llmStatus.provider === 'anthropic' ? 'Claude' : 'ChatGPT'} 사용 가능
+            {providerLabel(llmStatus.provider)} 사용 가능
           </span>
         )}
       </h2>
@@ -584,7 +594,7 @@ function AnalysisTab() {
             <>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <strong style={{ color: '#2e7d32' }}>
-                  AI 분석 사용 가능 ({llmStatus.provider === 'anthropic' ? 'Claude' : llmStatus.provider === 'openai_oauth' ? 'ChatGPT (OAuth)' : 'ChatGPT'} - {llmStatus.model})
+                  AI 분석 사용 가능 ({providerLabel(llmStatus.provider)} - {llmStatus.model})
                 </strong>
                 {authInfo.logged_in && (
                   <button
@@ -601,7 +611,12 @@ function AnalysisTab() {
                 )}
               </div>
               <p style={{ margin: '4px 0 0', color: '#5a5a5a' }}>
-                {llmStatus.auth_mode === 'oauth' ? 'OAuth 인증으로' : 'API Key로'} AI 심화 분석을 수행합니다.
+                {llmStatus.auth_mode === 'cli' ? 'Docker CLI로' : llmStatus.auth_mode === 'oauth' ? 'OAuth 인증으로' : 'API Key로'} AI 심화 분석을 수행합니다.
+                {llmStatus.cli_tools?.length > 0 && (
+                  <span style={{ fontSize: '11px', color: '#888', marginLeft: '6px' }}>
+                    (CLI: {llmStatus.cli_tools.join(', ')})
+                  </span>
+                )}
               </p>
             </>
           ) : (
@@ -677,7 +692,7 @@ function AnalysisTab() {
           {!mirofishAvailable && selectedSources.length > 0 && (
             <span style={{ marginLeft: '10px', fontSize: '12px', color: '#666' }}>
               {llmStatus.available
-                ? `${llmStatus.provider === 'anthropic' ? 'Claude' : 'ChatGPT'}로 AI 분석을 수행합니다`
+                ? `${providerLabel(llmStatus.provider)}로 AI 분석을 수행합니다`
                 : '로컬 감성 분석을 수행합니다'}
             </span>
           )}
@@ -850,7 +865,7 @@ function AnalysisTab() {
               fontSize: '11px', padding: '2px 8px', borderRadius: '12px',
               backgroundColor: '#e3f2fd', color: '#1565c0',
             }}>
-              {aiResult.provider === 'anthropic' ? 'Claude' : 'ChatGPT'} ({aiResult.model})
+              {providerLabel(aiResult.provider)} ({aiResult.model})
             </span>
           </h3>
 
@@ -1059,7 +1074,7 @@ function AnalysisTab() {
             AI 대화
             {aiResult && (
               <span style={{ fontSize: '12px', fontWeight: 'normal', color: '#888', marginLeft: '8px' }}>
-                {aiResult.provider === 'anthropic' ? 'Claude' : 'ChatGPT'}
+                {providerLabel(aiResult.provider)}
               </span>
             )}
           </h3>

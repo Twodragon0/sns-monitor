@@ -2,7 +2,23 @@ FROM python:3.14-slim-bookworm
 
 WORKDIR /app
 
-# Install dependencies
+# Install system deps + Node.js (for AI CLI tools)
+RUN (apt-get update -qq \
+    && apt-get install -y --no-install-recommends curl ca-certificates gnupg \
+    && mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
+       | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" \
+       > /etc/apt/sources.list.d/nodesource.list \
+    && apt-get update -qq \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/*) || true
+
+# Install AI CLI tools globally (optional — fails gracefully)
+RUN (npm install -g @anthropic-ai/claude-code@latest 2>/dev/null || true) \
+    && (npm install -g @openai/codex@latest 2>/dev/null || true)
+
+# Install Python dependencies
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
@@ -18,7 +34,6 @@ RUN mkdir -p /app/local-data/youtube/channels \
     && groupadd -r appuser && useradd -r -g appuser -d /app -s /sbin/nologin appuser
 
 # Playwright Chromium for DCInside comment fallback (when API blocks server-side)
-# apt 403 may occur in corporate proxy environments; || true ensures build continues
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers
 RUN (apt-get update -qq \
     && playwright install-deps chromium \
