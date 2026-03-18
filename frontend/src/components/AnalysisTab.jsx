@@ -5,6 +5,7 @@ import { API_BASE } from '../config';
 
 /** Inline auth panel: OAuth login + API key input */
 function AuthPanel({ apiBase, onKeySet, openaiOAuthAvailable }) {
+  const [showApiKey, setShowApiKey] = useState(false);
   const [keyProvider, setKeyProvider] = useState('openai');
   const [apiKey, setApiKey] = useState('');
   const [keyError, setKeyError] = useState('');
@@ -32,59 +33,83 @@ function AuthPanel({ apiBase, onKeySet, openaiOAuthAvailable }) {
 
   return (
     <>
-      <strong style={{ display: 'block', marginBottom: '8px' }}>AI 분석을 사용하려면 API Key를 입력하세요</strong>
+      <strong style={{ display: 'block', marginBottom: '10px' }}>AI 분석을 사용하려면 로그인하세요</strong>
 
-      <div style={{ padding: '12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '10px' }}>
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-          <select
-            value={keyProvider}
-            onChange={e => setKeyProvider(e.target.value)}
-            style={{ padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px' }}
-          >
-            <option value="openai">OpenAI (ChatGPT)</option>
-            <option value="anthropic">Anthropic (Claude)</option>
-          </select>
-          <input
-            type="password"
-            value={apiKey}
-            onChange={e => setApiKey(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && submitKey()}
-            placeholder={keyProvider === 'anthropic' ? 'sk-ant-api03-...' : 'sk-proj-...'}
-            style={{ flex: 1, padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px' }}
-          />
-          <button
-            type="button"
-            onClick={submitKey}
-            disabled={keySaving || !apiKey.trim()}
-            style={{
-              padding: '8px 18px', fontSize: '13px', fontWeight: '600',
-              background: keySaving ? '#94a3b8' : '#3b82f6', color: 'white',
-              border: 'none', borderRadius: '6px', cursor: keySaving ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {keySaving ? '...' : '연결'}
-          </button>
-        </div>
-        {keyError && <div style={{ color: '#dc2626', fontSize: '12px', marginBottom: '4px' }}>{keyError}</div>}
-        <p style={{ margin: 0, fontSize: '11px', color: '#94a3b8' }}>
-          API Key는 서버 세션에만 저장됩니다 (브라우저 종료 시 삭제).
-          {keyProvider === 'openai' && ' https://platform.openai.com/api-keys 에서 발급'}
-          {keyProvider === 'anthropic' && ' https://console.anthropic.com/settings/keys 에서 발급'}
-        </p>
-      </div>
-
-      {openaiOAuthAvailable && (
-        <div style={{ marginTop: '8px' }}>
+      {/* OAuth buttons */}
+      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '12px' }}>
+        <button
+          type="button"
+          onClick={() => { window.location.href = `${apiBase}/api/auth/anthropic?return_to=/analysis`; }}
+          style={{
+            padding: '10px 20px', fontSize: '14px', fontWeight: '600',
+            background: '#d97706', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: '6px',
+          }}
+        >
+          Claude 로그인
+        </button>
+        {openaiOAuthAvailable && (
           <button
             type="button"
             onClick={() => { window.location.href = `${apiBase}/api/auth/openai?return_to=/analysis`; }}
             style={{
-              padding: '6px 14px', fontSize: '12px', fontWeight: '500',
-              background: 'transparent', color: '#64748b', border: '1px solid #cbd5e1', borderRadius: '6px', cursor: 'pointer',
+              padding: '10px 20px', fontSize: '14px', fontWeight: '600',
+              background: '#10a37f', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: '6px',
             }}
           >
-            OpenAI OAuth 로그인
+            ChatGPT 로그인
           </button>
+        )}
+      </div>
+
+      <p style={{ margin: '0 0 8px', fontSize: '12px', color: '#64748b' }}>
+        Anthropic/OpenAI 계정으로 브라우저 인증 후 AI 분석이 활성화됩니다.
+      </p>
+
+      {/* API Key fallback (collapsible) */}
+      <button
+        type="button"
+        onClick={() => setShowApiKey(!showApiKey)}
+        style={{
+          padding: '4px 10px', fontSize: '11px', color: '#94a3b8',
+          background: 'transparent', border: 'none', cursor: 'pointer', textDecoration: 'underline',
+        }}
+      >
+        {showApiKey ? 'API Key 입력 닫기' : 'API Key 직접 입력'}
+      </button>
+
+      {showApiKey && (
+        <div style={{ padding: '10px', marginTop: '6px', background: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+          <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
+            <select
+              value={keyProvider}
+              onChange={e => setKeyProvider(e.target.value)}
+              style={{ padding: '6px 8px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '12px' }}
+            >
+              <option value="openai">OpenAI</option>
+              <option value="anthropic">Anthropic</option>
+            </select>
+            <input
+              type="password"
+              value={apiKey}
+              onChange={e => setApiKey(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && submitKey()}
+              placeholder={keyProvider === 'anthropic' ? 'sk-ant-...' : 'sk-...'}
+              style={{ flex: 1, padding: '6px 8px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '12px' }}
+            />
+            <button
+              type="button" onClick={submitKey} disabled={keySaving || !apiKey.trim()}
+              style={{
+                padding: '6px 12px', fontSize: '12px', fontWeight: '600',
+                background: keySaving ? '#94a3b8' : '#3b82f6', color: 'white',
+                border: 'none', borderRadius: '4px', cursor: keySaving ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {keySaving ? '...' : '연결'}
+            </button>
+          </div>
+          {keyError && <div style={{ color: '#dc2626', fontSize: '11px' }}>{keyError}</div>}
         </div>
       )}
     </>

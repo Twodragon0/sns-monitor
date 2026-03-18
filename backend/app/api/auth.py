@@ -2,9 +2,9 @@
 OAuth 2.0 authentication for LLM-powered analysis.
 
 Supports:
-1. Anthropic Console OAuth (PKCE) - Claude Code compatible
-2. OpenAI OAuth - for ChatGPT API access
-3. Browser API Key input - stored in session (no .env needed)
+1. Anthropic OAuth (PKCE) - Claude Code compatible (claude.ai)
+2. OpenAI OAuth (PKCE) - ChatGPT compatible
+3. Browser API Key input - stored in session (fallback)
 """
 
 import hashlib
@@ -25,6 +25,7 @@ from ..config import Config
 logger = logging.getLogger(__name__)
 
 # Anthropic OAuth (Claude Code compatible)
+# redirect_uri MUST be http://localhost:{port}/callback (Claude Code pattern)
 _ANTHROPIC_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
 _ANTHROPIC_AUTHORIZE_URL = "https://claude.ai/oauth/authorize"
 _ANTHROPIC_TOKEN_URL = "https://claude.ai/oauth/token"
@@ -44,19 +45,13 @@ def require_analysis_auth(f):
 
 
 def _oauth_configured():
-    return bool(
-        Config.OPENAI_OAUTH_CLIENT_ID
-        and Config.OPENAI_OAUTH_CLIENT_SECRET
-        and Config.OAUTH_REDIRECT_URI
-    )
+    return bool(Config.OPENAI_OAUTH_CLIENT_ID)
 
 
-def _get_redirect_uri():
-    """Get OAuth redirect URI from config or build from request."""
-    if Config.OAUTH_REDIRECT_URI:
-        return Config.OAUTH_REDIRECT_URI
-    # Auto-detect from request
-    return f"{request.scheme}://{request.host}/api/auth/callback"
+def _get_callback_uri():
+    """Build callback URI in Claude Code format: http://localhost:PORT/callback"""
+    port = request.host.split(":")[-1] if ":" in request.host else "8888"
+    return f"http://localhost:{port}/callback"
 
 
 # ==========================================
@@ -66,33 +61,27 @@ def _get_redirect_uri():
 def auth_me():
     """Return current user session info."""
     user = session.get("user")
-    has_api_key = bool(session.get("session_api_key"))
-    has_token = bool(session.get("access_token"))
-
     if user:
         return jsonify({
             "logged_in": True,
             "user": user,
             "auth_required": Config.AUTH_REQUIRED_FOR_ANALYSIS,
-            "has_api_key": has_api_key,
-            "has_token": has_token,
         })
     return jsonify({
         "logged_in": False,
         "auth_required": Config.AUTH_REQUIRED_FOR_ANALYSIS,
-        "anthropic_oauth_available": True,  # Always available (built-in client ID)
+        "anthropic_oauth_available": True,
         "openai_oauth_available": _oauth_configured(),
     })
 
 
 # ==========================================
-# Anthropic Console OAuth (PKCE)
+# Anthropic OAuth (PKCE) - Claude Code compatible
 # ==========================================
 @auth_bp.route("/api/auth/anthropic", methods=["GET"])
 @limiter.limit("10 per minute")
 def auth_anthropic_start():
-    """Start Anthropic Console OAuth with PKCE."""
-    # Generate PKCE verifier and challenge
+    """Start Anthropic OAuth with PKCE (same flow as Claude Code)."""
     code_verifier = secrets.token_urlsafe(64)[:128]
     code_challenge = urlsafe_b64encode(
         hashlib.sha256(code_verifier.encode("ascii")).digest()
@@ -114,7 +103,7 @@ def auth_anthropic_start():
         "code": "true",
         "client_id": _ANTHROPIC_CLIENT_ID,
         "response_type": "code",
-        "redirect_uri": _get_redirect_uri(),
+        "redirect_uri": _get_callback_uri(),
         "scope": _ANTHROPIC_SCOPES,
         "code_challenge": code_challenge,
         "code_challenge_method": "S256",
@@ -127,22 +116,14 @@ def auth_anthropic_start():
 # ==========================================
 # OpenAI OAuth (PKCE)
 # ==========================================
-# OpenAI OAuth endpoints (configurable via env, defaults to chatgpt.com)
-_OPENAI_DEFAULT_AUTHORIZE_URL = "https://auth.openai.com/authorize"
-_OPENAI_DEFAULT_TOKEN_URL = "https://auth.openai.com/oauth/token"
-_OPENAI_DEFAULT_SCOPES = "openid profile email"
-
-
 @auth_bp.route("/api/auth/openai", methods=["GET"])
 @limiter.limit("10 per minute")
 def auth_openai_start():
-    """Redirect to OpenAI OAuth authorize URL (PKCE or standard)."""
-    # Use configured client ID or fall back to error
+    """Start OpenAI OAuth with PKCE."""
     client_id = Config.OPENAI_OAUTH_CLIENT_ID
     if not client_id:
-        return jsonify({"error": "OpenAI OAuth not configured. Set OPENAI_OAUTH_CLIENT_ID in .env or use Anthropic OAuth."}), 503
+        return jsonify({"error": "OpenAI OAuth not configured. Set OPENAI_OAUTH_CLIENT_ID."}), 503
 
-    # PKCE for OpenAI
     code_verifier = secrets.token_urlsafe(64)[:128]
     code_challenge = urlsafe_b64encode(
         hashlib.sha256(code_verifier.encode("ascii")).digest()
@@ -160,14 +141,14 @@ def auth_openai_start():
     else:
         session["oauth_return_to"] = "/analysis"
 
-    authorize_url = Config.OAUTH_AUTHORIZE_URL or _OPENAI_DEFAULT_AUTHORIZE_URL
-    scopes = Config.OAUTH_SCOPES or _OPENAI_DEFAULT_SCOPES
+    authorize_url = Config.OAUTH_AUTHORIZE_URL or "https://auth.openai.com/authorize"
+    scopes = Config.OAUTH_SCOPES or "openid profile email"
 
     params = {
         "code": "true",
         "client_id": client_id,
         "response_type": "code",
-        "redirect_uri": _get_redirect_uri(),
+        "redirect_uri": _get_callback_uri(),
         "scope": scopes,
         "code_challenge": code_challenge,
         "code_challenge_method": "S256",
@@ -178,12 +159,13 @@ def auth_openai_start():
 
 
 # ==========================================
-# OAuth callback (handles both providers)
+# OAuth callback — http://localhost:PORT/callback
+# Claude Code pattern: must be at /callback (not /api/auth/callback)
 # ==========================================
-@auth_bp.route("/api/auth/callback", methods=["GET"])
+@auth_bp.route("/callback", methods=["GET"])
 @limiter.limit("10 per minute")
 def auth_callback():
-    """Exchange OAuth code for tokens (Anthropic PKCE or OpenAI)."""
+    """Exchange OAuth code for tokens (Anthropic PKCE or OpenAI PKCE)."""
     err = request.args.get("error")
     if err:
         logger.warning("OAuth error: %s", err)
@@ -199,12 +181,20 @@ def auth_callback():
         logger.warning("OAuth state mismatch")
         return redirect(_frontend_redirect("/analysis?auth_error=invalid_state"))
 
-    provider = session.pop("oauth_provider", "openai")
+    provider = session.pop("oauth_provider", "anthropic")
 
     if provider == "anthropic":
         return _handle_anthropic_callback(code)
     else:
         return _handle_openai_callback(code)
+
+
+# Keep legacy path for backward compatibility
+@auth_bp.route("/api/auth/callback", methods=["GET"])
+@limiter.limit("10 per minute")
+def auth_callback_legacy():
+    """Legacy callback path — redirect to /callback handler."""
+    return auth_callback()
 
 
 def _handle_anthropic_callback(code):
@@ -216,7 +206,7 @@ def _handle_anthropic_callback(code):
     data = {
         "grant_type": "authorization_code",
         "code": code,
-        "redirect_uri": _get_redirect_uri(),
+        "redirect_uri": _get_callback_uri(),
         "client_id": _ANTHROPIC_CLIENT_ID,
         "code_verifier": code_verifier,
     }
@@ -235,6 +225,7 @@ def _handle_anthropic_callback(code):
 
     access_token = token_data.get("access_token")
     if not access_token:
+        logger.warning("Anthropic token response: %s", {k: v for k, v in token_data.items() if k != "access_token"})
         return redirect(_frontend_redirect("/analysis?auth_error=no_access_token"))
 
     session["access_token"] = access_token
@@ -244,6 +235,7 @@ def _handle_anthropic_callback(code):
     session["user"] = {
         "id": token_data.get("user_id") or token_data.get("sub") or "anthropic-user",
         "provider": "anthropic",
+        "display": "Claude (Anthropic)",
     }
 
     return_to = session.pop("oauth_return_to", "/analysis")
@@ -251,21 +243,20 @@ def _handle_anthropic_callback(code):
 
 
 def _handle_openai_callback(code):
-    """Exchange OpenAI OAuth code for tokens (PKCE or client_secret)."""
+    """Exchange OpenAI OAuth code for tokens (PKCE)."""
     client_id = Config.OPENAI_OAUTH_CLIENT_ID
     if not client_id:
         return redirect(_frontend_redirect("/analysis?auth_error=openai_oauth_not_configured"))
 
-    token_url = Config.OAUTH_TOKEN_URL or _OPENAI_DEFAULT_TOKEN_URL
     code_verifier = session.pop("pkce_verifier", None)
+    token_url = Config.OAUTH_TOKEN_URL or "https://auth.openai.com/oauth/token"
 
     data = {
         "grant_type": "authorization_code",
         "code": code,
-        "redirect_uri": _get_redirect_uri(),
+        "redirect_uri": _get_callback_uri(),
         "client_id": client_id,
     }
-    # Use PKCE verifier if available, otherwise use client_secret
     if code_verifier:
         data["code_verifier"] = code_verifier
     elif Config.OPENAI_OAUTH_CLIENT_SECRET:
@@ -295,21 +286,19 @@ def _handle_openai_callback(code):
     session["user"] = {
         "id": token_data.get("id") or token_data.get("sub") or "openai-user",
         "provider": "openai",
+        "display": "ChatGPT (OpenAI)",
     }
     return_to = session.pop("oauth_return_to", "/analysis")
     return redirect(_frontend_redirect(return_to))
 
 
 # ==========================================
-# Browser API key input (session-based)
+# Browser API key input (session-based fallback)
 # ==========================================
 @auth_bp.route("/api/auth/apikey", methods=["POST"])
 @limiter.limit("10 per minute")
 def set_api_key():
-    """Store API key in session (no .env needed).
-
-    Request JSON: {"provider": "openai"|"anthropic", "api_key": "sk-..."}
-    """
+    """Store API key in session. Fallback for when OAuth is unavailable."""
     data = request.get_json() or {}
     provider = data.get("provider", "").strip()
     api_key = data.get("api_key", "").strip()
@@ -318,8 +307,6 @@ def set_api_key():
         return jsonify({"error": "Provider must be 'openai' or 'anthropic'"}), 400
     if not api_key:
         return jsonify({"error": "API key is required"}), 400
-
-    # Basic validation
     if provider == "openai" and not api_key.startswith("sk-"):
         return jsonify({"error": "OpenAI API key should start with 'sk-'"}), 400
     if provider == "anthropic" and not api_key.startswith("sk-ant-"):
@@ -330,8 +317,8 @@ def set_api_key():
     session["user"] = {
         "id": f"{provider}-apikey-user",
         "provider": provider,
+        "display": "Claude (API Key)" if provider == "anthropic" else "ChatGPT (API Key)",
     }
-
     return jsonify({"ok": True, "provider": provider})
 
 
@@ -345,11 +332,8 @@ def auth_logout():
     return jsonify({"ok": True})
 
 
-# ==========================================
-# Helpers
-# ==========================================
 def _frontend_redirect(path):
-    """Redirect to frontend; use env FRONTEND_URL or same host."""
+    """Redirect to frontend."""
     base = (os.environ.get("FRONTEND_URL") or "").strip()
     if not base:
         return path
