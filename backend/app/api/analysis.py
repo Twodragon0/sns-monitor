@@ -569,6 +569,67 @@ def sentiment_trend():
     })
 
 
+@analysis_bp.route('/api/analysis/compare', methods=['GET'])
+def gallery_compare():
+    """Compare sentiment across all DCInside galleries.
+
+    Returns sorted list of galleries with their latest sentiment stats.
+    """
+    from ..services.platform_analyzer import PlatformAnalyzer
+
+    data_dir = _get_local_data_dir()
+    dc_dir = data_dir / 'dcinside'
+    if not dc_dir.exists():
+        return jsonify({'galleries': []})
+
+    analyzer = PlatformAnalyzer(data_dir=str(data_dir))
+    galleries = []
+
+    for gallery_dir in sorted(dc_dir.iterdir()):
+        if not gallery_dir.is_dir() or gallery_dir.name.startswith('example'):
+            continue
+        json_files = sorted(gallery_dir.glob('*.json'))
+        if not json_files:
+            continue
+
+        # Read latest file
+        latest = json_files[-1]
+        try:
+            with open(latest, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            name = data.get('gallery_name', gallery_dir.name)
+            items = []
+            for post in data.get('posts', data.get('data', []))[:200]:
+                p = post.get('post', post)
+                text = p.get('text', '') or p.get('title', '')
+                if text:
+                    items.append({'text': text})
+                for c in post.get('comments', [])[:5]:
+                    ctext = c.get('text', c.get('content', ''))
+                    if ctext:
+                        items.append({'text': ctext})
+
+            sentiment = analyzer._analyze_sentiment(items)
+            s = sentiment['sentiment']
+            total = s['positive'] + s['neutral'] + s['negative']
+            galleries.append({
+                'id': gallery_dir.name,
+                'name': name,
+                'total': total,
+                'positive': s['positive'],
+                'neutral': s['neutral'],
+                'negative': s['negative'],
+                'pos_pct': round(s['positive'] / total * 100) if total else 0,
+                'neg_pct': round(s['negative'] / total * 100) if total else 0,
+                'keywords': [k['word'] for k in sentiment.get('top_keywords', [])[:5]],
+            })
+        except Exception as e:
+            logger.warning("Compare: failed to process %s: %s", gallery_dir.name, e)
+
+    return jsonify({'galleries': galleries})
+
+
 def _session_llm_kwargs():
     """Extract LLM credentials from Flask session."""
     return {

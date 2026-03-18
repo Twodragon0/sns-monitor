@@ -1,7 +1,75 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 import { API_BASE } from '../config';
+
+/** Word Cloud: CSS-based (no extra lib) + Gallery Comparison BarChart */
+function WordCloudAndCompare({ keywords }) {
+  const [compareData, setCompareData] = useState([]);
+
+  useEffect(() => {
+    axios.get(`${API_BASE}/api/analysis/compare`)
+      .then(({ data }) => setCompareData(data.galleries || []))
+      .catch(() => {});
+  }, []);
+
+  const maxCount = keywords.length > 0 ? Math.max(...keywords.map(k => k.count)) : 1;
+
+  return (
+    <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '20px' }}>
+      {/* Word Cloud */}
+      {keywords.length > 0 && (
+        <div style={{
+          flex: '1 1 340px', backgroundColor: 'white', padding: '16px',
+          borderRadius: '8px', border: '1px solid #dee2e6',
+        }}>
+          <h4 style={{ margin: '0 0 12px', fontSize: '14px', color: '#555' }}>키워드 클라우드</h4>
+          <div style={{
+            display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'center',
+            padding: '10px', minHeight: '100px',
+          }}>
+            {keywords.slice(0, 25).map((kw, i) => {
+              const ratio = kw.count / maxCount;
+              const size = Math.max(12, Math.round(ratio * 32 + 10));
+              const colors = ['#1d4ed8', '#7c3aed', '#0891b2', '#059669', '#d97706', '#dc2626', '#6366f1', '#0d9488'];
+              return (
+                <span key={i} style={{
+                  fontSize: `${size}px`,
+                  fontWeight: ratio > 0.5 ? 700 : 400,
+                  color: colors[i % colors.length],
+                  lineHeight: 1.3,
+                  cursor: 'default',
+                }} title={`${kw.word}: ${kw.count}회`}>
+                  {kw.word}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Gallery Comparison */}
+      {compareData.length > 1 && (
+        <div style={{
+          flex: '1 1 340px', backgroundColor: 'white', padding: '16px',
+          borderRadius: '8px', border: '1px solid #dee2e6',
+        }}>
+          <h4 style={{ margin: '0 0 12px', fontSize: '14px', color: '#555' }}>갤러리간 감성 비교</h4>
+          <ResponsiveContainer width="100%" height={compareData.length * 40 + 30}>
+            <BarChart data={compareData} layout="vertical" margin={{ left: 10, right: 10, top: 5, bottom: 5 }}>
+              <XAxis type="number" tick={{ fontSize: 11 }} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={100} />
+              <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v, name) => [v + '%', name === 'pos_pct' ? '긍정' : '부정']} />
+              <Bar dataKey="pos_pct" name="긍정" stackId="s" fill="#10b981" />
+              <Bar dataKey="neg_pct" name="부정" stackId="s" fill="#ef4444" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /** Map provider string to display name */
 function providerLabel(provider) {
@@ -809,10 +877,13 @@ function AnalysisTab() {
           )}
 
           <p style={{ marginTop: '16px', marginBottom: 0, fontSize: '12px', color: '#999' }}>
-            로컬 키워드 기반 분석입니다. OPENAI_API_KEY 또는 ANTHROPIC_API_KEY를 설정하면 AI 심화 분석이 가능합니다.
+            Kiwi 형태소 분석 기반. API Key 설정 시 AI 심화 분석이 가능합니다.
           </p>
         </div>
       )}
+
+      {/* Word Cloud + Gallery Comparison */}
+      {(localResult || aiResult) && <WordCloudAndCompare keywords={localResult?.overall?.top_keywords || aiResult?.topics?.map(t => ({word: t.topic, count: t.count || 1})) || []} />}
 
       {/* AI Analysis Result */}
       {aiResult && (
