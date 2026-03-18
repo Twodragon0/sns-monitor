@@ -140,7 +140,7 @@ function AnalysisTabWithAuth() {
   if (authRequired && !loggedIn) {
     return (
       <div className="analysis-auth-gate">
-        <h2>🐟 수집 데이터 분석 · 요약 (MiroFish)</h2>
+        <h2>수집 데이터 분석 · 요약</h2>
         <p>이 기능을 사용하려면 OpenAI OAuth로 로그인해 주세요.</p>
         <button type="button" className="btn-openai-login" onClick={() => login('/analysis')}>
           OpenAI(GPT)로 로그인

@@ -674,7 +674,7 @@ function AnalysisResult({ result }) {
           <div className="summary-content">
             <div className="summary-source">
               {summary.source === 'mirofish'
-                ? 'MiroFish AI'
+                ? 'AI 분석'
                 : summary.source === 'anthropic'
                 ? 'Claude AI'
                 : summary.source === 'openai' || summary.source === 'openai_oauth'

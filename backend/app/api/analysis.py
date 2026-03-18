@@ -1,6 +1,6 @@
 """
-MiroFish Analysis Bridge API.
-Transforms SNS crawled data into documents and proxies analysis requests to MiroFish.
+SNS AI Analysis Bridge API.
+Transforms SNS crawled data into documents and proxies analysis requests to the AI analysis service.
 """
 
 import json
@@ -27,12 +27,12 @@ MIROFISH_URL = os.environ.get('MIROFISH_ENDPOINT', 'http://mirofish:5001')
 
 
 def _mirofish_headers():
-    """Forward OpenAI OAuth access token to MiroFish so it can call OpenAI API without LLM_API_KEY."""
+    """Forward OpenAI OAuth access token to AI analysis service so it can call OpenAI API without LLM_API_KEY."""
     headers = {}
     token = session.get('access_token')
     if token:
         headers['Authorization'] = f'Bearer {token}'
-        headers['X-OpenAI-Access-Token'] = token  # MiroFish can use either
+        headers['X-OpenAI-Access-Token'] = token  # service can use either header
     return headers
 
 
@@ -41,7 +41,7 @@ def _get_local_data_dir():
 
 
 def _transform_youtube_to_document(channel_handle):
-    """Transform YouTube crawler data into a Markdown document for MiroFish."""
+    """Transform YouTube crawler data into a Markdown document for AI analysis."""
     data_dir = _get_local_data_dir() / 'youtube' / 'channels'
     lines = []
 
@@ -81,7 +81,7 @@ def _transform_youtube_to_document(channel_handle):
 
 
 def _transform_dcinside_to_document(gallery_id):
-    """Transform DCInside crawler data into a Markdown document for MiroFish."""
+    """Transform DCInside crawler data into a Markdown document for AI analysis."""
     data_dir = _get_local_data_dir() / 'dcinside' / gallery_id
     lines = []
 
@@ -124,7 +124,7 @@ def _transform_dcinside_to_document(gallery_id):
 
 @analysis_bp.route('/api/analysis/status', methods=['GET'])
 def analysis_status():
-    """Check MiroFish service availability."""
+    """Check AI analysis service availability."""
     try:
         resp = requests.get(
             f'{MIROFISH_URL}/api/graph/project/list',
@@ -146,7 +146,7 @@ def analysis_status():
 @require_analysis_auth
 def transform_sns_data():
     """
-    Transform SNS crawled data into a document and send to MiroFish for analysis.
+    Transform SNS crawled data into a document and send to AI analysis service.
 
     Request JSON:
     {
@@ -191,7 +191,7 @@ def transform_sns_data():
     if not documents:
         return jsonify({'error': 'No data found for specified sources'}), 404
 
-    # Send to MiroFish as file upload
+    # Send to AI analysis service as file upload
     try:
         import tempfile
         files = []
@@ -226,17 +226,17 @@ def transform_sns_data():
 
     except requests.ConnectionError:
         return jsonify({
-            'error': 'MiroFish service not available. Start with: docker-compose --profile analysis up -d'
+            'error': 'AI analysis service not available. Start with: docker-compose --profile analysis up -d'
         }), 503
     except Exception as e:
-        logger.error("MiroFish transform failed: %s", e, exc_info=True)
+        logger.error("AI analysis transform failed: %s", e, exc_info=True)
         return jsonify({'error': 'Internal server error'}), 500
 
 
 @analysis_bp.route('/api/analysis/graph/build', methods=['POST'])
 @require_analysis_auth
 def build_analysis_graph():
-    """Proxy graph build request to MiroFish."""
+    """Proxy graph build request to AI analysis service."""
     try:
         resp = requests.post(
             f'{MIROFISH_URL}/api/graph/build',
@@ -246,13 +246,13 @@ def build_analysis_graph():
         )
         return jsonify(resp.json()), resp.status_code
     except requests.ConnectionError:
-        return jsonify({'error': 'MiroFish service not available'}), 503
+        return jsonify({'error': 'AI analysis service not available'}), 503
 
 
 @analysis_bp.route('/api/analysis/graph/task/<task_id>', methods=['GET'])
 @require_analysis_auth
 def get_analysis_task(task_id):
-    """Proxy task status query to MiroFish."""
+    """Proxy task status query to AI analysis service."""
     if not _SAFE_ID_RE.match(task_id):
         return jsonify({'error': 'Invalid task_id'}), 400
     try:
@@ -263,13 +263,13 @@ def get_analysis_task(task_id):
         )
         return jsonify(resp.json()), resp.status_code
     except requests.ConnectionError:
-        return jsonify({'error': 'MiroFish service not available'}), 503
+        return jsonify({'error': 'AI analysis service not available'}), 503
 
 
 @analysis_bp.route('/api/analysis/graph/data/<graph_id>', methods=['GET'])
 @require_analysis_auth
 def get_analysis_graph_data(graph_id):
-    """Proxy graph data query to MiroFish."""
+    """Proxy graph data query to AI analysis service."""
     if not _SAFE_ID_RE.match(graph_id):
         return jsonify({'error': 'Invalid graph_id'}), 400
     try:
@@ -280,13 +280,13 @@ def get_analysis_graph_data(graph_id):
         )
         return jsonify(resp.json()), resp.status_code
     except requests.ConnectionError:
-        return jsonify({'error': 'MiroFish service not available'}), 503
+        return jsonify({'error': 'AI analysis service not available'}), 503
 
 
 @analysis_bp.route('/api/analysis/report/generate', methods=['POST'])
 @require_analysis_auth
 def generate_analysis_report():
-    """Proxy report generation to MiroFish."""
+    """Proxy report generation to AI analysis service."""
     try:
         resp = requests.post(
             f'{MIROFISH_URL}/api/report/generate',
@@ -296,13 +296,13 @@ def generate_analysis_report():
         )
         return jsonify(resp.json()), resp.status_code
     except requests.ConnectionError:
-        return jsonify({'error': 'MiroFish service not available'}), 503
+        return jsonify({'error': 'AI analysis service not available'}), 503
 
 
 @analysis_bp.route('/api/analysis/report/<report_id>', methods=['GET'])
 @require_analysis_auth
 def get_analysis_report(report_id):
-    """Proxy report retrieval from MiroFish."""
+    """Proxy report retrieval from AI analysis service."""
     if not _SAFE_ID_RE.match(report_id):
         return jsonify({'error': 'Invalid report_id'}), 400
     try:
@@ -313,14 +313,14 @@ def get_analysis_report(report_id):
         )
         return jsonify(resp.json()), resp.status_code
     except requests.ConnectionError:
-        return jsonify({'error': 'MiroFish service not available'}), 503
+        return jsonify({'error': 'AI analysis service not available'}), 503
 
 
 @analysis_bp.route('/api/analysis/report/chat', methods=['POST'])
 @limiter.limit("20 per minute")
 @require_analysis_auth
 def chat_with_analysis():
-    """Proxy chat with MiroFish ReportAgent."""
+    """Proxy chat with AI analysis ReportAgent."""
     try:
         resp = requests.post(
             f'{MIROFISH_URL}/api/report/chat',
@@ -330,13 +330,13 @@ def chat_with_analysis():
         )
         return jsonify(resp.json()), resp.status_code
     except requests.ConnectionError:
-        return jsonify({'error': 'MiroFish service not available'}), 503
+        return jsonify({'error': 'AI analysis service not available'}), 503
 
 
 @analysis_bp.route('/api/analysis/projects', methods=['GET'])
 @require_analysis_auth
 def list_analysis_projects():
-    """Proxy project list from MiroFish."""
+    """Proxy project list from AI analysis service."""
     try:
         resp = requests.get(
             f'{MIROFISH_URL}/api/graph/project/list',
@@ -345,7 +345,7 @@ def list_analysis_projects():
         )
         return jsonify(resp.json()), resp.status_code
     except requests.ConnectionError:
-        return jsonify({'error': 'MiroFish service not available'}), 503
+        return jsonify({'error': 'AI analysis service not available'}), 503
 
 
 def _source_display_name_youtube(json_path):
@@ -360,7 +360,7 @@ def _source_display_name_youtube(json_path):
 
 @analysis_bp.route('/api/analysis/sources', methods=['GET'])
 def list_available_sources():
-    """List available SNS data sources that can be analyzed (for MiroFish analysis/summary)."""
+    """List available SNS data sources that can be analyzed (for AI analysis/summary)."""
     data_dir = Path(Config.LOCAL_DATA_DIR)
     sources = []
 
@@ -448,7 +448,7 @@ def _read_source_items(src_type, src_id):
 @limiter.limit("10 per minute")
 def local_summary():
     """
-    Local analysis without MiroFish: reads crawled data and runs keyword-based sentiment analysis.
+    Local analysis: reads crawled data and runs keyword-based sentiment analysis.
     Works offline — no external AI service required.
     """
     from ..services.platform_analyzer import PlatformAnalyzer
@@ -520,7 +520,7 @@ def llm_status():
 def ai_summary():
     """
     AI-powered analysis using local LLM (Claude or ChatGPT).
-    Works without MiroFish — calls LLM APIs directly.
+    Works standalone — calls LLM APIs directly.
 
     Request JSON:
     {

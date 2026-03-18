@@ -393,15 +393,15 @@ function Dashboard({ onShowError }) {
         )}
 
         <div className="dash__monitoring-analysis-cta">
-          <span className="dash__monitoring-analysis-label">🐟 수집 데이터 분석 · 요약 (MiroFish)</span>
+          <span className="dash__monitoring-analysis-label">수집 데이터 분석 · 요약</span>
           <p className="dash__monitoring-analysis-desc">
-            위 URL 분석과 크롤러로 쌓인 YouTube·DCInside 데이터를 한꺼번에 MiroFish AI로 보내,
+            위 URL 분석과 크롤러로 쌓인 YouTube·DCInside 데이터를 한꺼번에 AI로 보내,
             엔티티 그래프와 AI 채팅으로 <strong>전체 패턴과 인사이트</strong>를 보는 심화 분석 기능입니다.
           </p>
           {analysisResult && (
             <p className="dash__monitoring-analysis-recent">
               최근 URL 분석: <strong>{PLATFORMS[analysisResult.platform]?.label || analysisResult.platform}</strong> — {analysisResult.title || analysisResult.gallery_name || analysisResult.gallery_id || '분석 결과'} ({formatNumber(analysisResult.total_posts ?? analysisResult.comment_count ?? (analysisResult.comments || analysisResult.posts || analysisResult.recent_videos || []).length)}건).
-              위의 URL 분석 결과 카드에서 <strong>「🐟 MiroFish로 심화 분석」</strong> 버튼을 누르면, 이 대상이 자동으로 MiroFish에 연결됩니다.
+              위의 URL 분석 결과 카드에서 <strong>「AI 심화 분석」</strong> 버튼을 누르면, 이 대상이 자동으로 AI 분석에 연결됩니다.
             </p>
           )}
           <button
@@ -412,7 +412,7 @@ function Dashboard({ onShowError }) {
               window.dispatchEvent(new PopStateEvent('popstate'));
             }}
           >
-            MiroFish 분석 페이지로 이동
+            AI 분석 페이지로 이동
           </button>
         </div>
 
@@ -519,17 +519,17 @@ function renderSummaryContent(text) {
   return parts;
 }
 
-/** MiroFish로 심화 분석 버튼: 상태 확인 후 이동, 현재 결과 소스 사전 선택. authRequired 시 로그인 유도. */
-function MiroFishCtaButton({ result, onShowError }) {
+/** AI 심화 분석 버튼: 상태 확인 후 이동, 현재 결과 소스 사전 선택. authRequired 시 로그인 유도. */
+function AiCtaButton({ result, onShowError }) {
   const [loading, setLoading] = useState(false);
   const { loggedIn, authRequired, login } = useAuth();
 
-  const goToMiroFish = useCallback(async () => {
+  const goToAiAnalysis = useCallback(async () => {
     setLoading(true);
     try {
       const { data } = await axios.get(`${API_BASE}/api/analysis/status`, { timeout: 5000 });
       if (!data.mirofish_available) {
-        onShowError?.('MiroFish 서비스가 꺼져 있습니다.\n\n시작 방법:\n1. .env.mirofish 파일에 OPENAI_API_KEY 설정\n2. docker-compose --profile analysis up -d\n3. 페이지 새로고침 후 다시 시도');
+        onShowError?.('AI 분석 서비스에 연결할 수 없습니다.\n\n시작 방법:\n1. .env.mirofish 파일에 OPENAI_API_KEY 설정\n2. docker-compose --profile analysis up -d\n3. 페이지 새로고침 후 다시 시도');
       }
       const preselect = [];
       if (result.platform === 'youtube' && (result.channel_id || result.channelId)) {
@@ -546,7 +546,7 @@ function MiroFishCtaButton({ result, onShowError }) {
       window.history.pushState({}, '', '/analysis');
       window.dispatchEvent(new PopStateEvent('popstate'));
     } catch (_) {
-      onShowError?.('MiroFish 상태 확인에 실패했습니다. API 서버 연결을 확인해 주세요.');
+      onShowError?.('AI 분석 상태 확인에 실패했습니다. API 서버 연결을 확인해 주세요.');
     } finally {
       setLoading(false);
     }
@@ -561,7 +561,7 @@ function MiroFishCtaButton({ result, onShowError }) {
           className="result__mirofish-cta-btn result__mirofish-cta-btn--login"
           onClick={() => login('/analysis')}
         >
-          OpenAI(GPT)로 로그인 후 MiroFish 분석
+          OpenAI(GPT)로 로그인 후 AI 심화 분석
         </button>
       </div>
     );
@@ -573,10 +573,10 @@ function MiroFishCtaButton({ result, onShowError }) {
       <button
         type="button"
         className="result__mirofish-cta-btn"
-        onClick={goToMiroFish}
+        onClick={goToAiAnalysis}
         disabled={loading}
       >
-        {loading ? '확인 중…' : '🐟 MiroFish로 심화 분석'}
+        {loading ? '확인 중…' : 'AI 심화 분석'}
       </button>
     </div>
   );
@@ -699,15 +699,15 @@ function AnalysisResult({ result, summary, summaryLoading, onSummarize, onShowEr
 
       {summary && (
         <div className="result__summary">
-          <span className="result__summary-src">{summary.source === 'mirofish' ? '🐟 MiroFish AI' : '📊 로컬 분석'}</span>
+          <span className="result__summary-src">{summary.source === 'mirofish' ? 'AI 분석' : '📊 로컬 분석'}</span>
           <div className="result__summary-text">
             {renderSummaryContent(summary.summary)}
           </div>
         </div>
       )}
 
-      {/* 이 분석을 MiroFish로 심화 분석 (요약/감성 아래 항상 노출) */}
-      <MiroFishCtaButton result={result} onShowError={onShowError} />
+      {/* AI 심화 분석 버튼 (요약/감성 아래 항상 노출) */}
+      <AiCtaButton result={result} onShowError={onShowError} />
 
       {/* DCInside 단일 게시글 본문 */}
       {(result.platform === 'dcinside' || result.platform === 'naver_cafe') && result.type === 'post' && result.content && (
@@ -1365,9 +1365,9 @@ function OverviewPanel({ stats, channels }) {
       </div>
       <div className="panel-overview__analysis">
         <div className="panel-card panel-card--analysis">
-          <h4 className="panel-card__title">🐟 수집 데이터 분석 · 요약</h4>
+          <h4 className="panel-card__title">수집 데이터 분석 · 요약</h4>
           <div className="panel-card__body">
-            <p>크롤러로 수집한 YouTube·DCInside 데이터를 MiroFish AI로 분석·요약합니다.</p>
+            <p>크롤러로 수집한 YouTube·DCInside 데이터를 AI로 분석·요약합니다.</p>
             <p className="panel-card__hint">엔티티 그래프 구축 후 AI 채팅으로 인사이트를 질의할 수 있습니다.</p>
             <button type="button" className="panel-card__btn" onClick={goAnalysis}>
               분석 페이지로 이동

@@ -65,7 +65,7 @@ def analyze_url():
 @analyze_bp.route("/api/analyze/summarize", methods=["POST"])
 @limiter.limit("10 per minute")
 def summarize_analysis():
-    """Summarize analysis results using MiroFish AI service."""
+    """Summarize analysis results using AI service."""
     data = request.get_json(silent=True)
     if not data or "result" not in data:
         return jsonify({"error": "Analysis result is required"}), 400
@@ -151,8 +151,8 @@ def summarize_analysis():
 
     document = "\n".join(lines)
 
-    # Try MiroFish first, then LLM, then local fallback
-    # 1) MiroFish
+    # Try AI analysis service first, then LLM, then local fallback
+    # 1) AI analysis service
     mirofish_endpoint = Config.MIROFISH_ENDPOINT
     try:
         import requests as req
@@ -180,9 +180,9 @@ def summarize_analysis():
                 }
             )
         else:
-            logger.warning(f"MiroFish returned {resp.status_code}: {resp.text[:200]}")
+            logger.warning(f"AI analysis service returned {resp.status_code}: {resp.text[:200]}")
     except Exception as e:
-        logger.warning(f"MiroFish summarization failed: {e}")
+        logger.warning(f"AI analysis summarization failed: {e}")
 
     # 2) Local LLM (Claude / ChatGPT via API key or OAuth token)
     try:

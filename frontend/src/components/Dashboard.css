@@ -241,7 +241,7 @@
   border: 1px solid rgba(2, 83, 254, 0.2);
 }
 
-/* MiroFish 분석 CTA (플랫폼별 모니터링 섹션 상단에 항상 노출) */
+/* AI 분석 CTA (플랫폼별 모니터링 섹션 상단에 항상 노출) */
 .dash__monitoring-analysis-cta {
   background: linear-gradient(135deg, rgba(2, 83, 254, 0.06) 0%, var(--c-bg) 100%);
   border: 1px solid rgba(2, 83, 254, 0.25);

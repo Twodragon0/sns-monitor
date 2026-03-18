@@ -137,7 +137,7 @@ function AnalysisTab() {
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
 
-  // Check MiroFish, LLM, and auth status
+  // Check SNS AI, LLM, and auth status
   useEffect(() => {
     const checkStatus = async () => {
       try {
@@ -177,7 +177,7 @@ function AnalysisTab() {
     loadSources();
   }, []);
 
-  // Apply preselect from Dashboard "MiroFish로 심화 분석" (same source as current URL result)
+  // Apply preselect from Dashboard "AI 심화 분석" (same source as current URL result)
   useEffect(() => {
     if (sources.length === 0) return;
     try {
@@ -215,7 +215,7 @@ function AnalysisTab() {
           setProjects(resp.data.data || []);
         }
       } catch {
-        // MiroFish may not be running
+        // AI analysis service may not be running
       }
     };
     loadProjects();
@@ -392,7 +392,7 @@ function AnalysisTab() {
   const startAnalysis = async () => {
     if (selectedSources.length === 0) return;
 
-    // When MiroFish is offline, use AI analysis (if available) or local analysis
+    // When SNS AI is offline, use AI analysis (if available) or local analysis
     if (!mirofishAvailable) {
       return llmStatus.available ? startAiAnalysis() : startLocalAnalysis();
     }
@@ -405,7 +405,7 @@ function AnalysisTab() {
     setLocalResult(null);
 
     try {
-      // Step 1: Transform SNS data and send to MiroFish
+      // Step 1: Transform SNS data and send to AI analysis service
       const transformResp = await axios.post(`${API_BASE}/api/analysis/transform`, {
         sources: selectedSources.map(s => ({ type: s.type, id: s.id })),
         project_name: `SNS Analysis - ${new Date().toISOString().split('T')[0]}`,
@@ -522,7 +522,7 @@ function AnalysisTab() {
           backgroundColor: mirofishAvailable ? '#d4edda' : '#f8d7da',
           color: mirofishAvailable ? '#155724' : '#721c24',
         }}>
-          MiroFish {mirofishAvailable ? '연결됨' : '오프라인'}
+          SNS AI {mirofishAvailable ? '연결됨' : '오프라인'}
         </span>
         {llmStatus.available && (
           <span style={{
@@ -678,7 +678,7 @@ function AnalysisTab() {
             <span style={{ marginLeft: '10px', fontSize: '12px', color: '#666' }}>
               {llmStatus.available
                 ? `${llmStatus.provider === 'anthropic' ? 'Claude' : 'ChatGPT'}로 AI 분석을 수행합니다`
-                : 'MiroFish 없이 로컬 감성 분석을 수행합니다'}
+                : '로컬 감성 분석을 수행합니다'}
             </span>
           )}
         </div>
@@ -1046,7 +1046,7 @@ function AnalysisTab() {
         </div>
       )}
 
-      {/* Chat Interface - works with MiroFish, AI LLM, URL result, or all */}
+      {/* Chat Interface - works with SNS AI, AI LLM, URL result, or all */}
       {analysisState === 'completed' && (currentProject || aiResult || urlAnalysisData || llmStatus.available) && (
         <div style={{
           backgroundColor: 'white',

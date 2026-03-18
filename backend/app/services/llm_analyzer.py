@@ -1,7 +1,7 @@
 """
 Local LLM analysis service.
 Supports OpenAI (ChatGPT) and Anthropic (Claude) APIs directly,
-without requiring MiroFish.
+without requiring an external AI analysis service.
 
 Authentication modes:
 1. Direct API keys (OPENAI_API_KEY, ANTHROPIC_API_KEY)
