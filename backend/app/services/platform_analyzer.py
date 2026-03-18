@@ -4352,7 +4352,9 @@ class PlatformAnalyzer:
         if kiwi:
             try:
                 tokens = kiwi.tokenize(text)
-                return [t.form for t in tokens if t.tag in self._KEYWORD_POS and len(t.form) >= 2]
+                return [t.form for t in tokens
+                        if t.tag in self._KEYWORD_POS
+                        and len(t.form) >= (3 if t.tag == "SL" else 2)]
             except Exception:
                 pass
         # Regex fallback
@@ -4373,10 +4375,15 @@ class PlatformAnalyzer:
         "ㅇㅇ", "ㄴㄴ", "ㄱㄱ", "ㅇㅋ",
         # App / platform noise
         "app", "com", "http", "https", "www", "gall",
-        "dcinside", "youtube", "naver", "kakao",
+        "dcinside", "youtube", "naver", "kakao", "soop",
+        "모바일", "갤럭시",
+        # DCInside content noise
+        "댓글은", "댓글", "해당", "작성자", "이용자", "본문",
+        "클린봇", "운영자", "관리자",
         # Short meaningless
         "해서", "했는데", "하는", "되는", "있는", "없는",
         "같은", "라는", "이런", "저런", "어떤",
+        "하고", "해야", "해도", "하면", "할까",
     })
 
     _POSITIVE_KW = [
