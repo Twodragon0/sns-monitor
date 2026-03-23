@@ -14,6 +14,9 @@ from pathlib import Path
 import glob
 from urllib.parse import quote
 
+# Safe ID pattern for path traversal prevention
+_SAFE_ID_RE = re.compile(r'^[a-zA-Z0-9_@-]{1,128}$')
+
 # 로깅 설정
 logging.basicConfig(
     level=logging.INFO,
@@ -1147,8 +1150,7 @@ def _handle_auth_proxy(event, path, query_params, http_method):
     return {
         'statusCode': response.status_code,
         'headers': {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
+            'Content-Type': 'application/json'
         },
         'body': response.text
     }
@@ -1159,8 +1161,7 @@ def _handle_health_check():
     return {
         'statusCode': 200,
         'headers': {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
+            'Content-Type': 'application/json'
         },
         'body': json.dumps({
             'status': 'healthy',
@@ -1225,8 +1226,7 @@ def _handle_dashboard_stats():
     return {
         'statusCode': 200,
         'headers': {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
+            'Content-Type': 'application/json'
         },
         'body': json.dumps(stats, default=decimal_default)
     }
@@ -1263,8 +1263,7 @@ def _handle_scans():
     return {
         'statusCode': 200,
         'headers': {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
+            'Content-Type': 'application/json'
         },
         'body': json.dumps({'scans': scans}, default=decimal_default)
     }
@@ -1324,8 +1323,7 @@ def _handle_channels():
     return {
         'statusCode': 200,
         'headers': {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
+            'Content-Type': 'application/json'
         },
         'body': json.dumps({'channels': channels}, default=decimal_default)
     }
@@ -1881,8 +1879,7 @@ def _handle_vuddy_creators():
     return {
         'statusCode': 200,
         'headers': {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
+            'Content-Type': 'application/json'
         },
         'body': json.dumps({'creators': creators}, default=decimal_default, ensure_ascii=False)
     }
@@ -1979,8 +1976,7 @@ def _handle_group_a_members():
     return {
         'statusCode': 200,
         'headers': {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
+            'Content-Type': 'application/json'
         },
         'body': json.dumps({
             'creators': creators,
@@ -2085,8 +2081,7 @@ def _handle_group_b_members():
     return {
         'statusCode': 200,
         'headers': {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
+            'Content-Type': 'application/json'
         },
         'body': json.dumps({
             'creators': creators,
@@ -2191,8 +2186,7 @@ def _handle_group_c_members():
     return {
         'statusCode': 200,
         'headers': {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
+            'Content-Type': 'application/json'
         },
         'body': json.dumps({
             'creators': creators,
@@ -2349,8 +2343,7 @@ def _handle_group_c_channel(event):
     return {
         'statusCode': 200,
         'headers': {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
+            'Content-Type': 'application/json'
         },
         'body': json.dumps(result, default=decimal_default, ensure_ascii=False)
     }
@@ -2648,8 +2641,7 @@ def _handle_group_b_channel(event):
     return {
         'statusCode': 200,
         'headers': {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
+            'Content-Type': 'application/json'
         },
         'body': json.dumps(result, default=decimal_default, ensure_ascii=False)
     }
@@ -2727,8 +2719,7 @@ def _handle_group_a_channel_all_channels():
     return {
         'statusCode': 200,
         'headers': {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
+            'Content-Type': 'application/json'
         },
         'body': json.dumps({
             'channels': channels_data,
@@ -2832,8 +2823,7 @@ def _handle_group_a_channel(event):
     return {
         'statusCode': 200,
         'headers': {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
+            'Content-Type': 'application/json'
         },
         'body': json.dumps(result, default=decimal_default, ensure_ascii=False)
     }
@@ -3019,8 +3009,7 @@ def _handle_dcinside_galleries():
     return {
         'statusCode': 200,
         'headers': {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
+            'Content-Type': 'application/json'
         },
         'body': json.dumps({'galleries': galleries_data}, default=decimal_default, ensure_ascii=False)
     }
@@ -3034,10 +3023,10 @@ def _handle_dcinside_gallery_posts(event, path):
         gallery_id_idx = parts.index('gallery') + 1
         gallery_id = parts[gallery_id_idx] if gallery_id_idx < len(parts) else None
 
-        if not gallery_id:
+        if not gallery_id or not _SAFE_ID_RE.match(gallery_id):
             return {
                 'statusCode': 400,
-                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'headers': {'Content-Type': 'application/json'},
                 'body': json.dumps({'error': 'Gallery ID is required'})
             }
 
@@ -3134,7 +3123,7 @@ def _handle_dcinside_gallery_posts(event, path):
 def _handle_data_s3_key(path):
     """S3 키로 데이터 조회 엔드포인트"""
     s3_key = path.replace('/api/data/', '')
-    
+
     try:
         if LOCAL_MODE:
             # 로컬 모드: 파일 시스템에서 읽기
@@ -3144,7 +3133,16 @@ def _handle_data_s3_key(path):
                 filepath = s3_key.replace('./local-data/', LOCAL_DATA_DIR + '/')
             else:
                 filepath = os.path.join(LOCAL_DATA_DIR, s3_key.replace('raw-data/', ''))
-            
+
+            # Path traversal protection
+            resolved = os.path.realpath(filepath)
+            if not resolved.startswith(os.path.realpath(LOCAL_DATA_DIR) + os.sep):
+                return {
+                    'statusCode': 403,
+                    'headers': {'Content-Type': 'application/json'},
+                    'body': json.dumps({'error': 'Access denied'})
+                }
+
             if os.path.exists(filepath):
                 with open(filepath, 'r', encoding='utf-8') as f:
                     data = json.load(f)
@@ -3165,8 +3163,7 @@ def _handle_data_s3_key(path):
         return {
             'statusCode': 200,
             'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
+                'Content-Type': 'application/json'
             },
             'body': json.dumps(data, default=decimal_default, ensure_ascii=False)
         }
@@ -3175,8 +3172,7 @@ def _handle_data_s3_key(path):
         return {
             'statusCode': 404,
             'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
+                'Content-Type': 'application/json'
             },
             'body': json.dumps({'error': 'Data not found'})
         }
@@ -3336,8 +3332,7 @@ def _handle_twitter_search(event):
         return {
             'statusCode': 200,
             'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
+                'Content-Type': 'application/json'
             },
             'body': json.dumps({
                 'tweets': tweets,
@@ -3352,8 +3347,7 @@ def _handle_twitter_search(event):
         return {
             'statusCode': 500,
             'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
+                'Content-Type': 'application/json'
             },
             'body': json.dumps({'error': str(e)})
         }
@@ -3364,8 +3358,11 @@ def _save_youtube_result(result, timestamp):
     channel_handle = result.get('channel')
     if not channel_handle:
         return False, None
-    
+
     channel_clean = channel_handle.lstrip('@').lower()
+    if not _SAFE_ID_RE.match(channel_clean):
+        logger.warning("Invalid channel handle rejected: %s", channel_clean)
+        return False, None
     
     if LOCAL_MODE:
         save_dir = os.path.join(LOCAL_DATA_DIR, 'youtube', channel_clean)
@@ -3392,7 +3389,7 @@ def _save_youtube_result(result, timestamp):
 def _save_dcinside_result(result, timestamp):
     """DCInside 크롤러 결과 저장 (중첩 if 제거)"""
     gallery_id = result.get('gallery_id')
-    if not gallery_id:
+    if not gallery_id or not _SAFE_ID_RE.match(gallery_id):
         return False
     
     if LOCAL_MODE:
@@ -3455,8 +3452,7 @@ def _handle_crawler_results(event):
         return {
             'statusCode': 200,
             'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
+                'Content-Type': 'application/json'
             },
             'body': json.dumps({
                 'message': f'Saved {saved_count} results',
@@ -3469,8 +3465,7 @@ def _handle_crawler_results(event):
         return {
             'statusCode': 500,
             'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
+                'Content-Type': 'application/json'
             },
             'body': json.dumps({'error': str(e)})
         }
@@ -4009,8 +4004,7 @@ def lambda_handler(event, context):
         return {
             'statusCode': 500,
             'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
+                'Content-Type': 'application/json'
             },
-            'body': json.dumps({'error': str(e)})
+            'body': json.dumps({'error': 'Internal server error'})
         }

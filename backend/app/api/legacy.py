@@ -47,10 +47,13 @@ def api_proxy(path):
         headers = result.get('headers', {})
 
         response = Response(body, status=status_code, content_type='application/json')
+        # Do not forward CORS headers — Flask-CORS handles them
+        _skip_headers = {'content-type', 'access-control-allow-origin', 'access-control-allow-headers',
+                         'access-control-allow-methods', 'access-control-allow-credentials'}
         for key, value in headers.items():
-            if key.lower() != 'content-type':
+            if key.lower() not in _skip_headers:
                 response.headers[key] = value
         return response
     except Exception as e:
         logger.error("API error on /%s: %s", path, e, exc_info=True)
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Internal server error'}), 500

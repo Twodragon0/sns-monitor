@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 import { API_BASE } from '../config';
 
@@ -152,7 +152,6 @@ function providerLabel(provider) {
 
 /** Inline auth panel: OAuth login + API key input */
 function AuthPanel({ apiBase, onKeySet, openaiOAuthAvailable }) {
-  const [showApiKey, setShowApiKey] = useState(false);
   const [keyProvider, setKeyProvider] = useState('openai');
   const [apiKey, setApiKey] = useState('');
   const [keyError, setKeyError] = useState('');

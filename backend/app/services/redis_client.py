@@ -21,12 +21,15 @@ def get_redis():
     try:
         import redis
         from ..config import Config
-        _redis_client = redis.Redis(
+        _conn_kwargs = dict(
             host=Config.REDIS_HOST,
             port=Config.REDIS_PORT,
             decode_responses=True,
-            socket_connect_timeout=2
+            socket_connect_timeout=2,
         )
+        if Config.REDIS_PASSWORD:
+            _conn_kwargs["password"] = Config.REDIS_PASSWORD
+        _redis_client = redis.Redis(**_conn_kwargs)
         _redis_client.ping()
         logger.info("Redis connected: %s:%s", Config.REDIS_HOST, Config.REDIS_PORT)
     except Exception:

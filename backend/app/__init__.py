@@ -12,9 +12,16 @@ from .config import Config
 from .utils.logger import setup_logger, get_logger
 
 # Module-level limiter so blueprints can import and decorate routes
+def _build_redis_uri():
+    if not Config.REDIS_HOST:
+        return "memory://"
+    if Config.REDIS_PASSWORD:
+        return f"redis://:{Config.REDIS_PASSWORD}@{Config.REDIS_HOST}:{Config.REDIS_PORT}"
+    return f"redis://{Config.REDIS_HOST}:{Config.REDIS_PORT}"
+
 limiter = Limiter(
     key_func=get_remote_address,
-    storage_uri=f"redis://{Config.REDIS_HOST}:{Config.REDIS_PORT}" if Config.REDIS_HOST else "memory://",
+    storage_uri=_build_redis_uri(),
     default_limits=["200 per minute"],
 )
 

@@ -16,6 +16,7 @@ from urllib.parse import urlparse, parse_qs, quote
 from collections import Counter
 
 import ipaddress
+import socket
 
 import requests
 
@@ -224,14 +225,19 @@ class PlatformAnalyzer:
             raise ValueError("Invalid URL: missing hostname")
         if hostname in _BLOCKED_HOSTS:
             raise ValueError("Blocked host")
+        # Resolve hostname and check ALL resolved IPs to prevent DNS rebinding
         try:
-            ip = ipaddress.ip_address(hostname)
-            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
-                raise ValueError("Internal addresses not allowed")
-        except ValueError as ve:
-            if "Internal" in str(ve) or "Blocked" in str(ve):
-                raise
-            # Not an IP literal — hostname is fine
+            addr_infos = socket.getaddrinfo(hostname, None)
+        except socket.gaierror:
+            raise ValueError("Cannot resolve hostname")
+        for family, _, _, _, sockaddr in addr_infos:
+            try:
+                ip = ipaddress.ip_address(sockaddr[0])
+                if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+                    raise ValueError("Internal addresses not allowed")
+            except ValueError as ve:
+                if "Internal" in str(ve) or "Blocked" in str(ve):
+                    raise
 
     def detect_platform(self, url):
         """Detect which platform a URL belongs to by matching against parsed hostname."""

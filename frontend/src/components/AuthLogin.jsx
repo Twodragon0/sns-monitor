@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE } from '../config';
 import './AuthLogin.css';
 
 const AuthLogin = () => {
@@ -47,7 +48,7 @@ const AuthLogin = () => {
       setMessage('🔄 인증 처리 중...');
 
       // Auth service의 callback 엔드포인트로 code와 state 전송
-      const response = await fetch(`http://localhost:8081/api/auth/callback?code=${code}&state=${state}`);
+      const response = await fetch(`${API_BASE}/api/auth/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`);
       const data = await response.json();
 
       if (response.ok && data.user_id && data.provider) {
@@ -80,7 +81,7 @@ const AuthLogin = () => {
       setMessage('');
 
       // Claude Console OAuth URL 가져오기
-      const response = await fetch('http://localhost:8081/api/auth/claude');
+      const response = await fetch(`${API_BASE}/api/auth/claude`);
       const data = await response.json();
 
       if (data.auth_url) {
@@ -101,7 +102,7 @@ const AuthLogin = () => {
       setMessage('');
 
       // Cursor OAuth URL 가져오기
-      const response = await fetch('http://localhost:8081/api/auth/openai');
+      const response = await fetch(`${API_BASE}/api/auth/openai`);
       const data = await response.json();
 
       if (data.auth_url) {
@@ -122,7 +123,7 @@ const AuthLogin = () => {
 
       if (!userId) return;
 
-      await fetch('http://localhost:8081/api/auth/logout', {
+      await fetch(`${API_BASE}/api/auth/logout`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json'

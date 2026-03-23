@@ -26,6 +26,7 @@ class Config:
     # Redis (optional)
     REDIS_HOST = os.environ.get("REDIS_HOST", "redis")
     REDIS_PORT = int(os.environ.get("REDIS_PORT", 6379))
+    REDIS_PASSWORD = os.environ.get("REDIS_PASSWORD", "")
 
     # YouTube (treat common placeholders as unset)
     _yt_key = (os.environ.get("YOUTUBE_API_KEY") or "").strip()
