@@ -124,6 +124,15 @@ User → Frontend (host :3080)
 | Kakao | pf.kakao.com, story.kakao.com | Profile info |
 | Naver Cafe | cafe.naver.com (f-e/cafes/ID/menus/0, ArticleRead.nhn) | Cafe posts and comments (NAVER_CAFE_COOKIE recommended) |
 
+## Project Agents (`.claude/agents/`)
+
+| Agent | Model | Role |
+|-------|-------|------|
+| `sns-monitor-lead` | sonnet | 프로젝트 리드, 개발 조율 |
+| `crawler-debugger` | sonnet | 크롤러 디버깅, 파싱 이슈 해결 |
+| `architect` | sonnet | React+Flask 아키텍처, 플랫폼 분석기 설계, Redis 캐싱 전략 |
+| `test-engineer` | sonnet | 플랫폼 분석기 테스트, API 테스트, 크롤러 검증 |
+
 ## Environment Variables
 
 | Variable | Required | Description |
