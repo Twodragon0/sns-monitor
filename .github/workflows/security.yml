@@ -53,12 +53,20 @@ jobs:
         run: pip install pip-audit
 
       - name: Audit backend dependencies
-        run: pip-audit -r backend/requirements.txt --format json --output backend-audit.json || true
+        run: |
+          set +e
+          pip-audit -r backend/requirements.txt --format json --output backend-audit.json
+          echo "backend_exit_code=$?" >> "$GITHUB_OUTPUT"
+        id: backend_audit
 
       - name: Audit crawler dependencies
+        id: crawler_audit
         run: |
+          set +e
+          echo 'crawler_exit_code=0' >> "$GITHUB_OUTPUT"
           if [ -f crawlers/youtube/requirements.txt ]; then
-            pip-audit -r crawlers/youtube/requirements.txt --format json --output crawlers-audit.json || true
+            pip-audit -r crawlers/youtube/requirements.txt --format json --output crawlers-audit.json
+            echo "crawler_exit_code=$?" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Check audit results
@@ -68,6 +76,10 @@ jobs:
           echo ""
           echo "=== Crawler Audit ==="
           cat crawlers-audit.json 2>/dev/null || echo "No results"
+          if [ "${{ steps.backend_audit.outputs.backend_exit_code }}" != "0" ] || [ "${{ steps.crawler_audit.outputs.crawler_exit_code }}" != "0" ]; then
+            echo "pip-audit detected vulnerable dependencies"
+            exit 1
+          fi
 
   secret-scan:
     name: Secret Detection

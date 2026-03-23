@@ -10,6 +10,7 @@ Supports multiple modes (in priority order):
 
 import json
 import logging
+import os
 import shutil
 import subprocess
 import tempfile
@@ -70,7 +71,7 @@ _SUMMARIZE_PROMPT = """당신은 SNS 데이터 분석 전문가입니다.
 _CLI_CACHE = {}
 
 
-def _detect_cli_tools() -> dict:
+def _detect_cli_tools() -> dict[str, str]:
     """Detect available AI tools (CLI binaries or Python SDK with credentials).
 
     Returns tools that can actually make API calls.
@@ -78,7 +79,6 @@ def _detect_cli_tools() -> dict:
     if _CLI_CACHE.get("_checked"):
         return {k: v for k, v in _CLI_CACHE.items() if k != "_checked"}
 
-    import os
     tools = {}
 
     # CLI binaries (if installed, e.g., via npm)
@@ -101,6 +101,45 @@ def _detect_cli_tools() -> dict:
     _CLI_CACHE.update(tools)
     _CLI_CACHE["_checked"] = True
     return {k: v for k, v in _CLI_CACHE.items() if k != "_checked"}
+
+
+def _build_cli_env(tool_name: str) -> dict[str, str]:
+    """Pass only the minimum environment needed for CLI execution."""
+    env = {}
+    passthrough_keys = (
+        "PATH",
+        "HOME",
+        "LANG",
+        "LC_ALL",
+        "LC_CTYPE",
+        "SSL_CERT_FILE",
+        "SSL_CERT_DIR",
+        "REQUESTS_CA_BUNDLE",
+        "CURL_CA_BUNDLE",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "NO_PROXY",
+        "http_proxy",
+        "https_proxy",
+        "no_proxy",
+    )
+    for key in passthrough_keys:
+        value = os.environ.get(key)
+        if value:
+            env[key] = value
+
+    credential_env = {
+        "claude": "ANTHROPIC_API_KEY",
+        "opencode": "OPENAI_API_KEY",
+        "gemini": "GOOGLE_API_KEY",
+    }
+    credential_key = credential_env.get(tool_name)
+    if credential_key:
+        credential_value = os.environ.get(credential_key)
+        if credential_value:
+            env[credential_key] = credential_value
+
+    return env
 
 
 def _call_cli(tool_name: str, prompt: str, timeout: int = 120) -> Optional[str]:
@@ -129,8 +168,11 @@ def _call_cli(tool_name: str, prompt: str, timeout: int = 120) -> Optional[str]:
             return None
 
         result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=timeout,
-            env={**__import__('os').environ}
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env=_build_cli_env(tool_name),
         )
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
@@ -149,6 +191,7 @@ def _call_sdk_anthropic(prompt: str) -> Optional[str]:
     """Call Anthropic SDK directly (Docker-internal, uses ANTHROPIC_API_KEY env)."""
     try:
         import anthropic
+
         client = anthropic.Anthropic()  # uses ANTHROPIC_API_KEY env
         response = client.messages.create(
             model=Config.LLM_MODEL or "claude-sonnet-4-20250514",
@@ -165,6 +208,7 @@ def _call_sdk_openai(prompt: str) -> Optional[str]:
     """Call OpenAI SDK directly (Docker-internal, uses OPENAI_API_KEY env)."""
     try:
         from openai import OpenAI
+
         client = OpenAI()  # uses OPENAI_API_KEY env
         response = client.chat.completions.create(
             model=Config.LLM_MODEL or "gpt-4o-mini",
@@ -180,10 +224,12 @@ def _call_sdk_openai(prompt: str) -> Optional[str]:
 # ==========================================
 # Provider detection
 # ==========================================
-def get_available_provider(oauth_token: Optional[str] = None,
-                           token_provider: Optional[str] = None,
-                           session_api_key: Optional[str] = None,
-                           session_api_provider: Optional[str] = None) -> Optional[str]:
+def get_available_provider(
+    oauth_token: Optional[str] = None,
+    token_provider: Optional[str] = None,
+    session_api_key: Optional[str] = None,
+    session_api_provider: Optional[str] = None,
+) -> Optional[str]:
     """Detect which LLM provider is available.
 
     Priority:
@@ -219,12 +265,16 @@ def get_available_provider(oauth_token: Optional[str] = None,
     return None
 
 
-def get_llm_status(oauth_token: Optional[str] = None,
-                   token_provider: Optional[str] = None,
-                   session_api_key: Optional[str] = None,
-                   session_api_provider: Optional[str] = None) -> dict:
+def get_llm_status(
+    oauth_token: Optional[str] = None,
+    token_provider: Optional[str] = None,
+    session_api_key: Optional[str] = None,
+    session_api_provider: Optional[str] = None,
+) -> dict:
     """Return LLM availability status."""
-    provider = get_available_provider(oauth_token, token_provider, session_api_key, session_api_provider)
+    provider = get_available_provider(
+        oauth_token, token_provider, session_api_key, session_api_provider
+    )
     auth_mode = None
     if provider and provider.startswith("cli_"):
         auth_mode = "cli"
@@ -253,15 +303,24 @@ def _get_model_name(provider: Optional[str]) -> str:
         return Config.LLM_MODEL
     if provider in ("anthropic", "anthropic_oauth", "anthropic_session", "cli_claude"):
         return "claude-sonnet-4-20250514"
-    if provider in ("openai", "openai_oauth", "openai_session", "cli_opencode", "cli_openai"):
+    if provider in (
+        "openai",
+        "openai_oauth",
+        "openai_session",
+        "cli_opencode",
+        "cli_openai",
+    ):
         return "gpt-4o-mini"
     if provider == "cli_gemini":
         return "gemini-2.5-flash"
     return ""
 
 
-def _resolve_credentials(provider: Optional[str], oauth_token: Optional[str] = None,
-                         session_api_key: Optional[str] = None) -> tuple:
+def _resolve_credentials(
+    provider: Optional[str],
+    oauth_token: Optional[str] = None,
+    session_api_key: Optional[str] = None,
+) -> tuple:
     """Resolve API key and provider base type from provider string."""
     if provider in ("anthropic",):
         return Config.ANTHROPIC_API_KEY, "anthropic"
@@ -280,20 +339,29 @@ def _resolve_credentials(provider: Optional[str], oauth_token: Optional[str] = N
     return None, None
 
 
-def analyze_with_llm(document: str, question: Optional[str] = None,
-                     oauth_token: Optional[str] = None,
-                     token_provider: Optional[str] = None,
-                     session_api_key: Optional[str] = None,
-                     session_api_provider: Optional[str] = None) -> dict:
+def analyze_with_llm(
+    document: str,
+    question: Optional[str] = None,
+    oauth_token: Optional[str] = None,
+    token_provider: Optional[str] = None,
+    session_api_key: Optional[str] = None,
+    session_api_provider: Optional[str] = None,
+) -> dict:
     """
     Analyze SNS data using LLM (Claude or ChatGPT).
     Returns structured analysis result.
     """
-    provider = get_available_provider(oauth_token, token_provider, session_api_key, session_api_provider)
+    provider = get_available_provider(
+        oauth_token, token_provider, session_api_key, session_api_provider
+    )
     if not provider:
-        return {"error": "LLM 인증이 필요합니다. Anthropic OAuth 로그인 또는 API Key를 입력하세요."}
+        return {
+            "error": "LLM 인증이 필요합니다. Anthropic OAuth 로그인 또는 API Key를 입력하세요."
+        }
 
-    api_key, base_provider = _resolve_credentials(provider, oauth_token, session_api_key)
+    api_key, base_provider = _resolve_credentials(
+        provider, oauth_token, session_api_key
+    )
     model = _get_model_name(provider)
     user_prompt = f"다음 SNS 수집 데이터를 분석해 주세요:\n\n{document[:15000]}\n\n{_RESPONSE_FORMAT_HINT}"
     if question:
@@ -313,19 +381,26 @@ def analyze_with_llm(document: str, question: Optional[str] = None,
         return {"error": f"LLM analysis failed: {str(e)}"}
 
 
-def summarize_with_llm(document: str, oauth_token: Optional[str] = None,
-                       token_provider: Optional[str] = None,
-                       session_api_key: Optional[str] = None,
-                       session_api_provider: Optional[str] = None) -> dict:
+def summarize_with_llm(
+    document: str,
+    oauth_token: Optional[str] = None,
+    token_provider: Optional[str] = None,
+    session_api_key: Optional[str] = None,
+    session_api_provider: Optional[str] = None,
+) -> dict:
     """
     Summarize SNS data using LLM. Returns markdown summary (for URL analyzer).
     Falls back gracefully if no LLM is available.
     """
-    provider = get_available_provider(oauth_token, token_provider, session_api_key, session_api_provider)
+    provider = get_available_provider(
+        oauth_token, token_provider, session_api_key, session_api_provider
+    )
     if not provider:
         return None
 
-    api_key, base_provider = _resolve_credentials(provider, oauth_token, session_api_key)
+    api_key, base_provider = _resolve_credentials(
+        provider, oauth_token, session_api_key
+    )
     model = _get_model_name(provider)
     user_prompt = f"다음 SNS 수집 데이터를 분석·요약해 주세요:\n\n{document[:15000]}"
 
@@ -342,23 +417,35 @@ def summarize_with_llm(document: str, oauth_token: Optional[str] = None,
         return None
 
 
-def chat_with_llm(document: str, message: str, chat_history: list,
-                  oauth_token: Optional[str] = None,
-                  token_provider: Optional[str] = None,
-                  session_api_key: Optional[str] = None,
-                  session_api_provider: Optional[str] = None) -> dict:
+def chat_with_llm(
+    document: str,
+    message: str,
+    chat_history: list,
+    oauth_token: Optional[str] = None,
+    token_provider: Optional[str] = None,
+    session_api_key: Optional[str] = None,
+    session_api_provider: Optional[str] = None,
+) -> dict:
     """Chat about SNS data using LLM."""
-    provider = get_available_provider(oauth_token, token_provider, session_api_key, session_api_provider)
+    provider = get_available_provider(
+        oauth_token, token_provider, session_api_key, session_api_provider
+    )
     if not provider:
-        return {"error": "LLM 인증이 필요합니다. OAuth 로그인 또는 API Key를 입력하세요."}
+        return {
+            "error": "LLM 인증이 필요합니다. OAuth 로그인 또는 API Key를 입력하세요."
+        }
 
-    api_key, base_provider = _resolve_credentials(provider, oauth_token, session_api_key)
+    api_key, base_provider = _resolve_credentials(
+        provider, oauth_token, session_api_key
+    )
     model = _get_model_name(provider)
     context = f"분석 대상 SNS 데이터:\n\n{document[:12000]}"
 
     try:
         if base_provider == "anthropic":
-            return _chat_anthropic(model, context, message, chat_history, api_key=api_key)
+            return _chat_anthropic(
+                model, context, message, chat_history, api_key=api_key
+            )
         elif base_provider == "openai":
             return _chat_openai(model, context, message, chat_history, api_key=api_key)
         elif base_provider == "cli":
@@ -370,8 +457,9 @@ def chat_with_llm(document: str, message: str, chat_history: list,
         return {"error": f"LLM chat failed: {str(e)}"}
 
 
-def _call_anthropic(model: str, user_prompt: str, is_question: bool,
-                    api_key: Optional[str] = None) -> dict:
+def _call_anthropic(
+    model: str, user_prompt: str, is_question: bool, api_key: Optional[str] = None
+) -> dict:
     """Call Anthropic Claude API."""
     import anthropic
 
@@ -385,13 +473,19 @@ def _call_anthropic(model: str, user_prompt: str, is_question: bool,
 
     text = response.content[0].text
     if is_question:
-        return {"success": True, "response": text, "provider": "anthropic", "model": model}
+        return {
+            "success": True,
+            "response": text,
+            "provider": "anthropic",
+            "model": model,
+        }
 
     return _parse_analysis_response(text, "anthropic", model)
 
 
-def _call_openai(model: str, user_prompt: str, is_question: bool,
-                 api_key: Optional[str] = None) -> dict:
+def _call_openai(
+    model: str, user_prompt: str, is_question: bool, api_key: Optional[str] = None
+) -> dict:
     """Call OpenAI ChatGPT API."""
     from openai import OpenAI
 
@@ -413,8 +507,9 @@ def _call_openai(model: str, user_prompt: str, is_question: bool,
     return _parse_analysis_response(text, "openai", model)
 
 
-def _call_summarize_anthropic(model: str, user_prompt: str,
-                              api_key: Optional[str] = None) -> dict:
+def _call_summarize_anthropic(
+    model: str, user_prompt: str, api_key: Optional[str] = None
+) -> dict:
     """Summarize with Anthropic."""
     import anthropic
 
@@ -429,8 +524,9 @@ def _call_summarize_anthropic(model: str, user_prompt: str,
     return {"summary": response.content[0].text, "source": "anthropic", "model": model}
 
 
-def _call_summarize_openai(model: str, user_prompt: str,
-                           api_key: Optional[str] = None) -> dict:
+def _call_summarize_openai(
+    model: str, user_prompt: str, api_key: Optional[str] = None
+) -> dict:
     """Summarize with OpenAI."""
     from openai import OpenAI
 
@@ -445,11 +541,20 @@ def _call_summarize_openai(model: str, user_prompt: str,
         temperature=0.3,
     )
 
-    return {"summary": response.choices[0].message.content, "source": "openai", "model": model}
+    return {
+        "summary": response.choices[0].message.content,
+        "source": "openai",
+        "model": model,
+    }
 
 
-def _chat_anthropic(model: str, context: str, message: str, chat_history: list,
-                    api_key: Optional[str] = None) -> dict:
+def _chat_anthropic(
+    model: str,
+    context: str,
+    message: str,
+    chat_history: list,
+    api_key: Optional[str] = None,
+) -> dict:
     """Chat with Anthropic Claude."""
     import anthropic
 
@@ -468,11 +573,21 @@ def _chat_anthropic(model: str, context: str, message: str, chat_history: list,
         messages=messages,
     )
 
-    return {"success": True, "response": response.content[0].text, "provider": "anthropic", "model": model}
+    return {
+        "success": True,
+        "response": response.content[0].text,
+        "provider": "anthropic",
+        "model": model,
+    }
 
 
-def _chat_openai(model: str, context: str, message: str, chat_history: list,
-                 api_key: Optional[str] = None) -> dict:
+def _chat_openai(
+    model: str,
+    context: str,
+    message: str,
+    chat_history: list,
+    api_key: Optional[str] = None,
+) -> dict:
     """Chat with OpenAI ChatGPT."""
     from openai import OpenAI
 
@@ -490,7 +605,12 @@ def _chat_openai(model: str, context: str, message: str, chat_history: list,
         temperature=0.5,
     )
 
-    return {"success": True, "response": response.choices[0].message.content, "provider": "openai", "model": model}
+    return {
+        "success": True,
+        "response": response.choices[0].message.content,
+        "provider": "openai",
+        "model": model,
+    }
 
 
 # ==========================================
@@ -509,10 +629,17 @@ def _call_cli_analyze(provider: str, user_prompt: str, is_question: bool) -> dic
 
     output = _call_cli(tool, full_prompt)
     if not output:
-        return {"error": f"CLI tool '{tool}' returned no output. Check if it is authenticated."}
+        return {
+            "error": f"CLI tool '{tool}' returned no output. Check if it is authenticated."
+        }
 
     if is_question:
-        return {"success": True, "response": output, "provider": f"cli:{tool}", "model": model}
+        return {
+            "success": True,
+            "response": output,
+            "provider": f"cli:{tool}",
+            "model": model,
+        }
     return _parse_analysis_response(output, f"cli:{tool}", model)
 
 
@@ -528,7 +655,9 @@ def _call_cli_summarize(provider: str, user_prompt: str) -> dict:
     return {"summary": output, "source": f"cli:{tool}", "model": model}
 
 
-def _call_cli_chat(provider: str, context: str, message: str, chat_history: list) -> dict:
+def _call_cli_chat(
+    provider: str, context: str, message: str, chat_history: list
+) -> dict:
     """Chat using CLI tool."""
     tool = _cli_tool_name(provider)
     model = _get_model_name(provider)
@@ -544,7 +673,12 @@ def _call_cli_chat(provider: str, context: str, message: str, chat_history: list
     output = _call_cli(tool, full_prompt)
     if not output:
         return {"error": f"CLI tool '{tool}' returned no output."}
-    return {"success": True, "response": output, "provider": f"cli:{tool}", "model": model}
+    return {
+        "success": True,
+        "response": output,
+        "provider": f"cli:{tool}",
+        "model": model,
+    }
 
 
 def _parse_analysis_response(text: str, provider: str, model: str) -> dict:

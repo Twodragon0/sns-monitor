@@ -11,7 +11,7 @@ k8s/
 ├── namespace.yaml              # 네임스페이스 정의
 ├── config/
 │   ├── configmap.yaml         # 설정값 (공개)
-│   └── secrets.yaml           # 민감 정보 (API 키 등)
+│   └── secrets.example.yaml   # 시크릿 예시 (복사 후 로컬에서 secrets.yaml 생성)
 ├── deployments/
 │   ├── api-backend.yaml       # API 백엔드 (2 replicas)
 │   ├── frontend.yaml          # React 프론트엔드 (2 replicas)
@@ -42,11 +42,12 @@ kubectl apply -f k8s/namespace.yaml
 # ConfigMap 생성
 kubectl apply -f k8s/config/configmap.yaml
 
-# Secrets 생성 (값 수정 필요)
+# Secrets 생성 (예시를 로컬 파일로 복사 후 값 입력)
+cp k8s/config/secrets.example.yaml k8s/config/secrets.yaml
 kubectl apply -f k8s/config/secrets.yaml
 ```
 
-**주의**: `secrets.yaml`의 실제 값은 환경에 맞게 수정하거나, Sealed Secrets를 사용하세요.
+**주의**: `k8s/config/secrets.yaml`은 로컬에서만 생성해 사용하고 GitHub에 푸시하지 마세요. 프로덕션에서는 Sealed Secrets, External Secrets, `kubectl create secret` 중 하나를 우선 사용하세요.
 
 ### 3. PVC 생성
 
@@ -116,7 +117,7 @@ kubectl apply -f k8s/network-policy/api-backend-policy.yaml
 - `S3_ENDPOINT`: S3 서비스 엔드포인트 (LocalStack 사용 시)
 - `REDIS_HOST`: Redis 서비스 이름
 
-#### Secrets (k8s/config/secrets.yaml)
+#### Secrets (`k8s/config/secrets.yaml`, local only)
 - `AWS_SECRET_ACCESS_KEY`: AWS 시크릿 키
 - `YOUTUBE_API_KEY`: YouTube API 키
 - 기타 API 키들
@@ -272,7 +273,6 @@ kubectl rollout undo deployment/api-backend -n sns-monitor
 
 **작성일**: 2025-11-25
 **버전**: 1.0
-
 
 
 
