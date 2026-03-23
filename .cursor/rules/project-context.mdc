@@ -1,0 +1,26 @@
+---
+description: SNS Monitor project overview, quick start, and security requirements
+alwaysApply: true
+---
+
+# SNS Monitor – Project Context
+
+**What it is:** Multi-platform social media content analyzer (YouTube, DCInside, Reddit, Telegram, Kakao, Naver Cafe). Paste a URL to analyze content and sentiment.
+
+**Stack:** React 18 + Recharts/Axios (frontend), Python 3.11 + Flask (backend), Redis (optional cache), Docker.
+
+**Run (Docker only):**
+```bash
+cp .env.example .env   # set YOUTUBE_API_KEY
+docker-compose up -d --build
+# Dashboard http://localhost:3080, API http://localhost:8888/health
+```
+
+**Commands:** `make build` | `make test` | `make lint` | `make clean`
+
+**Security (mandatory):**
+- No hardcoded secrets; use `os.getenv()`, env vars, or K8s Secrets.
+- Validate all external input (whitelist).
+- Python: use `logging`, not `print()`; no `eval()`, `exec()`, or `pickle`.
+
+**Structure:** `backend/` (Flask, `app/` factory, `api/`, `services/`), `frontend/src/components/`, `crawlers/`, `docker/`, `helm/`, `terraform/`.

@@ -1,0 +1,36 @@
+---
+description: Python/Flask backend and crawler conventions and security
+globs: backend/**/*.py, crawlers/**/*.py
+alwaysApply: false
+---
+
+# Backend Python Rules
+
+**Config:** Read all settings from `app/config.py` (Config class); use `os.environ.get()` or app config, never hardcode secrets.
+
+```python
+# ❌ BAD
+api_key = "AIza..."
+
+# ✅ GOOD
+from app.config import Config
+api_key = Config.YOUTUBE_API_KEY
+```
+
+**Logging:** Use the `logging` module; no `print()` in production code.
+
+```python
+# ❌ BAD
+print("Error:", e)
+
+# ✅ GOOD
+import logging
+logger = logging.getLogger(__name__)
+logger.error("Fetch failed", exc_info=True)
+```
+
+**Input:** Validate external input with a whitelist (URLs, IDs, query params). Reject unknown patterns.
+
+**Forbidden:** No `eval()`, `exec()`, or `pickle`. Prefer JSON for serialization.
+
+**API layout:** New routes in `app/api/` (e.g. `analyze.py`, `legacy.py`). Register blueprints in the app factory (`app/__init__.py`).

@@ -1,0 +1,23 @@
+---
+description: React frontend patterns and API usage
+globs: frontend/**/*.jsx, frontend/**/*.tsx, frontend/**/*.js, frontend/**/*.ts
+alwaysApply: false
+---
+
+# Frontend React Rules
+
+**Stack:** React 18, Recharts, Axios. Use functional components and hooks.
+
+**API base:** Use `process.env.REACT_APP_API_URL` or fallback (e.g. `''` for same-origin). Call backend at `/api/*`.
+
+```javascript
+// ✅ GOOD – env-based base
+const API_BASE = process.env.REACT_APP_API_URL || '';
+const res = await axios.post(`${API_BASE}/api/analyze/url`, { url });
+```
+
+**State:** Prefer `useState`/`useCallback`/`useEffect` for URL analyzer, history, and loading/error. Keep side effects (e.g. localStorage) in `useEffect`.
+
+**Charts:** Use Recharts (`PieChart`, `BarChart`, `ResponsiveContainer`, `Tooltip`, `Legend`) for sentiment and stats. Reuse platform/sentiment color constants (e.g. `PLATFORM_INFO`, `SENTIMENT_COLORS`).
+
+**Files:** Main UI in `src/components/` (e.g. `URLAnalyzer.jsx`, `Dashboard.jsx`, `*Detail.jsx`). Colocate component CSS next to the component.

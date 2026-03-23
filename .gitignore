@@ -63,6 +63,8 @@ k8s/config/secrets.yaml
 
 # Claude
 .claude/
+.omc/
+frontend/.omc/
 
 # Editor configs
 .cursor.md
