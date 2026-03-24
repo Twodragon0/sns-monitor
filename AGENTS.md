@@ -67,15 +67,35 @@ frontend/src/components/
 
 ## Agent Roles
 
-### `sns-monitor-lead` (sonnet)
+### Project Agents (`.claude/agents/`)
+
+| Agent File | Model | Role |
+|-----------|-------|------|
+| `sns-monitor-lead.md` | opus | 프로젝트 리드, 기능 조율, 아키텍처 결정 |
+| `architect.md` | sonnet | React+Flask 아키텍처, 플랫폼 분석기 설계 |
+| `crawler-debugger.md` | sonnet | 크롤러 파싱/API 장애 디버깅 |
+| `frontend-developer.md` | sonnet | React 대시보드, URL 분석 UI, 차트 |
+| `backend-developer.md` | sonnet | Flask API, 플랫폼 분석기, Redis 연동 |
+| `infra-engineer.md` | sonnet | Docker, K8s, Terraform, Helm 인프라 |
+| `security-reviewer.md` | sonnet | API 보안, 입력 검증, 시크릿 관리 |
+| `test-engineer.md` | sonnet | API 테스트, 크롤러 검증, 통합 테스트 |
+
+### Multi-Agent Workflow Patterns
+
+- **플랫폼 추가**: sns-monitor-lead → architect + backend-developer + test-engineer (병렬) → security-reviewer
+- **크롤러 장애**: crawler-debugger → backend-developer → test-engineer
+- **UI 개선**: frontend-developer → architect → test-engineer
+- **인프라 변경**: infra-engineer → security-reviewer → test-engineer
+
+### `sns-monitor-lead` (opus)
 기능 추가, 버그 수정, 아키텍처 결정 담당 리드. 새 기능은 `spec.md` 확인 후 진행.
 - Frontend + Backend + Crawler 서브태스크로 분해하여 실행
 - 포트/서비스명 변경 시 docker-compose.yml 일관성 검증
 - 크롤러 이슈는 `crawler-debugger`에 위임
 
-### `crawler-debugger` (haiku, read-only)
-크롤러 장애(rate limit, 인증 실패, 파싱 오류) 진단 전용. 파일 수정 불가.
-- 진단 후 구조화된 리포트 생성 → sns-monitor-lead가 수정 적용
+### `crawler-debugger` (sonnet)
+크롤러 장애(rate limit, 인증 실패, 파싱 오류) 진단 및 수정.
+- 진단 후 구조화된 리포트 생성
 - P0 보안 이슈(시크릿 노출) 즉시 보고
 
 **위임 규칙:**
