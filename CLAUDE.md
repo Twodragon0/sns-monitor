@@ -132,6 +132,10 @@ User → Frontend (host :3080)
 | `crawler-debugger` | sonnet | 크롤러 디버깅, 파싱 이슈 해결 |
 | `architect` | sonnet | React+Flask 아키텍처, 플랫폼 분석기 설계, Redis 캐싱 전략 |
 | `test-engineer` | sonnet | 플랫폼 분석기 테스트, API 테스트, 크롤러 검증 |
+| `frontend-developer` | sonnet | React 18 대시보드 UI, URL 분석기, Recharts 시각화 |
+| `backend-developer` | sonnet | Flask API 라우트, 플랫폼 분석기, Redis 통합 |
+| `infra-engineer` | sonnet | Docker, Kubernetes, Terraform, Helm 배포 관리 |
+| `security-reviewer` | sonnet | API 보안 검토, 입력 검증, 시크릿 관리 감사 |
 
 ## Environment Variables
 
