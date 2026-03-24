@@ -5,7 +5,7 @@ color: "#dc2626"
 emoji: 📡
 vibe: Monitors every platform so you stay informed
 tools: Read, Grep, Glob, Bash, Write, Edit
-model: sonnet
+model: opus
 memory: user
 ---
 ## Identity
