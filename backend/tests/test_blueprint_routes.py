@@ -116,6 +116,32 @@ class TestDataBlueprint:
         assert resp.status_code == 200
 
 
+class TestSafeLegacyCall:
+    """Tests for error handling decorator on blueprint routes."""
+
+    @patch(DASH_H)
+    def test_dashboard_error_returns_500(self, mock_gh, client):
+        mock_gh.return_value._handle_dashboard_stats.side_effect = RuntimeError("db crash")
+        resp = client.get('/api/dashboard/stats')
+        assert resp.status_code == 500
+        assert resp.get_json()['error'] == 'Internal server error'
+        assert 'db crash' not in resp.get_data(as_text=True)
+
+    @patch(DC_H)
+    def test_dcinside_error_returns_500(self, mock_gh, client):
+        mock_gh.return_value._handle_dcinside_galleries.side_effect = Exception("oops")
+        resp = client.get('/api/dcinside/galleries')
+        assert resp.status_code == 500
+        assert resp.get_json()['error'] == 'Internal server error'
+
+    @patch(DATA_H)
+    def test_data_error_returns_500(self, mock_gh, client):
+        mock_gh.return_value._handle_data_s3_key.side_effect = ValueError("bad key")
+        resp = client.get('/api/data/some/key.json')
+        assert resp.status_code == 500
+        assert resp.get_json()['error'] == 'Internal server error'
+
+
 class TestLegacyHelpers:
     """Tests for shared legacy_helpers module."""
 

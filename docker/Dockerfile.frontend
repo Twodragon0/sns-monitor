@@ -6,7 +6,7 @@ WORKDIR /app
 # package.json 복사 및 의존성 설치
 COPY frontend/package.json frontend/package-lock.json* ./
 
-RUN npm install
+RUN npm ci
 
 # 소스 코드 복사 및 빌드
 COPY frontend/ .

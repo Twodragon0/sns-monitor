@@ -2,9 +2,10 @@
 Shared helpers for legacy api_handlers bridge modules.
 """
 
+import functools
 import logging
 
-from flask import request, Response
+from flask import jsonify, request, Response
 
 logger = logging.getLogger(__name__)
 
@@ -37,3 +38,15 @@ def build_event():
         'body': request.get_data(as_text=True) or None,
         'headers': dict(request.headers),
     }
+
+
+def safe_legacy_call(fn):
+    """Decorator that wraps a legacy handler call with error handling."""
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        try:
+            return fn(*args, **kwargs)
+        except Exception as e:
+            logger.error("Legacy handler error on %s: %s", request.path, e, exc_info=True)
+            return jsonify({'error': 'Internal server error'}), 500
+    return wrapper

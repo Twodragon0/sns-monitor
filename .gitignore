@@ -21,6 +21,8 @@ venv/
 env/
 ENV/
 .pytest_cache/
+.coverage
+htmlcov/
 
 # IDE
 .vscode/

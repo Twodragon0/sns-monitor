@@ -26,7 +26,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # 로컬 모드 확인 (임포트 전에 확인)
-LOCAL_MODE = os.environ.get('LOCAL_MODE', 'false').lower() == 'true'
+LOCAL_MODE = os.environ.get('LOCAL_MODE', 'true').lower() == 'true'
 
 # requests는 항상 임포트 (내부 서비스 호출에 필요)
 # 보안: CVE-2024-35195 대응 - requests>=2.32.0 사용 (Session verify=False 이슈 수정)

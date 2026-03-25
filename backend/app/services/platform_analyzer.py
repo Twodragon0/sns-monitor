@@ -101,7 +101,14 @@ class PlatformAnalyzer:
 
         self._naver_cookie = (os.environ.get("NAVER_CAFE_COOKIE") or "").strip()
         if self._naver_cookie:
-            self._session.headers.update({"Cookie": self._naver_cookie})
+            # Scope cookies to naver.com only (not sent to YouTube/Reddit/etc)
+            for part in self._naver_cookie.split(";"):
+                part = part.strip()
+                if "=" in part:
+                    key, val = part.split("=", 1)
+                    self._session.cookies.set(
+                        key.strip(), val.strip(), domain=".naver.com"
+                    )
 
         self._naver_proxies = None
         proxy_url = (os.environ.get("NAVER_CAFE_PROXY_URL") or "").strip()
