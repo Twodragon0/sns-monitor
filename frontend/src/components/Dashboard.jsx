@@ -103,7 +103,9 @@ function Dashboard({ onShowError }) {
 
   useEffect(() => {
     loadMonitorData();
-    const iv = setInterval(loadMonitorData, 60000);
+    const iv = setInterval(() => {
+      if (document.visibilityState === 'visible') loadMonitorData();
+    }, 60000);
     return () => clearInterval(iv);
   }, [loadMonitorData]);
 
