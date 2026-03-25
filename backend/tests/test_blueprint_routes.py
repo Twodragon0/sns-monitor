@@ -16,12 +16,13 @@ def _mock_result(body='{"ok": true}', status=200):
 class TestDashboardBlueprint:
     """Tests for dashboard.py routes."""
 
-    @patch(DASH_H)
-    def test_dashboard_stats(self, mock_gh, client):
-        mock_gh.return_value._handle_dashboard_stats.return_value = _mock_result()
+    def test_dashboard_stats(self, client):
+        """dashboard_stats is now a direct implementation (no legacy wrapper)."""
         resp = client.get('/api/dashboard/stats')
         assert resp.status_code == 200
-        assert resp.get_json()['ok'] is True
+        data = resp.get_json()
+        assert 'total_items' in data
+        assert 'today_items' in data
 
     @patch(DASH_H)
     def test_scans(self, mock_gh, client):
@@ -29,11 +30,11 @@ class TestDashboardBlueprint:
         resp = client.get('/api/scans')
         assert resp.status_code == 200
 
-    @patch(DASH_H)
-    def test_channels(self, mock_gh, client):
-        mock_gh.return_value._handle_channels.return_value = _mock_result()
+    def test_channels(self, client):
+        """channels is now a direct implementation."""
         resp = client.get('/api/channels')
         assert resp.status_code == 200
+        assert 'channels' in resp.get_json()
 
     @patch(DASH_H)
     def test_vuddy_creators(self, mock_gh, client):
@@ -119,12 +120,14 @@ class TestDataBlueprint:
 class TestSafeLegacyCall:
     """Tests for error handling decorator on blueprint routes."""
 
-    @patch(DASH_H)
-    def test_dashboard_error_returns_500(self, mock_gh, client):
-        mock_gh.return_value._handle_dashboard_stats.side_effect = RuntimeError("db crash")
+    @patch('app.api.dashboard.load_metadata_files_local')
+    def test_dashboard_error_graceful(self, mock_load, client):
+        """dashboard_stats handles errors internally, returns empty stats."""
+        mock_load.side_effect = RuntimeError("db crash")
         resp = client.get('/api/dashboard/stats')
-        assert resp.status_code == 500
-        assert resp.get_json()['error'] == 'Internal server error'
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data['total_items'] == 0
         assert 'db crash' not in resp.get_data(as_text=True)
 
     @patch(DC_H)
