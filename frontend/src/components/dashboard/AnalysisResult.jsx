@@ -7,9 +7,8 @@ import {
 } from 'recharts';
 import { API_BASE } from '../../config';
 import {
-  NAVER_FETCH_STATUS_LABELS, NAVER_FETCH_REASON_LABELS,
+  NAVER_FETCH_STATUS_LABELS,
   formatNaverFetchReason, parseNaverReasonTokens, getNaverDiagnosticActions,
-  trimResultForSummarize,
 } from '../../utils/analysis';
 
 export const SENTIMENT_COLORS = {

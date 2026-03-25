@@ -1,15 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import {
-  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis,
-  Tooltip, ResponsiveContainer, Legend,
+  XAxis, YAxis,
+  Tooltip, ResponsiveContainer,
   LineChart, Line,
 } from 'recharts';
 import { API_BASE } from '../../config';
-import {
-  NAVER_FETCH_STATUS_LABELS,
-  formatNaverFetchReason, parseNaverReasonTokens, getNaverDiagnosticActions,
-} from '../../utils/analysis';
 
 const PLATFORMS = {
   youtube:    { label: 'YouTube',       color: '#FF0000', icon: '▶' },
@@ -24,11 +20,6 @@ const PLATFORMS = {
   threads:    { label: 'Threads',      color: '#000000', icon: '🧵' },
 };
 
-const SENTIMENT_COLORS = {
-  positive: '#10b981',
-  neutral:  '#9ca3af',
-  negative: '#ef4444',
-};
 
 function formatNumber(num) {
   if (num == null) return null;

@@ -14,6 +14,16 @@ from pathlib import Path
 import glob
 from urllib.parse import quote
 
+# Shared utilities (extracted to reusable module)
+from app.services.local_data import (
+    decimal_default,
+    convert_decimal,
+    load_metadata_files_local as _load_metadata_files_local,
+    parse_timestamp_for_today as _parse_timestamp_for_today,
+    load_channels_from_local as _load_channels_from_local,
+    is_timestamp_comment,
+)
+
 # Safe ID pattern for path traversal prevention
 _SAFE_ID_RE = re.compile(r'^[a-zA-Z0-9_@-]{1,128}$')
 
@@ -50,48 +60,9 @@ if not LOCAL_MODE:
 else:
     boto3 = None
 
-def decimal_default(obj):
-    """Decimal을 JSON 직렬화 가능한 타입으로 변환"""
-    if isinstance(obj, Decimal):
-        return int(obj) if obj % 1 == 0 else float(obj)
-    raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
+# decimal_default and convert_decimal imported from app.services.local_data
 
-def convert_decimal(obj):
-    """딕셔너리나 리스트 내의 모든 Decimal을 변환"""
-    if isinstance(obj, Decimal):
-        return int(obj) if obj % 1 == 0 else float(obj)
-    elif isinstance(obj, dict):
-        return {k: convert_decimal(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
-        return [convert_decimal(item) for item in obj]
-    return obj
-
-def is_timestamp_comment(text):
-    """타임스탬프 형식의 댓글인지 확인 (노래 목록, 챕터 등)
-
-    예: "00:16:46 怪獣の花唄 / Vaundy" 형태의 댓글 제외
-    """
-    if not text:
-        return False
-
-    # 타임스탬프 패턴 (00:00:00 또는 00:00 형식)
-    timestamp_pattern = r'\d{1,2}:\d{2}(?::\d{2})?'
-
-    # 댓글에서 타임스탬프 개수 확인
-    timestamps = re.findall(timestamp_pattern, text)
-
-    # 3개 이상의 타임스탬프가 있으면 노래 목록/챕터로 판단
-    if len(timestamps) >= 3:
-        return True
-
-    # 첫 줄이 타임스탬프로 시작하고 여러 줄로 구성된 경우
-    lines = text.strip().split('\n')
-    if len(lines) < 3:
-        return False
-    
-    # 여러 줄이 타임스탬프로 시작하는지 확인
-    timestamp_lines = sum(1 for line in lines if re.match(r'^\s*\d{1,2}:\d{2}', line.strip()))
-    return timestamp_lines >= 3
+# is_timestamp_comment imported from app.services.local_data
 
 
 def calculate_sentiment_from_comments(comment_samples, total_comments):
@@ -231,91 +202,6 @@ def find_channel_files_s3(s3_client, bucket, prefix, requested_handle):
         return []
 
 
-def _load_metadata_files_local(metadata_dir):
-    """로컬 모드에서 메타데이터 파일들을 로드"""
-    items = []
-    if not os.path.exists(metadata_dir):
-        return items
-    
-    for platform_dir in os.listdir(metadata_dir):
-        platform_path = os.path.join(metadata_dir, platform_dir)
-        if not os.path.isdir(platform_path):
-            continue
-        
-        for filename in os.listdir(platform_path):
-            if not filename.endswith('.json'):
-                continue
-            
-            filepath = os.path.join(platform_path, filename)
-            try:
-                with open(filepath, 'r', encoding='utf-8') as f:
-                    item = json.load(f)
-                    items.append(item)
-            except Exception as e:
-                logger.error(f"Error loading metadata file {filepath}: {e}", exc_info=True)
-    
-    return items
-
-
-def _load_channels_from_local(youtube_dir):
-    """로컬 youtube 디렉터리에서 채널 목록 수집 (대시보드 /api/channels용)."""
-    channels = []
-    if not os.path.exists(youtube_dir):
-        return channels
-    search_dirs = [
-        youtube_dir,
-        os.path.join(youtube_dir, 'channels'),
-    ]
-    seen = set()
-    for base_dir in search_dirs:
-        if not os.path.isdir(base_dir):
-            continue
-        for file_path in glob.glob(os.path.join(base_dir, '**', '*.json'), recursive=True):
-            try:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                channel_id = data.get('channel_handle') or data.get('channel_id') or data.get('channel', '')
-                channel_title = data.get('channel_title', '') or channel_id
-                if not channel_id and not channel_title:
-                    continue
-                key = (channel_id or channel_title).strip()
-                if key in seen:
-                    continue
-                seen.add(key)
-                videos = data.get('videos', [])
-                total_comments = 0
-                for v in videos:
-                    raw = v.get('comments') or v.get('comment_count') or 0
-                    total_comments += int(raw) if raw else 0
-                channels.append({
-                    'channel': channel_id or channel_title,
-                    'channel_title': channel_title or channel_id,
-                    'videos_analyzed': len(videos),
-                    'total_comments': total_comments,
-                    'vtuber_comments': 0,
-                    'vtuber_likes': 0,
-                    's3_key': '',
-                    'last_updated': data.get('last_updated', data.get('timestamp', '')),
-                })
-            except Exception as e:
-                logger.debug("Skip non-channel JSON %s: %s", file_path, e)
-    return channels
-
-def _parse_timestamp_for_today(timestamp_str, today_start):
-    """타임스탬프를 파싱하여 오늘 날짜인지 확인"""
-    if not timestamp_str:
-        return False
-    
-    try:
-        if 'T' in timestamp_str:
-            item_date = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
-            if item_date.tzinfo:
-                item_date = item_date.replace(tzinfo=None)
-            return item_date >= today_start
-    except Exception as e:
-        logger.error(f"Error parsing timestamp {timestamp_str}: {e}", exc_info=True)
-    
-    return False
 
 def calculate_sentiment_distribution(sentiment_dist):
     """감성 분포 계산"""

@@ -7,10 +7,10 @@ import {
   trimResultForSummarize, detectPlatform,
 } from '../utils/analysis';
 import {
-  OverviewPanel, GalleryMonitorPanel, YouTubePanel,
+  OverviewPanel, YouTubePanel,
   DCInsidePanel, TwitterPanel, SocialPanel,
 } from './dashboard/MonitorPanels';
-import { AnalysisResult, AiCtaButton } from './dashboard/AnalysisResult';
+import { AnalysisResult } from './dashboard/AnalysisResult';
 
 const RESULTS_CACHE_KEY = 'sns-monitor-results';
 
@@ -28,12 +28,6 @@ const PLATFORMS = {
   instagram:  { label: 'Instagram',    color: '#E1306C', icon: '📸' },
   facebook:   { label: 'Facebook',     color: '#1877F2', icon: '👥' },
   threads:    { label: 'Threads',      color: '#000000', icon: '🧵' },
-};
-
-const SENTIMENT_COLORS = {
-  positive: '#10b981',
-  neutral:  '#9ca3af',
-  negative: '#ef4444',
 };
 
 function formatNumber(num) {
