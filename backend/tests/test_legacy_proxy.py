@@ -9,6 +9,7 @@ class TestLegacyProxy:
 
     @patch('app.api.legacy._get_handlers')
     def test_proxies_to_lambda_handler(self, mock_handlers, client):
+        """Legacy proxy handles routes not claimed by new Blueprints."""
         mock_module = MagicMock()
         mock_module.lambda_handler.return_value = {
             'statusCode': 200,
@@ -17,7 +18,8 @@ class TestLegacyProxy:
         }
         mock_handlers.return_value = mock_module
 
-        resp = client.get('/api/dashboard/stats')
+        # Use a route that still goes through legacy (not migrated to Blueprint)
+        resp = client.get('/api/some-legacy-route')
         assert resp.status_code == 200
         assert resp.get_json()['status'] == 'ok'
 
@@ -36,9 +38,8 @@ class TestLegacyProxy:
         }
         mock_handlers.return_value = mock_module
 
-        resp = client.get('/api/dashboard/stats')
+        resp = client.get('/api/some-legacy-route')
         assert resp.status_code == 200
-        # CORS headers from legacy should NOT be forwarded
         assert 'Access-Control-Allow-Methods' not in resp.headers
 
     @patch('app.api.legacy._get_handlers')
@@ -48,7 +49,7 @@ class TestLegacyProxy:
         mock_module.lambda_handler.side_effect = RuntimeError("secret database error")
         mock_handlers.return_value = mock_module
 
-        resp = client.get('/api/dashboard/stats')
+        resp = client.get('/api/some-legacy-route')
         assert resp.status_code == 500
         data = resp.get_json()
         assert data['error'] == 'Internal server error'

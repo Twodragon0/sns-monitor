@@ -28,7 +28,14 @@ def _get_handlers():
 def api_proxy(path):
     """Proxy requests to legacy lambda_handler."""
     # Skip routes handled by other blueprints
-    if path in ('analyze/url', 'platforms'):
+    _skip_prefixes = (
+        'analyze/url', 'platforms',
+        'dashboard/', 'scans', 'channels',
+        'vuddy/', 'group-a/', 'group-b/', 'group-c/',
+        'dcinside/',
+        'data/', 'crawler/', 'twitter/',
+    )
+    if path.startswith(_skip_prefixes) or path in ('analyze/url', 'platforms'):
         return '', 404
 
     event = {
