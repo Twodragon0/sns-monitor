@@ -34,8 +34,10 @@ def api_proxy(path):
         'vuddy/', 'group-a/', 'group-b/', 'group-c/',
         'dcinside/',
         'data/', 'crawler/', 'twitter/',
+        'analysis/', 'auth/',
+        'health',
     )
-    if path.startswith(_skip_prefixes) or path in ('analyze/url', 'platforms'):
+    if path.startswith(_skip_prefixes) or path in ('analyze/url', 'platforms', 'health'):
         return '', 404
 
     event = {
