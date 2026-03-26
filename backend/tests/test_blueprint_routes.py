@@ -7,6 +7,7 @@ from unittest.mock import patch, MagicMock
 DASH_H = 'app.api.dashboard.get_handlers'
 DC_H = 'app.api.dcinside.get_handlers'
 DATA_H = 'app.api.data.get_handlers'
+VUDDY_H = 'app.api.vuddy.get_handlers'
 
 
 def _mock_result(body='{"ok": true}', status=200):
@@ -36,8 +37,10 @@ class TestDashboardBlueprint:
         assert resp.status_code == 200
         assert 'channels' in resp.get_json()
 
-    @patch(DASH_H)
-    def test_vuddy_creators(self, mock_gh, client):
+    @patch('app.api.vuddy.Config')
+    @patch(VUDDY_H)
+    def test_vuddy_creators(self, mock_gh, mock_cfg, client):
+        mock_cfg.LOCAL_MODE = False
         mock_gh.return_value._handle_vuddy_creators.return_value = _mock_result()
         resp = client.get('/api/vuddy/creators')
         assert resp.status_code == 200
@@ -110,8 +113,10 @@ class TestDataBlueprint:
         resp = client.post('/api/crawler/results', json={'data': 'test'})
         assert resp.status_code == 200
 
+    @patch('app.api.data.Config')
     @patch(DATA_H)
-    def test_twitter_search(self, mock_gh, client):
+    def test_twitter_search(self, mock_gh, mock_cfg, client):
+        mock_cfg.LOCAL_MODE = False
         mock_gh.return_value._handle_twitter_search.return_value = _mock_result()
         resp = client.post('/api/twitter/search', json={'query': 'test'})
         assert resp.status_code == 200
@@ -131,14 +136,18 @@ class TestSafeLegacyCall:
         assert 'db crash' not in resp.get_data(as_text=True)
 
     @patch(DC_H)
-    def test_dcinside_error_returns_500(self, mock_gh, client):
+    @patch('app.api.dcinside.Config')
+    def test_dcinside_error_returns_500(self, mock_cfg, mock_gh, client):
+        mock_cfg.LOCAL_MODE = False
         mock_gh.return_value._handle_dcinside_galleries.side_effect = Exception("oops")
         resp = client.get('/api/dcinside/galleries')
         assert resp.status_code == 500
         assert resp.get_json()['error'] == 'Internal server error'
 
+    @patch('app.api.data.Config')
     @patch(DATA_H)
-    def test_data_error_returns_500(self, mock_gh, client):
+    def test_data_error_returns_500(self, mock_gh, mock_cfg, client):
+        mock_cfg.LOCAL_MODE = False
         mock_gh.return_value._handle_data_s3_key.side_effect = ValueError("bad key")
         resp = client.get('/api/data/some/key.json')
         assert resp.status_code == 500

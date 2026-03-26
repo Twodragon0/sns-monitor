@@ -20,14 +20,18 @@ from . import auth      # noqa: E402, F401
 from . import dashboard  # noqa: E402, F401
 from . import dcinside   # noqa: E402, F401
 from . import data       # noqa: E402, F401
+from .vuddy import vuddy_bp  # noqa: E402, F401
+from .members import members_bp  # noqa: E402, F401
 
 
 def register_blueprints(app):
     """Register all API blueprints with the Flask app."""
     app.register_blueprint(analyze_bp)
+    app.register_blueprint(members_bp)   # unified group members — before dashboard
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(dcinside_bp)
     app.register_blueprint(data_bp)
     app.register_blueprint(analysis_bp)
     app.register_blueprint(auth_bp)
+    app.register_blueprint(vuddy_bp)
     app.register_blueprint(legacy_bp)  # legacy last — catches remaining routes

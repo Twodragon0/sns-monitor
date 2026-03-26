@@ -97,46 +97,4 @@ def scans():
     return legacy_response(get_handlers()._handle_scans())
 
 
-@dashboard_bp.route('/api/vuddy/creators', methods=['GET'])
-@safe_legacy_call
-def vuddy_creators():
-    return legacy_response(get_handlers()._handle_vuddy_creators())
-
-
-@dashboard_bp.route('/api/group-a/members', methods=['GET'])
-@safe_legacy_call
-def group_a_members():
-    return legacy_response(get_handlers()._handle_group_a_members())
-
-
-@dashboard_bp.route('/api/group-b/members', methods=['GET'])
-@safe_legacy_call
-def group_b_members():
-    return legacy_response(get_handlers()._handle_group_b_members())
-
-
-@dashboard_bp.route('/api/group-c/members', methods=['GET'])
-@safe_legacy_call
-def group_c_members():
-    return legacy_response(get_handlers()._handle_group_c_members())
-
-
-@dashboard_bp.route('/api/group-a/channel', methods=['GET'])
-@safe_legacy_call
-def group_a_channel():
-    event = build_event()
-    return legacy_response(get_handlers()._handle_group_a_channel(event))
-
-
-@dashboard_bp.route('/api/group-b/channel', methods=['GET'])
-@safe_legacy_call
-def group_b_channel():
-    event = build_event()
-    return legacy_response(get_handlers()._handle_group_b_channel(event))
-
-
-@dashboard_bp.route('/api/group-c/channel', methods=['GET'])
-@safe_legacy_call
-def group_c_channel():
-    event = build_event()
-    return legacy_response(get_handlers()._handle_group_c_channel(event))
+# Group members and channel routes are now handled by members_bp (app/api/members.py).

@@ -23,6 +23,16 @@ from app.services.local_data import (
     load_channels_from_local as _load_channels_from_local,
     is_timestamp_comment,
 )
+from app.services.sentiment import (
+    calculate_sentiment_from_comments,
+    detect_comment_sentiment,
+    calculate_sentiment_distribution,
+    get_overall_sentiment,
+    extract_comment_sentiment,
+    _detect_reply_sentiment,
+    _calculate_sentiment_from_samples,
+    _simple_sentiment_analysis,
+)
 
 # Safe ID pattern for path traversal prevention
 _SAFE_ID_RE = re.compile(r'^[a-zA-Z0-9_@-]{1,128}$')
@@ -65,41 +75,6 @@ else:
 # is_timestamp_comment imported from app.services.local_data
 
 
-def calculate_sentiment_from_comments(comment_samples, total_comments):
-    """댓글 샘플에서 감성 분석 결과 계산"""
-    if not comment_samples:
-        return None
-    
-    total = len(comment_samples)
-    if total == 0:
-        return None
-    
-    positive_count = sum(1 for c in comment_samples if c.get('sentiment') == 'positive')
-    negative_count = sum(1 for c in comment_samples if c.get('sentiment') == 'negative')
-    neutral_count = total - positive_count - negative_count
-    
-    # 감성 결정
-    if positive_count > negative_count and positive_count > neutral_count:
-        sentiment = 'positive'
-    elif negative_count > positive_count and negative_count > neutral_count:
-        sentiment = 'negative'
-    else:
-        sentiment = 'neutral'
-    
-    return {
-        'sentiment': sentiment,
-        'sentiment_distribution': {
-            'positive': round(positive_count / total, 2),
-            'negative': round(negative_count / total, 2),
-            'neutral': round(neutral_count / total, 2)
-        },
-        'summary': f"총 {total_comments}개의 댓글이 수집되었습니다. 감성 분석 결과: 긍정 {int((positive_count / total) * 100)}%, 중립 {int((neutral_count / total) * 100)}%, 부정 {int((negative_count / total) * 100)}%",
-        'keywords': [],
-        'trends': [],
-        'insights': [],
-        'overall_score': int((positive_count / total) * 100)
-    }
-
 
 def is_archive_studio_channel(channel_id, channel_title, channel_handle, channel_filter_from_data, channel_handle_from_data):
     """Example Studio 채널인지 확인"""
@@ -137,21 +112,6 @@ def get_local_filepath(s3_key, local_data_dir):
     # raw-data/youtube/keyword/timestamp.json 형식
     return os.path.join(local_data_dir, s3_key.replace('raw-data/', ''))
 
-
-def detect_comment_sentiment(comment_text):
-    """댓글 텍스트에서 감성 분석"""
-    if not comment_text:
-        return 'neutral'
-    
-    text_lower = comment_text.lower()
-    positive_words = ['좋', '최고', '사랑', '감사', '고마', '훌륭', '멋', '대박', '완벽', '👍', '❤', '💕', '😊', '😍']
-    negative_words = ['안좋', '최악', '싫', '별로', '실망', '나쁘', '문제', '불만', '😢', '😡', '👎']
-    
-    if any(word in text_lower for word in positive_words):
-        return 'positive'
-    if any(word in text_lower for word in negative_words):
-        return 'negative'
-    return 'neutral'
 
 
 def find_channel_files_local(youtube_dir, requested_handle):
@@ -201,29 +161,6 @@ def find_channel_files_s3(s3_client, bucket, prefix, requested_handle):
         logger.error(f"Error listing S3 objects: {e}", exc_info=True)
         return []
 
-
-
-def calculate_sentiment_distribution(sentiment_dist):
-    """감성 분포 계산"""
-    if not sentiment_dist:
-        return {'positive': 0.0, 'negative': 0.0, 'neutral': 0.0}
-    
-    total_sentiment = sum(sentiment_dist.values())
-    if total_sentiment == 0:
-        return {'positive': 0.0, 'negative': 0.0, 'neutral': 0.0}
-    
-    return {
-        'positive': round(sentiment_dist.get('positive', 0) / total_sentiment, 2),
-        'negative': round(sentiment_dist.get('negative', 0) / total_sentiment, 2),
-        'neutral': round(sentiment_dist.get('neutral', 0) / total_sentiment, 2)
-    }
-
-
-def get_overall_sentiment(sentiment_dist):
-    """전체 감성 결정"""
-    if not sentiment_dist:
-        return 'neutral'
-    return max(sentiment_dist, key=sentiment_dist.get)
 
 
 def safe_decimal_to_int(value, default=0):
@@ -420,16 +357,6 @@ def should_skip_archive_studio_channel(channel_title, channel_id, is_archive_stu
 
     return True  # Example Studio 채널이 아니므로 스킵
 
-
-def extract_comment_sentiment(comment, comment_text):
-    """댓글에서 감성 분석 추출 (중첩 if 제거)"""
-    # 기존 감성 분석 결과 확인
-    sentiment = comment.get('sentiment') or comment.get('is_vtuber')
-    if sentiment:
-        return sentiment
-    
-    # 감성 분석이 없으면 키워드 기반 분석
-    return detect_comment_sentiment(comment_text)
 
 
 def create_comment_sample(comment, video, video_id):
@@ -658,18 +585,6 @@ def process_rss_platform_data(s3_data, scan):
         })
     scan['entries'] = entries
 
-
-def _detect_reply_sentiment(reply_text):
-    """댓글 텍스트에서 감성 분석 (중첩 if 제거)"""
-    text_lower = reply_text.lower()
-    positive_words = ['좋', '최고', '사랑', '감사', '고마', '훌륭', '멋', '대박', '완벽', '👍', '❤', '💕', '😊', '😍']
-    negative_words = ['안좋', '최악', '싫', '별로', '실망', '나쁘', '문제', '불만', '😢', '😡', '👎']
-    
-    if any(word in text_lower for word in positive_words):
-        return 'positive'
-    if any(word in text_lower for word in negative_words):
-        return 'negative'
-    return 'neutral'
 
 
 def _extract_twitter_replies(replies):
@@ -1681,37 +1596,6 @@ def _build_analysis_info(analysis_result, comment_samples, summary_text, top_key
         'analyzed_at': ''
     }
 
-
-def _calculate_sentiment_from_samples(comment_samples):
-    """댓글 샘플에서 감성 분포 계산"""
-    if not comment_samples:
-        return {'positive': 0.0, 'negative': 0.0, 'neutral': 0.0}, 'neutral', 50
-    
-    total = len(comment_samples)
-    positive_count = sum(1 for c in comment_samples if c.get('sentiment') == 'positive')
-    negative_count = sum(1 for c in comment_samples if c.get('sentiment') == 'negative')
-    neutral_count = total - positive_count - negative_count
-    
-    if total == 0:
-        return {'positive': 0.0, 'negative': 0.0, 'neutral': 0.0}, 'neutral', 50
-    
-    sentiment_distribution = {
-        'positive': round(positive_count / total, 2),
-        'negative': round(negative_count / total, 2),
-        'neutral': round(neutral_count / total, 2)
-    }
-    
-    if positive_count > negative_count and positive_count > neutral_count:
-        overall_sentiment = 'positive'
-    elif negative_count > positive_count and negative_count > neutral_count:
-        overall_sentiment = 'negative'
-    else:
-        overall_sentiment = 'neutral'
-    
-    positive_ratio = positive_count / total if total > 0 else 0
-    calculated_score = int(positive_ratio * 100)
-    
-    return sentiment_distribution, overall_sentiment, calculated_score
 
 
 def _handle_vuddy_creators():
@@ -3740,54 +3624,6 @@ def _analyze_reddit_url(url):
     result['description'] = 'Reddit analysis requires crawler data.'
     return result
 
-
-def _simple_sentiment_analysis(items):
-    """간단한 감성 분석 (키워드 기반)"""
-    positive_words = ['좋아', '최고', '감사', '사랑', '대박', '멋지', '예쁘', '귀엽',
-                      '응원', '화이팅', 'love', 'great', 'amazing', 'awesome', 'best',
-                      '좋다', '재밌', '웃기', '감동', '완벽', '훌륭', '행복']
-    negative_words = ['싫어', '나쁘', '최악', '실망', '별로', '짜증', '혐오',
-                      'hate', 'worst', 'bad', 'terrible', 'awful',
-                      '쓰레기', '망했', '노잼']
-
-    total = len(items)
-    if total == 0:
-        return None
-
-    pos = 0
-    neg = 0
-    top_keywords = {}
-
-    for item in items:
-        text = (item.get('text', '') or '').lower()
-        is_pos = any(w in text for w in positive_words)
-        is_neg = any(w in text for w in negative_words)
-        if is_pos and not is_neg:
-            pos += 1
-        elif is_neg and not is_pos:
-            neg += 1
-
-        # Extract keywords
-        for word in text.split():
-            word = word.strip('.,!?()[]{}"\':;')
-            if len(word) >= 2 and word not in ('the', 'and', 'for', 'that', 'this', 'with', 'are', 'was', 'has'):
-                top_keywords[word] = top_keywords.get(word, 0) + 1
-
-    neu = total - pos - neg
-    overall = 'positive' if pos > neg else ('negative' if neg > pos else 'neutral')
-
-    sorted_keywords = sorted(top_keywords.items(), key=lambda x: x[1], reverse=True)[:15]
-
-    return {
-        'total': total,
-        'sentiment': {
-            'positive': pos,
-            'neutral': neu,
-            'negative': neg,
-        },
-        'overall': overall,
-        'top_keywords': [{'word': w, 'count': c} for w, c in sorted_keywords],
-    }
 
 
 def lambda_handler(event, context):
