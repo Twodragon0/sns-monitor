@@ -1,5 +1,6 @@
 import React from 'react';
-import { render } from '@testing-library/react';
+import { render, waitFor } from '@testing-library/react';
+import { axe } from 'jest-axe';
 import axios from 'axios';
 import Dashboard from './Dashboard';
 
@@ -30,5 +31,12 @@ describe('Dashboard (smoke)', () => {
   it('shows main content without throwing', () => {
     const { container } = render(<Dashboard onShowError={() => {}} />);
     expect(container.firstChild).toBeTruthy();
+  });
+
+  it('has no accessibility violations', async () => {
+    const { container } = render(<Dashboard onShowError={jest.fn()} />);
+    await waitFor(() => expect(container.querySelector('.dashboard')).toBeTruthy(), { timeout: 3000 }).catch(() => {});
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
   });
 });

@@ -102,15 +102,16 @@ function App() {
       {!isDetailPage && (
         <header className="App-header">
           <div className="App-header__inner">
-            <h1
-              className="App-header__title"
-              onClick={() => window.history.pushState({}, '', '/')}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') window.history.pushState({}, '', '/'); }}
-              aria-label="SNS Monitor 홈으로 이동"
-            >
-              🔍 SNS Monitor
+            <h1 className="App-header__title">
+              <span
+                onClick={() => window.history.pushState({}, '', '/')}
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') window.history.pushState({}, '', '/'); }}
+                aria-label="SNS Monitor 홈으로 이동"
+                style={{ cursor: 'pointer' }}
+              >
+                🔍 SNS Monitor
+              </span>
             </h1>
             <p className="App-header__desc">
               YouTube · DCInside · Reddit · Telegram · Kakao · X(Twitter) · Instagram · Facebook · Threads

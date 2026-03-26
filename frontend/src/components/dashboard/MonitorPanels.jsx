@@ -228,14 +228,14 @@ export function OverviewPanel({ stats, channels }) {
       )}
       <div className="panel-overview__grid">
         <div className="panel-card">
-          <h4 className="panel-card__title">YouTube</h4>
+          <h3 className="panel-card__title">YouTube</h3>
           <div className="panel-card__body">
             <p><strong>{channels.length}</strong> 키워드 모니터링</p>
             <p><strong>{formatNumber(stats.ytComments)}</strong> 댓글 수집됨</p>
           </div>
         </div>
         <div className="panel-card">
-          <h4 className="panel-card__title">DCInside</h4>
+          <h3 className="panel-card__title">DCInside</h3>
           <div className="panel-card__body">
             <p><strong>{stats.galleryCount}</strong> 갤러리 모니터링</p>
             <p><strong>{formatNumber(stats.dcPosts)}</strong> 게시글 수집됨</p>
@@ -243,14 +243,14 @@ export function OverviewPanel({ stats, channels }) {
           </div>
         </div>
         <div className="panel-card">
-          <h4 className="panel-card__title">X (Twitter)</h4>
+          <h3 className="panel-card__title">X (Twitter)</h3>
           <div className="panel-card__body">
             <p>키워드 검색 링크 기반 모니터링</p>
             <p className="panel-card__hint">트위터 API 유료 → 직접 검색 방식</p>
           </div>
         </div>
         <div className="panel-card">
-          <h4 className="panel-card__title">Instagram · Facebook · Threads</h4>
+          <h3 className="panel-card__title">Instagram · Facebook · Threads</h3>
           <div className="panel-card__body">
             <p>URL 분석 기반 모니터링</p>
             <p className="panel-card__hint">상단 URL 입력에서 분석 가능</p>
@@ -259,7 +259,7 @@ export function OverviewPanel({ stats, channels }) {
       </div>
       <div className="panel-overview__analysis">
         <div className="panel-card panel-card--analysis">
-          <h4 className="panel-card__title">수집 데이터 분석 · 요약</h4>
+          <h3 className="panel-card__title">수집 데이터 분석 · 요약</h3>
           <div className="panel-card__body">
             <p>크롤러로 수집한 YouTube·DCInside 데이터를 AI로 분석·요약합니다.</p>
             <p className="panel-card__hint">엔티티 그래프 구축 후 AI 채팅으로 인사이트를 질의할 수 있습니다.</p>

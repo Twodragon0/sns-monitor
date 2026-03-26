@@ -1,5 +1,6 @@
 import React from 'react';
-import { render } from '@testing-library/react';
+import { render, waitFor } from '@testing-library/react';
+import { axe } from 'jest-axe';
 import axios from 'axios';
 import App from './App';
 
@@ -31,5 +32,12 @@ describe('App (smoke)', () => {
   it('renders without crashing', () => {
     const { container } = render(<App />);
     expect(container).toBeTruthy();
+  });
+
+  it('has no accessibility violations', async () => {
+    const { container } = render(<App />);
+    await waitFor(() => expect(container.querySelector('.App')).toBeTruthy());
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
   });
 });

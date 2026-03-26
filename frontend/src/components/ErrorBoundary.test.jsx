@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
+import { axe } from 'jest-axe';
 import ErrorBoundary from './ErrorBoundary';
 
 // Component that throws on render when told to
@@ -45,5 +46,14 @@ describe('ErrorBoundary', () => {
       </ErrorBoundary>
     );
     expect(screen.getByRole('button', { name: '새로고침' })).toBeInTheDocument();
+  });
+
+  it('error state has no accessibility violations', async () => {
+    const ThrowError = () => { throw new Error('Test'); };
+    const { container } = render(
+      <ErrorBoundary><ThrowError /></ErrorBoundary>
+    );
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
   });
 });
