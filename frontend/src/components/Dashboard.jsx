@@ -326,13 +326,15 @@ function Dashboard({ onShowError }) {
           <StatBox icon="💬" label="DCInside 댓글" value={formatNumber(stats.dcComments)} />
         </div>
 
-        <nav className="dash__tabs" aria-label="플랫폼 탭">
+        <nav className="dash__tabs" aria-label="플랫폼 탭" role="tablist">
           {TABS.map(t => (
             <button
               key={t.id}
+              id={`tab-${t.id}`}
               className={`dash__tab ${activeTab === t.id ? 'dash__tab--active' : ''}`}
               onClick={() => setActiveTab(t.id)}
               aria-selected={activeTab === t.id}
+              aria-controls="dash-tabpanel"
               role="tab"
             >
               {t.label}
@@ -340,7 +342,7 @@ function Dashboard({ onShowError }) {
           ))}
         </nav>
 
-        <div className="dash__panel" role="tabpanel">
+        <div id="dash-tabpanel" className="dash__panel" role="tabpanel" aria-labelledby={`tab-${activeTab}`}>
           {monitorData.loading ? (
             <div className="dash__loading">
               <div className="dash__spinner" />

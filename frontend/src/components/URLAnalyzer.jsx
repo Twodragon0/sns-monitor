@@ -166,7 +166,7 @@ function URLAnalyzer() {
             onKeyDown={(e) => { if (e.key === 'Enter' && url.trim()) { e.preventDefault(); handleAnalyze(e); } }}
           />
           {searchQuery && (
-            <button type="button" className="search-query-clear" onClick={() => setSearchQuery('')} title="검색어 지우기">✕</button>
+            <button type="button" className="search-query-clear" onClick={() => setSearchQuery('')} title="검색어 지우기" aria-label="검색어 지우기">✕</button>
           )}
         </div>
       )}
@@ -229,9 +229,9 @@ function URLAnalyzer() {
         </div>
       )}
 
-      <div className="supported-platforms">
+      <div className="supported-platforms" role="list" aria-label="지원 플랫폼">
         {Object.entries(PLATFORM_INFO).map(([key, info]) => (
-          <span key={key} className="platform-tag" style={{ borderColor: info.color }}>
+          <span key={key} className="platform-tag" style={{ borderColor: info.color }} role="listitem">
             {info.icon} {info.name}
           </span>
         ))}
@@ -287,35 +287,39 @@ function URLAnalyzer() {
         </div>
       )}
 
-      {error && <div className="error-message">{error}</div>}
+      {error && <div className="error-message" role="alert" aria-live="assertive">{error}</div>}
 
       {loading && (
-        <div className="loading-container">
+        <div className="loading-container" aria-live="polite" aria-label="분석 중">
           <div className="loading-spinner" />
           <p>Analyzing content...</p>
         </div>
       )}
 
-      {result && <AnalysisResult result={result} />}
+      <div aria-live="polite" aria-atomic="false">
+        {result && <AnalysisResult result={result} />}
+      </div>
 
       {history.length > 0 && (
         <div className="analysis-history">
           <div className="history-header">
             <h3>Recent Analyses</h3>
-            <button className="clear-history-button" onClick={clearHistory}>Clear</button>
+            <button className="clear-history-button" onClick={clearHistory} aria-label="분석 기록 전체 삭제">Clear</button>
           </div>
           <ul>
             {history.map((item, idx) => (
-              <li key={idx} onClick={() => openHistoryItem(item)}>
-                <span className="history-platform" style={{
-                  color: PLATFORM_INFO[item.platform]?.color || '#666'
-                }}>
-                  {PLATFORM_INFO[item.platform]?.icon}
-                </span>
-                <span className="history-title">{item.title}</span>
-                <span className="history-time">
-                  {item.analyzed_at ? new Date(item.analyzed_at).toLocaleTimeString('ko-KR') : ''}
-                </span>
+              <li key={idx}>
+                <button type="button" className="history-item-button" onClick={() => openHistoryItem(item)} aria-label={`${item.title} 분석 결과 불러오기`}>
+                  <span className="history-platform" style={{
+                    color: PLATFORM_INFO[item.platform]?.color || '#666'
+                  }} aria-hidden="true">
+                    {PLATFORM_INFO[item.platform]?.icon}
+                  </span>
+                  <span className="history-title">{item.title}</span>
+                  <span className="history-time">
+                    {item.analyzed_at ? new Date(item.analyzed_at).toLocaleTimeString('ko-KR') : ''}
+                  </span>
+                </button>
               </li>
             ))}
           </ul>

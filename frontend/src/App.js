@@ -105,6 +105,10 @@ function App() {
             <h1
               className="App-header__title"
               onClick={() => window.history.pushState({}, '', '/')}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') window.history.pushState({}, '', '/'); }}
+              aria-label="SNS Monitor 홈으로 이동"
             >
               🔍 SNS Monitor
             </h1>
@@ -112,7 +116,7 @@ function App() {
               YouTube · DCInside · Reddit · Telegram · Kakao · X(Twitter) · Instagram · Facebook · Threads
             </p>
             <div className="App-header__status">
-              <span className={`status-dot ${isBackendOnline ? 'online' : 'offline'}`} />
+              <span className={`status-dot ${isBackendOnline ? 'online' : 'offline'}`} aria-hidden="true" />
               <span className="status-label">
                 API {isBackendOnline ? 'Connected' : 'Offline'}
               </span>
