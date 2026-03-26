@@ -11,6 +11,7 @@ import {
   DCInsidePanel, TwitterPanel, SocialPanel,
 } from './dashboard/MonitorPanels';
 import { AnalysisResult } from './dashboard/AnalysisResult';
+import { formatNumber } from './url-analyzer/ResultComponents';
 
 const RESULTS_CACHE_KEY = 'sns-monitor-results';
 
@@ -29,15 +30,6 @@ const PLATFORMS = {
   facebook:   { label: 'Facebook',     color: '#1877F2', icon: '👥' },
   threads:    { label: 'Threads',      color: '#000000', icon: '🧵' },
 };
-
-function formatNumber(num) {
-  if (num == null) return null;
-  const n = typeof num === 'string' ? parseInt(num.replace(/[,\s]/g, ''), 10) : Number(num);
-  if (isNaN(n)) return '0';
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toLocaleString();
-}
 
 
 /* ============================================================

@@ -3,10 +3,12 @@ import axios from 'axios';
 import './App.css';
 import { API_BASE } from './config';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import Dashboard from './components/Dashboard';
-import CreatorDetail from './components/CreatorDetail';
-import AnalysisTab from './components/AnalysisTab';
+import ErrorBoundary from './components/ErrorBoundary';
 import { ToastContainer, useToast } from './components/Toast';
+
+const Dashboard = React.lazy(() => import('./components/Dashboard'));
+const CreatorDetail = React.lazy(() => import('./components/CreatorDetail'));
+const AnalysisTab = React.lazy(() => import('./components/AnalysisTab'));
 
 if (API_BASE) axios.defaults.withCredentials = true;
 
@@ -95,6 +97,7 @@ function App() {
 
   return (
     <AuthProvider>
+    <ErrorBoundary>
     <div className="App">
       {!isDetailPage && (
         <header className="App-header">
@@ -119,7 +122,9 @@ function App() {
       )}
 
       <main className="App-main">
-        {renderContent()}
+        <React.Suspense fallback={<div style={{ textAlign: 'center', padding: '60px 20px', color: '#888' }}>로딩 중...</div>}>
+          {renderContent()}
+        </React.Suspense>
       </main>
 
       {!isDetailPage && (
@@ -130,6 +135,7 @@ function App() {
 
       <ToastContainer toasts={toasts} removeToast={removeToast} />
     </div>
+    </ErrorBoundary>
     </AuthProvider>
   );
 }
