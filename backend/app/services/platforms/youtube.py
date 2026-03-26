@@ -119,7 +119,7 @@ class YouTubeMixin:
                     }
                 )
         except Exception as e:
-            logger.warning(f"Failed to fetch comments for {video_id}: {e}")
+            logger.warning("Failed to fetch comments for %s: %s", video_id, e)
 
         return {
             "type": "video",

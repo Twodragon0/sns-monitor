@@ -253,6 +253,7 @@ class PlatformAnalyzer(
             except ValueError as ve:
                 if "Internal" in str(ve) or "Blocked" in str(ve):
                     raise
+                raise ValueError("Internal addresses not allowed")
 
     def detect_platform(self, url):
         """Detect which platform a URL belongs to by matching against parsed hostname."""
@@ -736,6 +737,6 @@ class PlatformAnalyzer(
             with open(filepath, "w", encoding="utf-8") as f:
                 json.dump(result, f, ensure_ascii=False, indent=2, default=str)
 
-            logger.info(f"Saved analysis result: {filepath}")
+            logger.info("Saved analysis result: %s", filepath)
         except Exception as e:
-            logger.warning(f"Failed to save result: {e}")
+            logger.warning("Failed to save result: %s", e)

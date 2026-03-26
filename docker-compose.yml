@@ -9,6 +9,8 @@ services:
     # Redis is internal-only; expose port only for local debugging via REDIS_HOST_PORT
     # ports:
     #   - "${REDIS_HOST_PORT:-6380}:6379"
+    mem_limit: 256m
+    cpus: 0.5
     volumes:
       - redis-data:/data
     networks:
@@ -62,6 +64,8 @@ services:
       - API_EXTERNAL_PORT=${API_PORT:-8888}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+    mem_limit: 2g
+    cpus: 2
     volumes:
       - ./local-data:/app/local-data:rw
     depends_on:
@@ -80,10 +84,13 @@ services:
       context: .
       dockerfile: docker/Dockerfile.frontend
     container_name: sns-monitor-frontend
+    mem_limit: 256m
+    cpus: 0.5
     ports:
       - "${FRONTEND_PORT:-3080}:3000"
     depends_on:
-      - api-backend
+      api-backend:
+        condition: service_healthy
     networks:
       - sns-network
 
@@ -95,6 +102,8 @@ services:
     container_name: sns-monitor-youtube-crawler
     profiles:
       - crawlers
+    mem_limit: 512m
+    cpus: 1
     environment:
       - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
       - CHANNELS=${CHANNELS:-}
@@ -120,6 +129,8 @@ services:
     profiles:
       - crawlers
     restart: unless-stopped
+    mem_limit: 512m
+    cpus: 1
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -144,6 +155,8 @@ services:
     container_name: sns-monitor-naver-cafe-crawler
     profiles:
       - crawlers
+    mem_limit: 512m
+    cpus: 1
     environment:
       - API_BASE_URL=http://api-backend:8080
       - LOCAL_MODE=true
@@ -166,6 +179,8 @@ services:
     container_name: sns-monitor-mirofish
     profiles:
       - analysis
+    mem_limit: 1g
+    cpus: 1
     env_file:
       - .env.mirofish
     ports:

@@ -146,6 +146,10 @@ def _call_cli(tool_name: str, prompt: str, timeout: int = 120) -> Optional[str]:
     """Call an AI tool via CLI binary or Python SDK."""
     tools = _detect_cli_tools()
 
+    # Sanitize: strip control chars that could confuse CLI tools
+    import re as _re
+    prompt = _re.sub(r'[\x00-\x1f\x7f]', ' ', prompt[:15000])
+
     # SDK-based tools: use Python packages directly (no subprocess needed)
     if tool_name in ("claude_sdk", "claude") and "claude_sdk" in tools:
         return _call_sdk_anthropic(prompt)

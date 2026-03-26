@@ -64,7 +64,7 @@ class TwitterMixin:
                     if user_data.get("banner_url"):
                         profile_info["banner"] = user_data["banner_url"]
         except Exception as e:
-            logger.warning(f"FxTwitter profile fetch failed for {username}: {e}")
+            logger.warning("FxTwitter profile fetch failed for %s: %s", username, e)
 
         # Method 2: Twitter API v2 for timeline posts (requires Bearer Token)
         bearer_token = os.environ.get("TWITTER_BEARER_TOKEN", "").strip()
@@ -108,7 +108,7 @@ class TwitterMixin:
                                 }
                             )
             except Exception as e:
-                logger.warning(f"Twitter syndication fetch failed for {username}: {e}")
+                logger.warning("Twitter syndication fetch failed for %s: %s", username, e)
 
         # Method 4: Fallback to og:meta from X.com
         if not profile_info.get("description"):
@@ -150,7 +150,7 @@ class TwitterMixin:
                             else str(image_val or "")
                         )
             except Exception as e:
-                logger.warning(f"Twitter page fetch failed for {username}: {e}")
+                logger.warning("Twitter page fetch failed for %s: %s", username, e)
 
         profile_info["total_posts"] = len(profile_info["posts"])
         return profile_info
@@ -172,7 +172,7 @@ class TwitterMixin:
         user_data = resp.json().get("data", {})
         user_id = user_data.get("id")
         if not user_id:
-            logger.warning(f"Twitter API v2: user not found: {username}")
+            logger.warning("Twitter API v2: user not found: %s", username)
             return []
 
         # Step 2: Get recent tweets
@@ -251,7 +251,7 @@ class TwitterMixin:
                         tweet_info["author_name"] = author.get("name", "")
                         tweet_info["thumbnail"] = author.get("avatar_url", "")
         except Exception as e:
-            logger.warning(f"FxTwitter tweet fetch failed for {tweet_id}: {e}")
+            logger.warning("FxTwitter tweet fetch failed for %s: %s", tweet_id, e)
 
         # Method 2: Twitter API v2 direct tweet lookup (if bearer token available)
         if not tweet_info["posts"]:
@@ -338,7 +338,7 @@ class TwitterMixin:
                             }
                         )
             except Exception as e:
-                logger.warning(f"Twitter tweet page fetch failed: {e}")
+                logger.warning("Twitter tweet page fetch failed: %s", e)
 
         # Fetch replies (comments) for the tweet
         comments = self._fetch_twitter_replies(tweet_id, username)

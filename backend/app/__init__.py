@@ -48,7 +48,10 @@ def create_app(config_class=Config):
         _origins = [o.strip() for o in _cors_origins.split(",") if o.strip()]
         CORS(app, resources={r"/api/*": {"origins": _origins, "supports_credentials": True}})
     else:
-        CORS(app, resources={r"/api/*": {"origins": ["http://localhost:3080", "http://localhost:3000"]}})
+        _fallback = ["http://localhost:3080", "http://localhost:3000"]
+        if not app.debug:
+            logger.warning("CORS_ORIGINS not set — falling back to localhost origins")
+        CORS(app, resources={r"/api/*": {"origins": _fallback}})
 
     # Health check (frontend calls /api/health via nginx proxy)
     def _health():

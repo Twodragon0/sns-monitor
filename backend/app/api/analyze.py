@@ -180,9 +180,9 @@ def summarize_analysis():
                 }
             )
         else:
-            logger.warning(f"AI analysis service returned {resp.status_code}: {resp.text[:200]}")
+            logger.warning("AI analysis service returned %s: %s", resp.status_code, resp.text[:200])
     except Exception as e:
-        logger.warning(f"AI analysis summarization failed: {e}")
+        logger.warning("AI analysis summarization failed: %s", e)
 
     # 2) Local LLM (Claude / ChatGPT via API key or OAuth token)
     try:
@@ -197,7 +197,7 @@ def summarize_analysis():
         if llm_result and llm_result.get("summary"):
             return jsonify(llm_result)
     except Exception as e:
-        logger.warning(f"LLM summarization failed: {e}")
+        logger.warning("LLM summarization failed: %s", e)
 
     # Fallback: generate a readable plain-text summary in Korean (no markdown)
     def _fmt_num(v):
