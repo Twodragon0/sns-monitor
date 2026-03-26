@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 
 
-DASH_H = 'app.api.dashboard.get_handlers'
+DASH_H = 'app.api.members.get_handlers'
 DC_H = 'app.api.dcinside.get_handlers'
 DATA_H = 'app.api.data.get_handlers'
 VUDDY_H = 'app.api.vuddy.get_handlers'
@@ -25,11 +25,12 @@ class TestDashboardBlueprint:
         assert 'total_items' in data
         assert 'today_items' in data
 
-    @patch(DASH_H)
-    def test_scans(self, mock_gh, client):
-        mock_gh.return_value._handle_scans.return_value = _mock_result()
+    @patch('app.api.dashboard.load_metadata_files_local', return_value=[])
+    def test_scans(self, mock_load, client):
+        """scans is now a direct implementation (no legacy wrapper)."""
         resp = client.get('/api/scans')
         assert resp.status_code == 200
+        assert 'scans' in resp.get_json()
 
     def test_channels(self, client):
         """channels is now a direct implementation."""

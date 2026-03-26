@@ -12,12 +12,13 @@ from datetime import datetime, timezone
 from flask import jsonify
 
 from . import dashboard_bp
-from .legacy_helpers import get_handlers, legacy_response, build_event, safe_legacy_call
+from .legacy_helpers import safe_legacy_call
 from ..config import Config
 from ..services.local_data import (
     load_metadata_files_local,
     parse_timestamp_for_today,
     load_channels_from_local,
+    convert_item_to_scan,
     decimal_default,
 )
 
@@ -89,12 +90,23 @@ def channels():
     return jsonify({'channels': channel_list})
 
 
-# --- Remaining routes still delegate to legacy api_handlers ---
-
 @dashboard_bp.route('/api/scans', methods=['GET'])
 @safe_legacy_call
 def scans():
-    return legacy_response(get_handlers()._handle_scans())
+    """Scan list — migrated from api_handlers._handle_scans (LOCAL_MODE path)."""
+    try:
+        metadata_dir = os.path.join(Config.LOCAL_DATA_DIR, 'metadata')
+        items = load_metadata_files_local(metadata_dir)
+        items.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+        items = items[:100]
+
+        scan_list = [convert_item_to_scan(item) for item in items]
+        scan_list.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+    except Exception as e:
+        logger.error("Error getting scans: %s", e, exc_info=True)
+        scan_list = []
+
+    return jsonify({'scans': scan_list})
 
 
 # Group members and channel routes are now handled by members_bp (app/api/members.py).

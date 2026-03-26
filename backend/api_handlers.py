@@ -3246,20 +3246,8 @@ def lambda_handler(event, context):
         if path.startswith('/api/auth'):
             return _handle_auth_proxy(event, path, query_params, http_method)
 
-        # GET /api/dashboard/stats
-        if path.endswith('/dashboard/stats'):
-            return _handle_dashboard_stats()
-
-        # GET /api/scans
-        elif path.endswith('/scans'):
-            return _handle_scans()
-
-        # GET /api/channels
-        elif path.endswith('/channels'):
-            return _handle_channels()
-
         # GET /api/vuddy/creators
-        elif path.endswith('/vuddy/creators'):
+        if path.endswith('/vuddy/creators'):
             return _handle_vuddy_creators()
 
         # GET /api/group-a/members (GroupA members)

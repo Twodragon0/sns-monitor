@@ -129,6 +129,94 @@ def load_channels_from_local(youtube_dir=None):
     return channels
 
 
+def convert_item_to_scan(item):
+    """Metadata item dict를 scan 응답 객체로 변환 (LOCAL_MODE용)."""
+    def _to_int(val, default=0):
+        if isinstance(val, Decimal):
+            return int(val)
+        if isinstance(val, (int, float)):
+            return int(val)
+        return default
+
+    def _to_str(val, default='unknown'):
+        if isinstance(val, Decimal):
+            return str(val)
+        if isinstance(val, str):
+            return val
+        return str(val) if val else default
+
+    scan = {
+        'id': item.get('id', ''),
+        'platform': _to_str(item.get('platform', 'unknown')),
+        'keyword': item.get('keyword', ''),
+        'timestamp': item.get('timestamp', ''),
+        's3_key': item.get('s3_key', ''),
+        'total_comments': _to_int(item.get('total_comments', 0)),
+        'total_likes': _to_int(item.get('total_likes', 0)),
+        'videos_found': _to_int(item.get('videos_found', 0) or item.get('videos_analyzed', 0)),
+        'entries_found': _to_int(item.get('entries_found', 0)),
+        'tweets_found': _to_int(item.get('total_tweets', 0) or item.get('tweets_found', 0)),
+        'posts_found': _to_int(item.get('total_posts', 0) or item.get('posts_found', 0)),
+        'channel': item.get('channel', ''),
+        'channel_title': item.get('channel_title', ''),
+    }
+
+    # Sentiment analysis
+    sentiment_analysis = item.get('sentiment_analysis', {})
+    if sentiment_analysis:
+        sentiment_dist = sentiment_analysis.get('sentiment_distribution', {})
+        total_s = sum(sentiment_dist.values()) if sentiment_dist else 0
+        if total_s > 0:
+            dist = {
+                'positive': round(sentiment_dist.get('positive', 0) / total_s, 2),
+                'negative': round(sentiment_dist.get('negative', 0) / total_s, 2),
+                'neutral': round(sentiment_dist.get('neutral', 0) / total_s, 2),
+            }
+        else:
+            dist = {
+                'positive': float(sentiment_dist.get('positive', 0)),
+                'negative': float(sentiment_dist.get('negative', 0)),
+                'neutral': float(sentiment_dist.get('neutral', 0)),
+            }
+        scan['analysis'] = {
+            'sentiment': sentiment_analysis.get('overall_sentiment', 'neutral'),
+            'sentiment_distribution': dist,
+            'summary': sentiment_analysis.get('summary', ''),
+        }
+
+    # Keyword analysis
+    keyword_analysis = item.get('keyword_analysis', {})
+    if keyword_analysis:
+        if 'analysis' not in scan:
+            scan['analysis'] = {}
+        scan['analysis']['keywords'] = keyword_analysis.get('keywords', [])
+        scan['analysis']['trends'] = keyword_analysis.get('trends', [])
+
+    # Insights
+    insights = item.get('insights', {})
+    if insights:
+        if 'analysis' not in scan:
+            scan['analysis'] = {}
+        scan['analysis']['insights'] = insights.get('key_insights', [])
+        overall_score = insights.get('overall_score', 50)
+        scan['analysis']['overall_score'] = _to_int(overall_score, 50)
+
+    # Country stats
+    metadata_country_stats = item.get('country_stats', {})
+    if metadata_country_stats:
+        country_stats = {}
+        for country_code, stats in metadata_country_stats.items():
+            country_stats[country_code] = {
+                'comments': _to_int(stats.get('comments', 0)),
+                'likes': _to_int(stats.get('likes', 0)),
+            }
+        if 'Other' not in country_stats:
+            country_stats['Other'] = {'comments': 0, 'likes': 0}
+        scan['country_stats'] = country_stats
+
+    return scan
+
+
 def is_timestamp_comment(text):
     """Check if a comment is a timestamp list (song list, chapters)."""
     if not text:
