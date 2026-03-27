@@ -155,6 +155,208 @@ class TestDataBlueprint:
         assert 'error' in resp.get_json()
 
 
+class TestDashboardStats:
+    """Tests for dashboard.py stats route uncovered paths (lines 51-62)."""
+
+    @patch('app.api.dashboard.load_metadata_files_local')
+    def test_stats_with_items_today(self, mock_load, client):
+        """Stats route counts today items and analyzed items."""
+        from datetime import datetime, timezone
+        now_iso = datetime.now(timezone.utc).isoformat()
+        mock_load.return_value = [
+            {
+                'timestamp': now_iso,
+                'total_comments': 10,
+                'sentiment_analysis': {'overall': 'positive'},
+            },
+            {
+                'timestamp': now_iso,
+                'total_comments': 5,
+                'insights': {'score': 80},
+            },
+            {
+                'timestamp': '2020-01-01T00:00:00',
+                'total_comments': 0,
+            },
+        ]
+        resp = client.get('/api/dashboard/stats')
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data['total_items'] == 3
+        assert data['today_items'] == 2
+        assert data['analyzed_items'] == 2
+        assert data['total_comments'] == 15
+
+    @patch('app.api.dashboard.load_metadata_files_local')
+    def test_stats_analyzed_via_synthesized_result(self, mock_load, client):
+        """analyzed_items counts items with synthesized_result."""
+        from datetime import datetime, timezone
+        mock_load.return_value = [
+            {'synthesized_result': 'some result', 'timestamp': '', 'total_comments': 0},
+            {'sentiment': 'positive', 'timestamp': '', 'total_comments': 0},
+        ]
+        resp = client.get('/api/dashboard/stats')
+        data = resp.get_json()
+        assert data['analyzed_items'] == 2
+
+    @patch('app.api.dashboard.load_channels_from_local')
+    def test_channels_error_returns_empty(self, mock_load, client):
+        """channels route returns empty list on error."""
+        mock_load.side_effect = RuntimeError("disk error")
+        resp = client.get('/api/channels')
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data['channels'] == []
+
+    @patch('app.api.dashboard.load_metadata_files_local')
+    @patch('app.api.dashboard.convert_item_to_scan')
+    def test_scans_with_items(self, mock_convert, mock_load, client):
+        """scans route converts items and returns sorted list."""
+        mock_load.return_value = [
+            {'timestamp': '2026-03-27T10:00:00'},
+            {'timestamp': '2026-03-26T10:00:00'},
+        ]
+        mock_convert.side_effect = lambda x: {'timestamp': x['timestamp'], 'id': 'scan'}
+        resp = client.get('/api/scans')
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert len(data['scans']) == 2
+
+    @patch('app.api.dashboard.load_metadata_files_local')
+    def test_scans_error_returns_empty(self, mock_load, client):
+        """scans route returns empty list on error."""
+        mock_load.side_effect = RuntimeError("crash")
+        resp = client.get('/api/scans')
+        assert resp.status_code == 200
+        assert resp.get_json()['scans'] == []
+
+
+class TestDCInsideBlueprintExtra:
+    """Extra coverage for dcinside.py uncovered paths."""
+
+    @patch('app.api.dcinside._load_gallery_data_local')
+    def test_galleries_with_data(self, mock_load, client):
+        """galleries route processes posts with comments."""
+        mock_load.return_value = (
+            [
+                {
+                    'post': {
+                        'post_id': 'p1',
+                        'title': 'Test Post',
+                        'author': 'user1',
+                        'date': '2026-03-27',
+                        'view_count': 100,
+                        'recommend_count': 10,
+                        'url': 'http://example.com',
+                        'comment_count': 5,
+                    },
+                    'comments': [{'text': 'hello'}],
+                    'content': 'post content',
+                }
+            ],
+            '2026-03-27T00:00:00',
+            ['keyword1'],
+            20,
+            15,
+            5,
+        )
+        resp = client.get('/api/dcinside/galleries')
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert len(data['galleries']) > 0
+
+    @patch('app.api.dcinside._load_gallery_data_local')
+    def test_galleries_redistribute_comments(self, mock_load, client):
+        """galleries route redistributes total_comments when posts have none."""
+        mock_load.return_value = (
+            [
+                {
+                    'post': {
+                        'post_id': 'p1',
+                        'title': 'Post 1',
+                        'author': 'anon',
+                        'date': '',
+                        'view_count': 0,
+                        'recommend_count': 0,
+                        'url': '',
+                        'comment_count': 0,
+                    },
+                    'comments': [],
+                    'content': '',
+                },
+                {
+                    'post': {
+                        'post_id': 'p2',
+                        'title': 'Post 2',
+                        'author': 'anon',
+                        'date': '',
+                        'view_count': 0,
+                        'recommend_count': 0,
+                        'url': '',
+                        'comment_count': 0,
+                    },
+                    'comments': [],
+                    'content': '',
+                },
+            ],
+            '',
+            [],
+            10,
+            0,
+            0,
+        )
+        resp = client.get('/api/dcinside/galleries')
+        assert resp.status_code == 200
+
+    @patch('app.api.dcinside._load_gallery_data_local')
+    def test_gallery_posts_with_data(self, mock_load, client):
+        """gallery_posts returns paginated posts."""
+        mock_load.return_value = (
+            [
+                {
+                    'post': {
+                        'post_id': f'p{i}',
+                        'title': f'Post {i}',
+                        'author': 'user',
+                        'date': '2026-03-27',
+                        'view_count': i * 10,
+                        'recommend_count': i,
+                        'url': '',
+                        'comment_count': 0,
+                    },
+                    'comments': [],
+                    'content': f'content {i}',
+                }
+                for i in range(5)
+            ],
+            '2026-03-27',
+            [],
+            0,
+            0,
+            0,
+        )
+        resp = client.get('/api/dcinside/gallery/example-gallery-1/posts?page=1&limit=3')
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert len(data['posts']) == 3
+        assert data['pagination']['total_posts'] == 5
+        assert data['pagination']['has_more'] is True
+
+    @patch('app.api.dcinside._load_gallery_data_local')
+    def test_gallery_posts_exception_returns_500(self, mock_load, client):
+        """gallery_posts returns 500 on unexpected error."""
+        mock_load.side_effect = RuntimeError("unexpected error")
+        resp = client.get('/api/dcinside/gallery/valid_gallery/posts')
+        assert resp.status_code == 500
+        data = resp.get_json()
+        assert 'error' in data
+
+    def test_gallery_posts_invalid_id_special_chars(self, client):
+        """gallery_posts returns 400 for gallery_id with special chars."""
+        resp = client.get('/api/dcinside/gallery/bad%20id/posts')
+        assert resp.status_code in (400, 404)
+
+
 class TestErrorHandling:
     """Tests for error handling on blueprint routes."""
 
