@@ -12,7 +12,6 @@ from datetime import datetime, timezone
 from flask import jsonify
 
 from . import dashboard_bp
-from .legacy_helpers import safe_legacy_call
 from ..config import Config
 from ..services.local_data import (
     load_metadata_files_local,
@@ -26,7 +25,6 @@ logger = logging.getLogger(__name__)
 
 
 @dashboard_bp.route('/api/dashboard/stats', methods=['GET'])
-@safe_legacy_call
 def dashboard_stats():
     """Dashboard statistics — migrated from api_handlers."""
     stats = {
@@ -77,7 +75,6 @@ def dashboard_stats():
 
 
 @dashboard_bp.route('/api/channels', methods=['GET'])
-@safe_legacy_call
 def channels():
     """Channel list — migrated from api_handlers."""
     try:
@@ -91,7 +88,6 @@ def channels():
 
 
 @dashboard_bp.route('/api/scans', methods=['GET'])
-@safe_legacy_call
 def scans():
     """Scan list — migrated from api_handlers._handle_scans (LOCAL_MODE path)."""
     try:

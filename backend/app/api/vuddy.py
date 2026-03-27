@@ -10,9 +10,8 @@ import os
 from collections import Counter
 from decimal import Decimal
 
-from flask import Blueprint, Response
+from flask import Blueprint, Response, jsonify
 
-from .legacy_helpers import get_handlers, legacy_response, safe_legacy_call
 from ..config import Config
 from ..services.local_data import decimal_default, is_timestamp_comment
 from ..services.sentiment import (
@@ -318,18 +317,16 @@ def _handle_vuddy_creators_local():
 # ---------------------------------------------------------------------------
 
 @vuddy_bp.route('/api/vuddy/creators', methods=['GET'])
-@safe_legacy_call
 def vuddy_creators():
     """Vuddy 크리에이터 목록"""
-    if Config.LOCAL_MODE:
-        try:
-            creators = _handle_vuddy_creators_local()
-        except Exception as e:
-            logger.error("Error getting vuddy creators: %s", e, exc_info=True)
-            creators = []
+    if not Config.LOCAL_MODE:
+        return jsonify({"error": "S3 mode not supported. Set LOCAL_MODE=true"}), 501
 
-        body = json.dumps({'creators': creators}, default=decimal_default, ensure_ascii=False)
-        return Response(body, status=200, content_type='application/json')
+    try:
+        creators = _handle_vuddy_creators_local()
+    except Exception as e:
+        logger.error("Error getting vuddy creators: %s", e, exc_info=True)
+        creators = []
 
-    # non-local: legacy fallback
-    return legacy_response(get_handlers()._handle_vuddy_creators())
+    body = json.dumps({'creators': creators}, default=decimal_default, ensure_ascii=False)
+    return Response(body, status=200, content_type='application/json')

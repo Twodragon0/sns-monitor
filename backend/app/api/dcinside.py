@@ -13,7 +13,6 @@ from datetime import datetime, timedelta
 from flask import jsonify, request, Response
 
 from . import dcinside_bp
-from .legacy_helpers import get_handlers, legacy_response, build_event, safe_legacy_call
 from ..config import Config
 from ..services.local_data import decimal_default
 
@@ -153,12 +152,10 @@ def _format_post(post_data, max_comments=None):
 
 
 @dcinside_bp.route('/api/dcinside/galleries', methods=['GET'])
-@safe_legacy_call
 def galleries():
     """DC인사이드 갤러리 목록 반환."""
     if not Config.LOCAL_MODE:
-        # S3 모드: 레거시 핸들러 위임
-        return legacy_response(get_handlers()._handle_dcinside_galleries())
+        return jsonify({"error": "S3 mode not supported. Set LOCAL_MODE=true"}), 501
 
     galleries_data = []
 
@@ -233,21 +230,29 @@ def gallery_posts(gallery_id):
         limit = min(int(request.args.get('limit', 20)), 100)
         offset = (page - 1) * limit
 
-        if Config.LOCAL_MODE:
-            all_posts_data, _, _, _, _, _ = _load_gallery_data_local(
-                gallery_id, max_files=0, days_back=14
-            )
-        else:
-            # S3 모드: 레거시 핸들러 위임
-            event = build_event()
-            path = f'/api/dcinside/gallery/{gallery_id}/posts'
-            return legacy_response(get_handlers()._handle_dcinside_gallery_posts(event, path))
+        if not Config.LOCAL_MODE:
+            return jsonify({"error": "S3 mode not supported. Set LOCAL_MODE=true"}), 501
+
+        all_posts_data, _, _, _, _, _ = _load_gallery_data_local(
+            gallery_id, max_files=0, days_back=14
+        )
 
         if not all_posts_data:
-            # 로컬 데이터 없을 경우 레거시 핸들러로 fallback
-            event = build_event()
-            path = f'/api/dcinside/gallery/{gallery_id}/posts'
-            return legacy_response(get_handlers()._handle_dcinside_gallery_posts(event, path))
+            body = json.dumps(
+                {
+                    'gallery_id': gallery_id,
+                    'posts': [],
+                    'pagination': {
+                        'page': page,
+                        'limit': limit,
+                        'total_posts': 0,
+                        'total_pages': 0,
+                        'has_more': False,
+                    },
+                },
+                ensure_ascii=False,
+            )
+            return Response(body, status=200, content_type='application/json')
 
         total_posts = len(all_posts_data)
         paginated = all_posts_data[offset:offset + limit]

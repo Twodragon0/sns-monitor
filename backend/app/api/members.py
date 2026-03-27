@@ -13,7 +13,6 @@ from datetime import datetime, timedelta
 from flask import request, Response, jsonify
 
 from flask import Blueprint
-from .legacy_helpers import get_handlers, legacy_response, build_event, safe_legacy_call
 from ..config import Config
 from ..services.local_data import decimal_default, is_timestamp_comment
 
@@ -511,56 +510,41 @@ def _handle_channel_local(group_id: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Legacy fallback (non-LOCAL_MODE)
-# ---------------------------------------------------------------------------
-
-_LEGACY_MEMBERS = {
-    'group-a': '_handle_group_a_members',
-    'group-b': '_handle_group_b_members',
-    'group-c': '_handle_group_c_members',
-}
-_LEGACY_CHANNEL = {
-    'group-a': '_handle_group_a_channel',
-    'group-b': '_handle_group_b_channel',
-    'group-c': '_handle_group_c_channel',
-}
-
-
-def _handle_members_legacy(group_id: str) -> dict:
-    handler_name = _LEGACY_MEMBERS[group_id]
-    return getattr(get_handlers(), handler_name)()
-
-
-def _handle_channel_legacy(group_id: str) -> dict:
-    handler_name = _LEGACY_CHANNEL[group_id]
-    event = build_event()
-    return getattr(get_handlers(), handler_name)(event)
-
-
-# ---------------------------------------------------------------------------
 # Route factories
 # ---------------------------------------------------------------------------
 
 def _make_members_view(group_id: str):
-    @safe_legacy_call
     def view():
-        if Config.LOCAL_MODE:
-            return legacy_response(_handle_members_local(group_id))
-        return legacy_response(_handle_members_legacy(group_id))
+        if not Config.LOCAL_MODE:
+            return jsonify({"error": "S3 mode not supported. Set LOCAL_MODE=true"}), 501
+        try:
+            result = _handle_members_local(group_id)
+            return Response(
+                result['body'],
+                status=result.get('statusCode', 200),
+                content_type='application/json',
+            )
+        except Exception as e:
+            logger.error("Error in %s members handler: %s", group_id, e, exc_info=True)
+            return jsonify({'error': 'Internal server error'}), 500
     view.__name__ = f"{group_id.replace('-', '_')}_members"
     return view
 
 
 def _make_channel_view(group_id: str):
-    @safe_legacy_call
     def view():
-        if Config.LOCAL_MODE:
-            try:
-                return legacy_response(_handle_channel_local(group_id))
-            except Exception as e:
-                logger.error("Error in %s channel local handler: %s", group_id, e, exc_info=True)
-                raise
-        return legacy_response(_handle_channel_legacy(group_id))
+        if not Config.LOCAL_MODE:
+            return jsonify({"error": "S3 mode not supported. Set LOCAL_MODE=true"}), 501
+        try:
+            result = _handle_channel_local(group_id)
+            return Response(
+                result['body'],
+                status=result.get('statusCode', 200),
+                content_type='application/json',
+            )
+        except Exception as e:
+            logger.error("Error in %s channel handler: %s", group_id, e, exc_info=True)
+            return jsonify({'error': 'Internal server error'}), 500
     view.__name__ = f"{group_id.replace('-', '_')}_channel"
     return view
 

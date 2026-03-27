@@ -17,7 +17,6 @@ import requests
 from flask import jsonify, request
 
 from . import data_bp
-from .legacy_helpers import build_event, get_handlers, legacy_response, safe_legacy_call
 from ..config import Config
 from ..services.local_data import decimal_default
 
@@ -116,22 +115,16 @@ def _save_dcinside_result(result: dict, timestamp: str):
 # ---------------------------------------------------------------------------
 
 @data_bp.route('/api/data/<path:s3_key>', methods=['GET'])
-@safe_legacy_call
 def get_data(s3_key):
-    """S3 키(또는 로컬 경로)로 데이터 조회. Legacy handler handles both LOCAL and S3 modes."""
-    path = f'/api/data/{s3_key}'
-    return legacy_response(get_handlers()._handle_data_s3_key(path))
+    """S3 키(또는 로컬 경로)로 데이터 조회."""
+    return jsonify({"error": "S3 mode not supported. Set LOCAL_MODE=true"}), 501
 
 
 @data_bp.route('/api/crawler/results', methods=['POST'])
 def crawler_results():
     """크롤러 결과 저장 엔드포인트 (DCInside + YouTube)."""
     if not Config.LOCAL_MODE:
-        try:
-            return legacy_response(get_handlers()._handle_crawler_results(build_event()))
-        except Exception as e:
-            logger.error("Legacy handler error on %s: %s", request.path, e, exc_info=True)
-            return jsonify({'error': 'Internal server error'}), 500
+        return jsonify({"error": "S3 mode not supported. Set LOCAL_MODE=true"}), 501
 
     try:
         body = request.get_json(force=True, silent=True) or {}
@@ -164,11 +157,7 @@ def crawler_results():
 def twitter_search():
     """Twitter 키워드 검색 엔드포인트."""
     if not Config.LOCAL_MODE:
-        try:
-            return legacy_response(get_handlers()._handle_twitter_search(build_event()))
-        except Exception as e:
-            logger.error("Legacy handler error on %s: %s", request.path, e, exc_info=True)
-            return jsonify({'error': 'Internal server error'}), 500
+        return jsonify({"error": "S3 mode not supported. Set LOCAL_MODE=true"}), 501
 
     try:
         body = request.get_json(force=True, silent=True) or {}
