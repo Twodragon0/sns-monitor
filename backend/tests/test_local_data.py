@@ -5,6 +5,7 @@ import os
 import pytest
 from decimal import Decimal
 from datetime import datetime
+from unittest.mock import patch
 
 from decimal import Decimal as D
 from app.services.local_data import (
@@ -58,6 +59,21 @@ class TestConvertDecimal:
 
 
 class TestLoadMetadataFilesLocal:
+    def test_uses_default_dir_from_config(self):
+        """line 41: metadata_dir=None uses Config.LOCAL_DATA_DIR."""
+        with patch("app.services.local_data.Config") as mock_cfg:
+            mock_cfg.LOCAL_DATA_DIR = "/nonexistent/path/xyz"
+            result = load_metadata_files_local(metadata_dir=None)
+        assert result == []
+
+    def test_skips_non_directory_at_platform_level(self, tmp_path):
+        """line 49: files at platform level are skipped."""
+        metadata_dir = tmp_path / "metadata"
+        metadata_dir.mkdir()
+        (metadata_dir / "not_a_dir.txt").write_text("hello")
+        result = load_metadata_files_local(str(metadata_dir))
+        assert result == []
+
     def test_nonexistent_dir(self, tmp_path):
         result = load_metadata_files_local(str(tmp_path / 'nonexistent'))
         assert result == []
@@ -125,6 +141,29 @@ class TestParseTimestampForToday:
 
 
 class TestLoadChannelsFromLocal:
+    def test_uses_default_dir_from_config(self):
+        """line 87: youtube_dir=None uses Config.LOCAL_DATA_DIR."""
+        with patch("app.services.local_data.Config") as mock_cfg:
+            mock_cfg.LOCAL_DATA_DIR = "/nonexistent/path/xyz"
+            result = load_channels_from_local(youtube_dir=None)
+        assert result == []
+
+    def test_skips_entry_without_channel_id_or_title(self, tmp_path):
+        """line 107: JSON without channel_id/channel_title is skipped."""
+        yt_dir = tmp_path / "youtube"
+        yt_dir.mkdir()
+        (yt_dir / "empty.json").write_text(json.dumps({"videos": []}))
+        result = load_channels_from_local(str(yt_dir))
+        assert result == []
+
+    def test_skips_invalid_json_files(self, tmp_path):
+        """lines 127-128: invalid JSON is skipped with debug log."""
+        yt_dir = tmp_path / "youtube"
+        yt_dir.mkdir()
+        (yt_dir / "bad.json").write_text("{not valid json}")
+        result = load_channels_from_local(str(yt_dir))
+        assert result == []
+
     def test_nonexistent_dir(self, tmp_path):
         result = load_channels_from_local(str(tmp_path / 'nonexistent'))
         assert result == []
@@ -191,6 +230,16 @@ class TestIsTimestampComment:
         text = "01:00:00 02:00:00 03:00:00"
         assert is_timestamp_comment(text) is True
 
+    def test_multiline_fewer_than_3_timestamp_lines_returns_false(self):
+        """lines 234-235: only 2 timestamp lines → False."""
+        text = "0:00 intro\n1:30 main\nsome random text\nmore text here"
+        assert is_timestamp_comment(text) is False
+
+    def test_multiline_exactly_3_timestamp_lines_returns_true(self):
+        """lines 234-235: exactly 3 timestamp lines → True."""
+        text = "0:00 start\n1:00 middle\n2:00 end\nsome other text"
+        assert is_timestamp_comment(text) is True
+
 
 class TestConvertItemToScan:
     def test_basic_item(self):
@@ -214,6 +263,24 @@ class TestConvertItemToScan:
         assert result['total_likes'] == 50
         assert result['videos_found'] == 5
         assert result['channel'] == '@testchannel'
+
+    def test_to_int_fallback_non_numeric_string(self):
+        """line 139: _to_int with non-numeric string returns default 0."""
+        item = {"total_comments": "not-a-number"}
+        result = convert_item_to_scan(item)
+        assert result["total_comments"] == 0
+
+    def test_to_str_with_none_returns_unknown(self):
+        """line 146: _to_str(None) returns default 'unknown'."""
+        item = {"platform": None}
+        result = convert_item_to_scan(item)
+        assert result["platform"] == "unknown"
+
+    def test_to_str_with_integer_returns_str(self):
+        """line 146: _to_str(42) returns '42'."""
+        item = {"platform": 99}
+        result = convert_item_to_scan(item)
+        assert result["platform"] == "99"
 
     def test_empty_item(self):
         result = convert_item_to_scan({})

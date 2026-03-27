@@ -418,3 +418,123 @@ class TestAnalyzeFullFlow:
 
         result = analyzer.analyze('https://x.com/testuser')
         assert result['platform'] == 'twitter'
+
+
+class TestTelegramBs4ImportError:
+    """other_platforms.py lines 71-75: bs4 ImportError in Telegram."""
+
+    def test_bs4_import_error_fallback(self, analyzer):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.text = "<html></html>"
+        mock_resp.raise_for_status = MagicMock()
+        analyzer._session.get = MagicMock(return_value=mock_resp)
+
+        with patch.dict("sys.modules", {"bs4": None}):
+            result = analyzer._analyze_telegram("https://t.me/testchannel")
+        assert result is not None
+        assert result.get("type") == "channel"
+
+
+class TestAnalyzeKakaoRouting:
+    """other_platforms.py lines 97, 99: story and openchat routing."""
+
+    def test_story_url_routes_to_story(self, analyzer):
+        """line 97: story.kakao.com → _analyze_kakao_story"""
+        html = '<html><head><meta property="og:title" content="My Story"></head><body></body></html>'
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.text = html
+        mock_resp.raise_for_status = MagicMock()
+        analyzer._session.get = MagicMock(return_value=mock_resp)
+        from urllib.parse import urlparse
+        url = "https://story.kakao.com/someuser"
+        result = analyzer._analyze_kakao(url)
+        assert result["type"] == "kakao_story"
+
+    def test_openchat_url_routes_to_openchat(self, analyzer):
+        """line 99: open.kakao.com → _analyze_kakao_openchat"""
+        html = '<html><head><title>Test OpenChat</title><meta property="og:description" content="desc"></head><body></body></html>'
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.text = html
+        mock_resp.raise_for_status = MagicMock()
+        analyzer._session.get = MagicMock(return_value=mock_resp)
+        url = "https://open.kakao.com/o/gTESTroom"
+        result = analyzer._analyze_kakao(url)
+        assert result["type"] == "kakao_openchat"
+
+
+class TestAnalyzeKakaoStoryExtra:
+    """other_platforms.py lines 159, 168-169: story thumbnail and ImportError."""
+
+    def test_story_with_thumbnail(self, analyzer):
+        """line 159: og:image sets thumbnail in story_info."""
+        html = (
+            '<html><head>'
+            '<meta property="og:title" content="Story Title">'
+            '<meta property="og:description" content="Story Desc">'
+            '<meta property="og:image" content="https://img.example.com/thumb.jpg">'
+            '</head><body></body></html>'
+        )
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.text = html
+        mock_resp.raise_for_status = MagicMock()
+        analyzer._session.get = MagicMock(return_value=mock_resp)
+        from urllib.parse import urlparse
+        url = "https://story.kakao.com/someuser"
+        result = analyzer._analyze_kakao_story(url, urlparse(url))
+        assert result["thumbnail"] == "https://img.example.com/thumb.jpg"
+
+    def test_story_bs4_import_error(self, analyzer):
+        """lines 168-169: bs4 ImportError silently ignored."""
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.text = "<html></html>"
+        mock_resp.raise_for_status = MagicMock()
+        analyzer._session.get = MagicMock(return_value=mock_resp)
+        with patch.dict("sys.modules", {"bs4": None}):
+            from urllib.parse import urlparse
+            url = "https://story.kakao.com/someuser"
+            result = analyzer._analyze_kakao_story(url, urlparse(url))
+        assert result is not None
+        assert result["type"] == "kakao_story"
+
+
+class TestAnalyzeKakaoOpenchatExtra:
+    """other_platforms.py lines 195, 201, 211-212."""
+
+    def test_openchat_with_og_type_and_member_count(self, analyzer):
+        """lines 195, 201: og:type and member_count extraction."""
+        html = (
+            '<html><head>'
+            '<title>Test OpenChat 1,234명</title>'
+            '<meta property="og:description" content="채팅방">'
+            '<meta property="og:type" content="website">'
+            '</head><body>1,234명 members</body></html>'
+        )
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.text = html
+        mock_resp.raise_for_status = MagicMock()
+        analyzer._session.get = MagicMock(return_value=mock_resp)
+        from urllib.parse import urlparse
+        url = "https://open.kakao.com/o/gTESTroom"
+        result = analyzer._analyze_kakao_openchat(url, urlparse(url))
+        assert result.get("og_type") == "website"
+        assert result.get("member_count") == 1234
+
+    def test_openchat_bs4_import_error(self, analyzer):
+        """lines 211-212: bs4 ImportError silently ignored."""
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.text = "<html></html>"
+        mock_resp.raise_for_status = MagicMock()
+        analyzer._session.get = MagicMock(return_value=mock_resp)
+        with patch.dict("sys.modules", {"bs4": None}):
+            from urllib.parse import urlparse
+            url = "https://open.kakao.com/o/gTESTroom"
+            result = analyzer._analyze_kakao_openchat(url, urlparse(url))
+        assert result is not None
+        assert result["type"] == "kakao_openchat"

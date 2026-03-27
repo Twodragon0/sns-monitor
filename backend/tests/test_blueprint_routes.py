@@ -383,3 +383,108 @@ class TestErrorHandling:
         mock_cfg.LOCAL_MODE = False
         resp = client.get('/api/data/some/key.json')
         assert resp.status_code == 501
+
+
+class TestCrawlerResultsDCInside:
+    """Tests for data.py crawler_results dcinside save path (lines 143-144)."""
+
+    @patch('app.api.data._save_youtube_result', return_value=(False, None))
+    @patch('app.api.data._save_dcinside_result', return_value=True)
+    def test_dcinside_result_saved(self, mock_dc, mock_yt, client):
+        """When youtube save returns False, dcinside save path is tried (line 143-144)."""
+        resp = client.post('/api/crawler/results', json={
+            'results': [{'gallery_id': 'test_gallery', 'data': []}]
+        })
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data['saved_count'] == 1
+        mock_dc.assert_called_once()
+
+    @patch('app.api.data._save_youtube_result', return_value=(False, None))
+    @patch('app.api.data._save_dcinside_result', return_value=False)
+    def test_dcinside_result_not_saved(self, mock_dc, mock_yt, client):
+        """When both saves fail, saved_count stays 0."""
+        resp = client.post('/api/crawler/results', json={
+            'results': [{'gallery_id': 'unknown', 'data': []}]
+        })
+        assert resp.status_code == 200
+        assert resp.get_json()['saved_count'] == 0
+
+
+class TestDCInsideBlueprintErrorPaths:
+    """Extra coverage for dcinside.py gallery error path (lines 189-195, 210-212)."""
+
+    @patch('app.api.dcinside._load_gallery_data_local')
+    def test_galleries_exception_continues(self, mock_load, client):
+        """galleries route logs error and continues on exception (lines 210-212)."""
+        mock_load.side_effect = Exception("disk read error")
+        resp = client.get('/api/dcinside/galleries')
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert 'galleries' in data
+
+    def test_load_gallery_data_local_invalid_filename(self, tmp_path):
+        """lines 93-94: files with non-date filenames fall back to include."""
+        import json as _json
+        from app.api.dcinside import _load_gallery_data_local
+        from unittest.mock import patch as _patch
+
+        gallery_dir = tmp_path / "dcinside" / "testgal"
+        gallery_dir.mkdir(parents=True)
+        # File with non-date name → ValueError → appended anyway (line 94)
+        data = {"data": [], "total_comments": 0, "positive_count": 0, "negative_count": 0}
+        (gallery_dir / "notadate.json").write_text(_json.dumps(data))
+
+        with _patch("app.api.dcinside.Config") as mc:
+            mc.LOCAL_DATA_DIR = str(tmp_path)
+            result = _load_gallery_data_local("testgal")
+        assert isinstance(result, tuple)
+
+    def test_load_gallery_data_local_invalid_json(self, tmp_path):
+        """lines 122-124: invalid JSON in file is caught and skipped."""
+        from app.api.dcinside import _load_gallery_data_local
+        from unittest.mock import patch as _patch
+
+        gallery_dir = tmp_path / "dcinside" / "testgal2"
+        gallery_dir.mkdir(parents=True)
+        (gallery_dir / "2026-01-01_data.json").write_text("{bad json{{")
+
+        with _patch("app.api.dcinside.Config") as mc:
+            mc.LOCAL_DATA_DIR = str(tmp_path)
+            result = _load_gallery_data_local("testgal2")
+        assert result[0] == []  # no posts loaded
+
+    @patch('app.api.dcinside._load_gallery_data_local')
+    def test_galleries_with_total_comments_redistribution(self, mock_load, client):
+        """galleries redistributes avg comments when posts have no comments (lines 189-195)."""
+        mock_load.return_value = (
+            [
+                {
+                    'post': {
+                        'post_id': 'p1', 'title': 'Post 1', 'author': 'a',
+                        'date': '', 'view_count': 10, 'recommend_count': 0,
+                        'url': '', 'comment_count': 0,
+                    },
+                    'comments': [],
+                    'content': '',
+                },
+                {
+                    'post': {
+                        'post_id': 'p2', 'title': 'Post 2', 'author': 'b',
+                        'date': '', 'view_count': 5, 'recommend_count': 0,
+                        'url': '', 'comment_count': 0,
+                    },
+                    'comments': [],
+                    'content': '',
+                },
+            ],
+            '2026-01-01',
+            [],
+            20,   # total_comments > 0 triggers redistribution
+            0,
+            0,
+        )
+        resp = client.get('/api/dcinside/galleries')
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert len(data['galleries']) > 0
