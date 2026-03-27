@@ -202,9 +202,10 @@ def twitter_search():
                 {'Content-Type': 'application/json'},
             )
 
-        keyword = body.get('keyword', '')
-        if not keyword:
-            return jsonify({'error': 'Keyword is required'}), 400
+        MAX_KEYWORD_LENGTH = 100
+        keyword = (body.get('keyword', '') or '').strip()
+        if not keyword or len(keyword) > MAX_KEYWORD_LENGTH:
+            return jsonify({'error': 'Keyword must be 1-100 characters'}), 400
 
         tweets, replies = _fetch_tweets_from_crawler(twitter_crawler_endpoint, keyword)
         local_tweets, local_replies = _load_tweets_from_local_files(keyword)

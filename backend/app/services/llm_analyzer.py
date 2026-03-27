@@ -162,22 +162,35 @@ def _call_cli(tool_name: str, prompt: str, timeout: int = 120) -> Optional[str]:
         return None
 
     try:
-        if tool_name == "claude":
-            cmd = [tool_path, "--print", "-p", prompt[:8000]]
-        elif tool_name == "opencode":
-            cmd = [tool_path, "--print", "-p", prompt[:8000]]
-        elif tool_name == "gemini":
-            cmd = [tool_path, "--print", "-p", prompt[:8000]]
-        else:
-            return None
+        # Write prompt to a temp file so it never appears in /proc/<pid>/cmdline
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".txt", delete=False, encoding="utf-8"
+        ) as tmp:
+            tmp.write(prompt[:8000])
+            prompt_file = tmp.name
 
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            env=_build_cli_env(tool_name),
-        )
+        try:
+            if tool_name == "claude":
+                cmd = [tool_path, "--print", "-p", f"@{prompt_file}"]
+            elif tool_name == "opencode":
+                cmd = [tool_path, "--print", "-p", f"@{prompt_file}"]
+            elif tool_name == "gemini":
+                cmd = [tool_path, "--print", "-p", f"@{prompt_file}"]
+            else:
+                return None
+
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                env=_build_cli_env(tool_name),
+            )
+        finally:
+            try:
+                os.unlink(prompt_file)
+            except OSError:
+                pass
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
         if result.stderr:

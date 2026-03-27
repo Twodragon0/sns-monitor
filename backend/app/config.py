@@ -64,8 +64,9 @@ class Config:
     _secret = os.environ.get("SECRET_KEY") or os.environ.get("FLASK_SECRET_KEY") or ""
     if not _secret:
         _secret = secrets.token_hex(32)
-        logging.getLogger(__name__).warning(
-            "SECRET_KEY not set — using random key (sessions will not survive restarts)"
+        logging.getLogger("sns-monitor").error(
+            "SECRET_KEY not set — using random key. Sessions will NOT survive restarts. "
+            "Set SECRET_KEY in .env for production."
         )
     SECRET_KEY = _secret
     AUTH_REQUIRED_FOR_ANALYSIS = os.environ.get("AUTH_REQUIRED_FOR_ANALYSIS", "false").lower() in ("1", "true", "yes")

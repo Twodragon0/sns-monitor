@@ -26,7 +26,9 @@ logger = logging.getLogger(__name__)
 
 # Anthropic OAuth (Claude Code compatible)
 # redirect_uri MUST be http://localhost:{port}/callback (Claude Code pattern)
-_ANTHROPIC_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
+_ANTHROPIC_CLIENT_ID = os.environ.get(
+    "ANTHROPIC_OAUTH_CLIENT_ID", "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
+)
 _ANTHROPIC_AUTHORIZE_URL = "https://claude.ai/oauth/authorize"
 _ANTHROPIC_TOKEN_URL = "https://claude.ai/oauth/token"
 _ANTHROPIC_SCOPES = "org:create_api_key user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload"
@@ -120,7 +122,9 @@ def auth_anthropic_start():
 # OpenAI OAuth (PKCE)
 # ==========================================
 # OpenAI OAuth (OpenCode / Codex CLI compatible)
-_OPENAI_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann"
+_OPENAI_CLIENT_ID = os.environ.get(
+    "OPENAI_OAUTH_CLIENT_ID", "app_EMoamEEZ73f0CkXaXp7hrann"
+)
 _OPENAI_AUTHORIZE_URL = "https://auth.openai.com/oauth/authorize"
 _OPENAI_TOKEN_URL = "https://auth.openai.com/oauth/token"
 _OPENAI_SCOPES = "openid profile email offline_access"

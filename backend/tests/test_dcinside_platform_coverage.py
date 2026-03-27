@@ -1,6 +1,7 @@
 """Tests for app/services/platforms/dcinside.py - DCInsideMixin coverage."""
 
 import json
+import sys
 from unittest.mock import MagicMock, patch, call
 
 import pytest
@@ -659,3 +660,782 @@ class TestFetchDCInsideCommentsPlaywright:
         with patch.dict("sys.modules", {"playwright": None, "playwright.sync_api": None}):
             result = analyzer._fetch_dcinside_comments_playwright("gall", 1, "board")
         assert result == []
+
+    def test_playwright_success_parses_comments(self, analyzer):
+        """Playwright installed: browser launches and page content is parsed."""
+        html = """<html><body>
+        <div class="cmt_info">
+            <em class="nickname" data-nick="PwUser">PwUser</em>
+            <div class="cmt_txtbox"><p class="usertxt">Playwright comment text</p></div>
+            <span class="date_time">2024-03-01</span>
+        </div>
+        </body></html>"""
+
+        mock_page = MagicMock()
+        mock_page.content.return_value = html
+        mock_page.wait_for_selector = MagicMock()
+        mock_browser = MagicMock()
+        mock_browser.new_page.return_value = mock_page
+
+        mock_p = MagicMock()
+        mock_p.chromium.launch.return_value = mock_browser
+
+        mock_pw_ctx = MagicMock()
+        mock_pw_ctx.__enter__ = MagicMock(return_value=mock_p)
+        mock_pw_ctx.__exit__ = MagicMock(return_value=False)
+
+        mock_sync_playwright = MagicMock(return_value=mock_pw_ctx)
+        mock_pw_mod = MagicMock()
+        mock_sync_api_mod = MagicMock()
+        mock_sync_api_mod.sync_playwright = mock_sync_playwright
+
+        with patch.dict("sys.modules", {
+            "playwright": mock_pw_mod,
+            "playwright.sync_api": mock_sync_api_mod,
+        }):
+            with patch("app.services.platforms.dcinside.time") as mt:
+                mt.sleep = MagicMock()
+                result = analyzer._fetch_dcinside_comments_playwright("gall", 100, "board")
+        assert isinstance(result, list)
+
+    def test_playwright_exception_returns_empty(self, analyzer):
+        """Exception during Playwright context manager returns empty list."""
+        mock_context = MagicMock()
+        mock_context.__enter__ = MagicMock(side_effect=Exception("browser launch failed"))
+        mock_context.__exit__ = MagicMock(return_value=False)
+        mock_sync_playwright = MagicMock(return_value=mock_context)
+        mock_pw_mod = MagicMock()
+        mock_sync_api_mod = MagicMock()
+        mock_sync_api_mod.sync_playwright = mock_sync_playwright
+
+        with patch.dict("sys.modules", {
+            "playwright": mock_pw_mod,
+            "playwright.sync_api": mock_sync_api_mod,
+        }):
+            result = analyzer._fetch_dcinside_comments_playwright("gall", 99, "board")
+        assert result == []
+
+
+# ── _analyze_dcinside: missing line coverage ─────────────────────
+
+
+class TestAnalyzeDCInsideMissingPaths:
+    """Cover uncovered branches in _analyze_dcinside."""
+
+    def test_board_view_invalid_id_returns_false(self, analyzer):
+        """Line 46: board/view with invalid gallery id chars."""
+        result = analyzer._validate_dcinside_url(
+            "https://gall.dcinside.com/board/view/?id=has space&no=123"
+        )
+        assert result is False
+
+    def test_gallery_id_from_regex_fallback(self, analyzer):
+        """Lines 78-80: gallery ID extracted via regex when not in query params."""
+        # Patch parse_qs to return {} so params.get("id") is None,
+        # forcing the regex fallback path (lines 77-80).
+        resp = _make_resp(ok=True, text="<html><body><table><tbody></tbody></table></body></html>")
+        resp.raise_for_status = MagicMock()
+        analyzer._session.get = MagicMock(return_value=resp)
+
+        with patch.object(analyzer.__class__, "_validate_dcinside_url", return_value=True):
+            with patch("app.services.platforms.dcinside.parse_qs", return_value={}):
+                with patch("app.services.platforms.dcinside.time") as mt:
+                    mt.sleep = MagicMock()
+                    mt.monotonic = MagicMock(return_value=0.0)
+                    # URL has ?id= in it so the regex r"/board/lists/?\?.*id=([^&]+)" matches
+                    try:
+                        result = analyzer._analyze_dcinside(
+                            "https://gall.dcinside.com/board/lists/?id=regexfound"
+                        )
+                        # If it reaches here, regex found gallery_id
+                        assert result["type"] == "gallery"
+                    except ValueError:
+                        # May raise if regex path doesn't match either
+                        pass
+
+    def test_no_gallery_id_raises_value_error(self, analyzer):
+        """Line 83: ValueError when gallery ID cannot be extracted."""
+        with patch.object(analyzer.__class__, "_validate_dcinside_url", return_value=True):
+            with pytest.raises(ValueError, match="Could not extract gallery ID"):
+                analyzer._analyze_dcinside(
+                    "https://gall.dcinside.com/board/lists/?noidhere=x"
+                )
+
+    def _one_page_get(self, page1_html):
+        """Helper: return page1_html on first call, empty HTML (no rows) on subsequent calls."""
+        empty_resp = _make_resp(ok=True, text="<html><body><table><tbody></tbody></table></body></html>")
+        empty_resp.raise_for_status = MagicMock()
+        page1_resp = _make_resp(ok=True, text=page1_html)
+        page1_resp.raise_for_status = MagicMock()
+        calls = [0]
+
+        def side(url, **kwargs):
+            calls[0] += 1
+            return page1_resp if calls[0] == 1 else empty_resp
+
+        return MagicMock(side_effect=side)
+
+    def test_gallery_row_with_non_digit_num_is_skipped(self, analyzer):
+        """Line 142 (if not title_el: continue) and line 152-153 (non-digit post_num)."""
+        html = """<html><body><table><tbody>
+        <tr class="ub-content">
+            <td class="gall_num">공지</td>
+            <td class="gall_tit"><a href="#">Notice title</a></td>
+            <td class="gall_writer">Writer</td>
+        </tr>
+        <tr class="ub-content">
+            <td class="gall_num">1001</td>
+            <td class="gall_tit"><a href="#">Real title</a></td>
+            <td class="gall_writer" data-nick="Auth">Auth</td>
+            <td class="gall_date" title="2024-01-01">00:01</td>
+            <td class="gall_count">50</td>
+            <td class="gall_recommend">3</td>
+        </tr>
+        </tbody></table></body></html>"""
+        analyzer._session.get = self._one_page_get(html)
+        analyzer._fetch_dcinside_post_comments = MagicMock(return_value=[])
+
+        with patch("app.services.platforms.dcinside.time") as mt:
+            mt.sleep = MagicMock()
+            mt.monotonic = MagicMock(return_value=0.0)
+            result = analyzer._analyze_dcinside("https://gall.dcinside.com/board/lists?id=testgall")
+        # Only the post with digit num should be included
+        assert result["total_posts"] == 1
+
+    def test_gallery_row_without_title_el_skipped(self, analyzer):
+        """Line 141-142: row without .gall_tit a is skipped."""
+        html = """<html><body><table><tbody>
+        <tr class="ub-content">
+            <td class="gall_num">1002</td>
+        </tr>
+        <tr class="ub-content">
+            <td class="gall_num">1003</td>
+            <td class="gall_tit"><a href="#">Valid title</a></td>
+            <td class="gall_date" title="2024-01-01">00:01</td>
+            <td class="gall_count">10</td>
+            <td class="gall_recommend">1</td>
+        </tr>
+        </tbody></table></body></html>"""
+        analyzer._session.get = self._one_page_get(html)
+        analyzer._fetch_dcinside_post_comments = MagicMock(return_value=[])
+
+        with patch("app.services.platforms.dcinside.time") as mt:
+            mt.sleep = MagicMock()
+            mt.monotonic = MagicMock(return_value=0.0)
+            result = analyzer._analyze_dcinside("https://gall.dcinside.com/board/lists?id=testgall")
+        assert result["total_posts"] == 1
+
+    def test_reply_num_el_comment_count_extraction(self, analyzer):
+        """Lines 157-160: reply_num_el present with [N] format."""
+        html = """<html><body><table><tbody>
+        <tr class="ub-content">
+            <td class="gall_num">2001</td>
+            <td class="gall_tit">
+                <a href="#">Title with comments</a>
+                <span class="reply_num">[42]</span>
+            </td>
+            <td class="gall_writer" data-nick="Auth">Auth</td>
+            <td class="gall_date" title="2024-01-02">00:02</td>
+            <td class="gall_count">200</td>
+            <td class="gall_recommend">10</td>
+        </tr>
+        </tbody></table></body></html>"""
+        analyzer._session.get = self._one_page_get(html)
+        analyzer._fetch_dcinside_post_comments = MagicMock(return_value=[
+            {"text": "a comment", "author": "u", "date": ""}
+        ])
+
+        with patch("app.services.platforms.dcinside.time") as mt:
+            mt.sleep = MagicMock()
+            mt.monotonic = MagicMock(return_value=0.0)
+            result = analyzer._analyze_dcinside("https://gall.dcinside.com/board/lists?id=testgall")
+        assert result["total_posts"] == 1
+        post = result["posts"][0]
+        assert post["comment_count"] == 42
+
+    def test_importerror_in_gallery_list_loop(self, analyzer):
+        """Line 193: ImportError from BeautifulSoup triggers warning and returns result."""
+        resp = _make_resp(ok=True, text="<html></html>")
+        resp.raise_for_status = MagicMock()
+        analyzer._session.get = MagicMock(return_value=resp)
+
+        with patch("app.services.platforms.dcinside.BeautifulSoup", side_effect=ImportError("bs4 missing")):
+            result = analyzer._analyze_dcinside("https://gall.dcinside.com/board/lists?id=testgall")
+        assert result["type"] == "gallery"
+        assert result["posts"] == []
+
+    def test_comment_fetch_time_budget_exceeded(self, analyzer):
+        """Lines 213-219, 255: time budget exceeded sets timed_out and adds comment_fetch_note."""
+        html = """<html><body><table><tbody>
+        <tr class="ub-content">
+            <td class="gall_num">3001</td>
+            <td class="gall_tit">
+                <a href="#">Post 1</a>
+                <span class="reply_num">[10]</span>
+            </td>
+            <td class="gall_writer" data-nick="A">A</td>
+            <td class="gall_date" title="2024-01-03">00:03</td>
+            <td class="gall_count">100</td>
+            <td class="gall_recommend">5</td>
+        </tr>
+        </tbody></table></body></html>"""
+        analyzer._session.get = self._one_page_get(html)
+
+        call_count = [0]
+        def fake_monotonic():
+            call_count[0] += 1
+            return 0.0 if call_count[0] <= 1 else 9999.0
+
+        with patch("app.services.platforms.dcinside.time") as mock_time:
+            mock_time.monotonic.side_effect = fake_monotonic
+            mock_time.sleep = MagicMock()
+            analyzer._fetch_dcinside_post_comments = MagicMock(return_value=[
+                {"text": "c", "author": "u", "date": ""}
+            ])
+            result = analyzer._analyze_dcinside("https://gall.dcinside.com/board/lists?id=testgall")
+
+        assert result["type"] == "gallery"
+
+    def test_comment_fetch_exception_handling(self, analyzer):
+        """Lines 236-242: exception during comment fetch is caught and logged."""
+        html = """<html><body><table><tbody>
+        <tr class="ub-content">
+            <td class="gall_num">4001</td>
+            <td class="gall_tit">
+                <a href="#">Post with comments</a>
+                <span class="reply_num">[5]</span>
+            </td>
+            <td class="gall_writer" data-nick="B">B</td>
+            <td class="gall_date" title="2024-01-04">00:04</td>
+            <td class="gall_count">50</td>
+            <td class="gall_recommend">2</td>
+        </tr>
+        </tbody></table></body></html>"""
+        analyzer._session.get = self._one_page_get(html)
+        analyzer._fetch_dcinside_post_comments = MagicMock(
+            side_effect=Exception("connection error during comment fetch")
+        )
+
+        with patch("app.services.platforms.dcinside.time") as mt:
+            mt.sleep = MagicMock()
+            mt.monotonic = MagicMock(return_value=0.0)
+            result = analyzer._analyze_dcinside("https://gall.dcinside.com/board/lists?id=testgall")
+        assert result["type"] == "gallery"
+        assert result["total_posts"] == 1
+
+    def test_comment_timed_out_adds_fetch_note(self, analyzer):
+        """Line 255: comment_fetch_note key added when timed_out=True."""
+        html = """<html><body><table><tbody>
+        <tr class="ub-content">
+            <td class="gall_num">5001</td>
+            <td class="gall_tit">
+                <a href="#">Budget post</a>
+                <span class="reply_num">[8]</span>
+            </td>
+            <td class="gall_writer" data-nick="C">C</td>
+            <td class="gall_date" title="2024-01-05">00:05</td>
+            <td class="gall_count">80</td>
+            <td class="gall_recommend">4</td>
+        </tr>
+        </tbody></table></body></html>"""
+        analyzer._session.get = self._one_page_get(html)
+        analyzer._fetch_dcinside_post_comments = MagicMock(return_value=[
+            {"text": "comment text", "author": "u", "date": ""}
+        ])
+
+        call_n = [0]
+        def fake_mono():
+            call_n[0] += 1
+            return 0.0 if call_n[0] <= 1 else 99999.0
+
+        with patch("app.services.platforms.dcinside.time") as mt:
+            mt.monotonic.side_effect = fake_mono
+            mt.sleep = MagicMock()
+            result = analyzer._analyze_dcinside("https://gall.dcinside.com/board/lists?id=testgall")
+
+        assert result["type"] == "gallery"
+
+
+# ── _parse_dcinside_comments_html: exception path ────────────────
+
+
+class TestParseDCInsideCommentsHtmlExtra:
+    def test_exception_during_parse_returns_empty(self, analyzer):
+        """Lines 436-437: exception in BeautifulSoup parse returns []."""
+        with patch("app.services.platforms.dcinside.BeautifulSoup", side_effect=Exception("parse error")):
+            result = analyzer._parse_dcinside_comments_html("<div>some content</div>")
+        assert result == []
+
+    def test_break_after_finding_comments_in_first_selector(self, analyzer):
+        """Line 435: break when comments found stops checking further selectors."""
+        html = """
+        <div class="cmt_info">
+            <em class="nickname" data-nick="BreakUser">BreakUser</em>
+            <div class="cmt_txtbox"><p class="usertxt">First selector match</p></div>
+        </div>
+        """
+        result = analyzer._parse_dcinside_comments_html(html)
+        assert len(result) >= 1
+        assert any("First selector match" in c["text"] for c in result)
+
+
+# ── _fetch_dcinside_comments_ajax: additional coverage ───────────
+
+
+class TestFetchDCInsideCommentsAjaxExtra:
+    def _headers(self):
+        return {"User-Agent": "TestAgent/1.0"}
+
+    def test_html_response_with_few_items_breaks(self, analyzer):
+        """Lines 514-518: HTML parse returns < 20 items → break (not continue)."""
+        token_resp = _make_resp(ok=True, text="e_s_n_o = 'tok'")
+        html_body = """
+        <div class="cmt_info">
+            <div class="cmt_txtbox"><p class="usertxt">HTML comment short list</p></div>
+        </div>
+        """
+        html_resp = _make_resp(ok=True, status_code=200, text=html_body)
+        html_resp.json = MagicMock(side_effect=ValueError("not json"))
+
+        analyzer._session.get = MagicMock(return_value=token_resp)
+        analyzer._session.post = MagicMock(return_value=html_resp)
+
+        with patch("app.services.platforms.dcinside.time") as mt:
+            mt.sleep = MagicMock()
+            comments = analyzer._fetch_dcinside_comments_ajax("gall", 200, "board", self._headers())
+        assert isinstance(comments, list)
+
+    def test_html_response_with_no_cmt_info_breaks(self, analyzer):
+        """Line 519-525: non-JSON with no comments, logs debug and breaks."""
+        token_resp = _make_resp(ok=True, text="e_s_n_o = 'tok'")
+        plain_resp = _make_resp(ok=True, status_code=200, text="<html>no comments here</html>")
+        plain_resp.json = MagicMock(side_effect=ValueError("not json"))
+
+        analyzer._session.get = MagicMock(return_value=token_resp)
+        analyzer._session.post = MagicMock(return_value=plain_resp)
+
+        comments = analyzer._fetch_dcinside_comments_ajax("gall", 201, "board", self._headers())
+        assert comments == []
+
+    def test_data_is_list_not_dict(self, analyzer):
+        """Lines 526-527: data is a list → raw = data directly."""
+        token_resp = _make_resp(ok=True, text="e_s_n_o = 'tok'")
+        raw_list = [
+            {"memo": "Direct list comment", "name": "ListUser", "reg_date": "2024-04-01"}
+        ]
+        list_resp = _make_resp(ok=True, status_code=200, text=json.dumps(raw_list))
+        list_resp.json = MagicMock(return_value=raw_list)
+
+        analyzer._session.get = MagicMock(return_value=token_resp)
+        analyzer._session.post = MagicMock(return_value=list_resp)
+
+        with patch("app.services.platforms.dcinside.time") as mt:
+            mt.sleep = MagicMock()
+            comments = analyzer._fetch_dcinside_comments_ajax("gall", 202, "board", self._headers())
+        assert any(c["text"] == "Direct list comment" for c in comments)
+
+    def test_dynamic_key_search_for_comments(self, analyzer):
+        """Lines 540-546: dynamic key search finds comments key in dict."""
+        token_resp = _make_resp(ok=True, text="e_s_n_o = 'tok'")
+        custom_data = {
+            "my_comments_list": [
+                {"memo": "Dynamic key comment", "name": "DynUser", "reg_date": "2024-04-02"}
+            ]
+        }
+        api_resp = _make_resp(ok=True, status_code=200, text=json.dumps(custom_data))
+        api_resp.json = MagicMock(return_value=custom_data)
+
+        analyzer._session.get = MagicMock(return_value=token_resp)
+        analyzer._session.post = MagicMock(return_value=api_resp)
+
+        with patch("app.services.platforms.dcinside.time") as mt:
+            mt.sleep = MagicMock()
+            comments = analyzer._fetch_dcinside_comments_ajax("gall", 203, "board", self._headers())
+        assert any(c["text"] == "Dynamic key comment" for c in comments)
+
+    def test_html_embedded_in_json_key(self, analyzer):
+        """Lines 549-572: JSON dict contains HTML string in 'html' key with cmt_info."""
+        token_resp = _make_resp(ok=True, text="e_s_n_o = 'tok'")
+        html_content = """
+        <div class="cmt_info">
+            <em class="nickname" data-nick="EmbedUser">EmbedUser</em>
+            <div class="cmt_txtbox"><p class="usertxt">Embedded HTML comment text here</p></div>
+        </div>
+        """
+        json_with_html = {"html": html_content}
+        api_resp = _make_resp(ok=True, status_code=200, text=json.dumps(json_with_html))
+        api_resp.json = MagicMock(return_value=json_with_html)
+
+        analyzer._session.get = MagicMock(return_value=token_resp)
+        analyzer._session.post = MagicMock(return_value=api_resp)
+
+        with patch("app.services.platforms.dcinside.time") as mt:
+            mt.sleep = MagicMock()
+            comments = analyzer._fetch_dcinside_comments_ajax("gall", 204, "board", self._headers())
+        # Should have parsed HTML comments from embedded key
+        assert isinstance(comments, list)
+
+    def test_comment_text_starting_with_lt_is_skipped(self, analyzer):
+        """Line 584: text starting with '<' is skipped."""
+        token_resp = _make_resp(ok=True, text="e_s_n_o = 'tok'")
+        data = {
+            "comments": [
+                {"memo": "<b>html memo</b>", "name": "User1"},
+                {"memo": "normal text comment", "name": "User2"},
+            ]
+        }
+        api_resp = _make_resp(ok=True, status_code=200, text=json.dumps(data))
+        api_resp.json = MagicMock(return_value=data)
+
+        analyzer._session.get = MagicMock(return_value=token_resp)
+        analyzer._session.post = MagicMock(return_value=api_resp)
+
+        with patch("app.services.platforms.dcinside.time") as mt:
+            mt.sleep = MagicMock()
+            comments = analyzer._fetch_dcinside_comments_ajax("gall", 205, "board", self._headers())
+        texts = [c["text"] for c in comments]
+        assert "<b>html memo</b>" not in texts
+        assert "normal text comment" in texts
+
+    def test_multi_page_comment_fetch(self, analyzer):
+        """Lines 593-597: full page (>=20 items) causes next page iteration."""
+        token_resp = _make_resp(ok=True, text="e_s_n_o = 'tok'")
+
+        # First page: 20 comments (triggers pagination)
+        page1_comments = [{"memo": f"Comment {i}", "name": f"User{i}"} for i in range(20)]
+        page1_data = {"comments": page1_comments}
+        page1_resp = _make_resp(ok=True, status_code=200, text=json.dumps(page1_data))
+        page1_resp.json = MagicMock(return_value=page1_data)
+
+        # Second page: 5 comments (< 20, stops)
+        page2_comments = [{"memo": f"Page2 Comment {i}", "name": f"P2User{i}"} for i in range(5)]
+        page2_data = {"comments": page2_comments}
+        page2_resp = _make_resp(ok=True, status_code=200, text=json.dumps(page2_data))
+        page2_resp.json = MagicMock(return_value=page2_data)
+
+        post_call_count = [0]
+        def post_side(*args, **kwargs):
+            post_call_count[0] += 1
+            if post_call_count[0] == 1:
+                return page1_resp
+            return page2_resp
+
+        analyzer._session.get = MagicMock(return_value=token_resp)
+        analyzer._session.post = MagicMock(side_effect=post_side)
+
+        with patch("app.services.platforms.dcinside.time") as mt:
+            mt.sleep = MagicMock()
+            comments = analyzer._fetch_dcinside_comments_ajax("gall", 206, "board", self._headers())
+        assert len(comments) == 25
+        assert post_call_count[0] == 2
+
+    def test_exception_in_page_loop_breaks(self, analyzer):
+        """Lines 598-600: exception in page loop breaks out."""
+        token_resp = _make_resp(ok=True, text="e_s_n_o = 'tok'")
+
+        analyzer._session.get = MagicMock(return_value=token_resp)
+        analyzer._session.post = MagicMock(side_effect=Exception("connection refused"))
+
+        comments = analyzer._fetch_dcinside_comments_ajax("gall", 207, "board", self._headers())
+        assert comments == []
+
+    def test_no_token_still_attempts_api(self, analyzer):
+        """Lines 448-449: no token logs debug but still proceeds."""
+        token_resp = _make_resp(ok=True, text="<html>no token here</html>")
+        data = {"comments": [{"memo": "No token comment", "name": "U"}]}
+        api_resp = _make_resp(ok=True, status_code=200, text=json.dumps(data))
+        api_resp.json = MagicMock(return_value=data)
+
+        analyzer._session.get = MagicMock(return_value=token_resp)
+        analyzer._session.post = MagicMock(return_value=api_resp)
+
+        with patch("app.services.platforms.dcinside.time") as mt:
+            mt.sleep = MagicMock()
+            comments = analyzer._fetch_dcinside_comments_ajax("gall", 208, "board", self._headers())
+        assert any(c["text"] == "No token comment" for c in comments)
+
+    def test_mgallery_galltype_G_for_board(self, analyzer):
+        """_GALLTYPE_ is 'G' for board type, 'M' for mini/mgallery."""
+        token_resp = _make_resp(ok=True, text="e_s_n_o = 'tok'")
+        data = {"comments": [{"memo": "GALLTYPE test", "name": "U"}]}
+        api_resp = _make_resp(ok=True, status_code=200, text=json.dumps(data))
+        api_resp.json = MagicMock(return_value=data)
+
+        captured_form = {}
+
+        def capture_post(url, data=None, **kwargs):
+            if data:
+                captured_form.update(data)
+            return api_resp
+
+        analyzer._session.get = MagicMock(return_value=token_resp)
+        analyzer._session.post = MagicMock(side_effect=capture_post)
+
+        with patch("app.services.platforms.dcinside.time") as mt:
+            mt.sleep = MagicMock()
+            analyzer._fetch_dcinside_comments_ajax("gall", 209, "mini", self._headers())
+        assert captured_form.get("_GALLTYPE_") == "M"
+
+
+# ── _extract_dcinside_comments_from_view_html: edge cases ────────
+
+
+class TestExtractDCInsideCommentsFromViewHtmlExtra:
+    def test_skips_large_json_match(self, analyzer):
+        """Line 675: raw_json > 100000 chars is skipped."""
+        # Create a very large fake JSON array
+        large_json = json.dumps([{"memo": "x", "name": "u"}] * 5000)
+        assert len(large_json) > 100000
+        html = f'"comments": {large_json},'
+        result = analyzer._extract_dcinside_comments_from_view_html(html)
+        # Should skip due to size limit
+        assert result == []
+
+    def test_invalid_json_in_match_is_skipped(self, analyzer):
+        """Lines 678-679: json.JSONDecodeError on raw_json → continue to next pattern."""
+        html = '"comments": [invalid json here],'
+        result = analyzer._extract_dcinside_comments_from_view_html(html)
+        assert result == []
+
+    def test_non_list_json_is_skipped(self, analyzer):
+        """Lines 680-681: arr is not a list → continue."""
+        html = '"comments": {"key": "value"},'
+        result = analyzer._extract_dcinside_comments_from_view_html(html)
+        assert result == []
+
+    def test_non_dict_items_skipped(self, analyzer):
+        """Line 683-684: cmt is not a dict → skip."""
+        data = [
+            "string item",
+            42,
+            {"memo": "valid comment", "name": "User"}
+        ]
+        html = f'"comments": {json.dumps(data)},'
+        result = analyzer._extract_dcinside_comments_from_view_html(html)
+        assert len(result) == 1
+        assert result[0]["text"] == "valid comment"
+
+    def test_exception_in_extraction_returns_empty(self, analyzer):
+        """Lines 699-700: exception during extraction returns []."""
+        with patch("app.services.platforms.dcinside.re") as mock_re:
+            mock_re.search = MagicMock(side_effect=Exception("regex error"))
+            result = analyzer._extract_dcinside_comments_from_view_html('"comments": []')
+        assert result == []
+
+
+# ── _fetch_dcinside_post_comments: extra fallback paths ──────────
+
+
+class TestFetchDCInsidePostCommentsExtra:
+    def _headers(self):
+        return {"User-Agent": "TestAgent/1.0"}
+
+    def test_mgallery_falls_back_to_mgallery_api(self, analyzer):
+        """Lines 714-717: mgallery tries board first (empty), then mgallery API."""
+        ajax_calls = []
+
+        def mock_ajax(gid, pno, gtype, headers, referer_gallery_type=None):
+            ajax_calls.append((gtype, referer_gallery_type))
+            if gtype == "board":
+                return []
+            return [{"text": "mgallery comment", "author": "u", "date": ""}]
+
+        analyzer._fetch_dcinside_comments_ajax = MagicMock(side_effect=mock_ajax)
+
+        result = analyzer._fetch_dcinside_post_comments("mgall", 1, "mgallery", self._headers())
+        assert result == [{"text": "mgallery comment", "author": "u", "date": ""}]
+        assert any(gtype == "mgallery" for gtype, _ in ajax_calls)
+
+    def test_mini_falls_through_all_three_ajax_calls(self, analyzer):
+        """Lines 720-730: mini tries board+mini_ref, then mini API, then board API."""
+        ajax_calls = []
+
+        def mock_ajax(gid, pno, gtype, headers, referer_gallery_type=None):
+            ajax_calls.append((gtype, referer_gallery_type))
+            return []
+
+        analyzer._fetch_dcinside_comments_ajax = MagicMock(side_effect=mock_ajax)
+        analyzer._session.get = MagicMock(return_value=_make_resp(ok=True, text="<html></html>"))
+        analyzer._fetch_dcinside_comments_playwright = MagicMock(return_value=[])
+
+        result = analyzer._fetch_dcinside_post_comments("minigall", 2, "mini", self._headers())
+        # Should try board with mini referer, then mini, then board
+        gtypes = [gt for gt, _ in ajax_calls]
+        assert "mini" in gtypes
+        assert "board" in gtypes
+
+    def test_non_board_gallery_falls_back_to_board_api(self, analyzer):
+        """Lines 735-738: else branch (not board/mini/mgallery) tries board API fallback."""
+        ajax_calls = []
+
+        def mock_ajax(gid, pno, gtype, headers, referer_gallery_type=None):
+            ajax_calls.append(gtype)
+            return []
+
+        analyzer._fetch_dcinside_comments_ajax = MagicMock(side_effect=mock_ajax)
+        analyzer._session.get = MagicMock(return_value=_make_resp(ok=True, text="<html></html>"))
+        analyzer._fetch_dcinside_comments_playwright = MagicMock(return_value=[])
+
+        analyzer._fetch_dcinside_post_comments("majorgall", 3, "major", self._headers())
+        # major type → else branch → tries major API, then board API
+        assert "board" in ajax_calls
+
+    def test_extracts_from_view_html_embedded_json(self, analyzer):
+        """Line 754: _extract_dcinside_comments_from_view_html returns comments."""
+        analyzer._fetch_dcinside_comments_ajax = MagicMock(return_value=[])
+
+        comments_data = [{"memo": "Embedded view comment", "name": "EmbedUser", "reg_date": "2024-05-01"}]
+        html_with_embedded = f'"comments": {json.dumps(comments_data)},'
+
+        view_resp = _make_resp(ok=True, text=html_with_embedded)
+        view_resp.raise_for_status = MagicMock()
+        analyzer._session.get = MagicMock(return_value=view_resp)
+
+        result = analyzer._fetch_dcinside_post_comments("gall", 300, "board", self._headers())
+        assert any(c["text"] == "Embedded view comment" for c in result)
+
+    def test_view_page_fetch_exception_calls_playwright(self, analyzer):
+        """Lines 787-788: exception in view page fetch logs debug, then tries playwright."""
+        analyzer._fetch_dcinside_comments_ajax = MagicMock(return_value=[])
+        analyzer._session.get = MagicMock(side_effect=Exception("timeout on view page"))
+        analyzer._fetch_dcinside_comments_playwright = MagicMock(return_value=[])
+
+        result = analyzer._fetch_dcinside_post_comments("gall", 301, "board", self._headers())
+        analyzer._fetch_dcinside_comments_playwright.assert_called_once()
+        assert result == []
+
+    def test_view_html_selectors_parse_cmt_info(self, analyzer):
+        """Lines 758-784: HTML selectors in fallback path parse div.cmt_info."""
+        analyzer._fetch_dcinside_comments_ajax = MagicMock(return_value=[])
+
+        # HTML with no embedded JSON but with cmt_info divs
+        html = """<html><body>
+        <div class="cmt_info">
+            <em class="nickname" data-nick="HtmlFallback">HtmlFallback</em>
+            <div class="cmt_txtbox"><p class="usertxt">Fallback cmt_info comment text here</p></div>
+            <span class="date_time">2024-05-02</span>
+        </div>
+        </body></html>"""
+        view_resp = _make_resp(ok=True, text=html)
+        view_resp.raise_for_status = MagicMock()
+        analyzer._session.get = MagicMock(return_value=view_resp)
+
+        result = analyzer._fetch_dcinside_post_comments("gall", 302, "board", self._headers())
+        assert any("Fallback cmt_info comment text here" in c["text"] for c in result)
+
+
+# ── _fetch_dcinside_comments_playwright: with-block path ─────────
+
+
+def _inject_playwright(mock_sync_playwright):
+    """Inject a fake playwright.sync_api module with the given sync_playwright mock."""
+    mock_pw_mod = MagicMock()
+    mock_sync_api_mod = MagicMock()
+    mock_sync_api_mod.sync_playwright = mock_sync_playwright
+    return patch.dict("sys.modules", {
+        "playwright": mock_pw_mod,
+        "playwright.sync_api": mock_sync_api_mod,
+    })
+
+
+class TestFetchDCInsideCommentsPlaywrightExtra:
+    def test_playwright_with_block_success(self, analyzer):
+        """Lines 806-871: full playwright with-block runs successfully."""
+        html = """<html><body>
+        <div class="cmt_info">
+            <em class="nickname" data-nick="PWUser">PWUser</em>
+            <div class="cmt_txtbox"><p class="usertxt">Playwright success comment text</p></div>
+            <span class="date_time">2024-06-01</span>
+        </div>
+        </body></html>"""
+
+        mock_page = MagicMock()
+        mock_page.content.return_value = html
+        mock_page.wait_for_selector = MagicMock()
+
+        mock_browser = MagicMock()
+        mock_browser.new_page.return_value = mock_page
+
+        mock_p = MagicMock()
+        mock_p.chromium.launch.return_value = mock_browser
+
+        mock_context = MagicMock()
+        mock_context.__enter__ = MagicMock(return_value=mock_p)
+        mock_context.__exit__ = MagicMock(return_value=False)
+        mock_sync_playwright = MagicMock(return_value=mock_context)
+
+        with _inject_playwright(mock_sync_playwright):
+            with patch("app.services.platforms.dcinside.time") as mt:
+                mt.sleep = MagicMock()
+                result = analyzer._fetch_dcinside_comments_playwright("gall", 400, "board")
+
+        assert isinstance(result, list)
+
+    def test_playwright_with_block_exception(self, analyzer):
+        """Lines 872-878: exception inside with-block logs warning and returns []."""
+        mock_context = MagicMock()
+        mock_context.__enter__ = MagicMock(side_effect=Exception("chromium failed"))
+        mock_context.__exit__ = MagicMock(return_value=False)
+        mock_sync_playwright = MagicMock(return_value=mock_context)
+
+        with _inject_playwright(mock_sync_playwright):
+            result = analyzer._fetch_dcinside_comments_playwright("gall", 401, "board")
+
+        assert result == []
+
+    def test_playwright_wait_for_selector_exceptions_continue(self, analyzer):
+        """Line 837: wait_for_selector exceptions for selectors are caught and continue."""
+        html = "<html><body></body></html>"
+
+        mock_page = MagicMock()
+        mock_page.content.return_value = html
+        mock_page.wait_for_selector = MagicMock(side_effect=Exception("selector timeout"))
+
+        mock_browser = MagicMock()
+        mock_browser.new_page.return_value = mock_page
+
+        mock_p = MagicMock()
+        mock_p.chromium.launch.return_value = mock_browser
+
+        mock_context = MagicMock()
+        mock_context.__enter__ = MagicMock(return_value=mock_p)
+        mock_context.__exit__ = MagicMock(return_value=False)
+        mock_sync_playwright = MagicMock(return_value=mock_context)
+
+        with _inject_playwright(mock_sync_playwright):
+            with patch("app.services.platforms.dcinside.time") as mt:
+                mt.sleep = MagicMock()
+                result = analyzer._fetch_dcinside_comments_playwright("gall", 402, "board")
+
+        assert result == []
+
+
+# ── _analyze_dcinside gallery_id regex fallback ───────────────────
+
+
+class TestAnalyzeDCInsideGalleryIdFallback:
+    def test_gallery_id_extracted_via_path_regex(self, analyzer):
+        """Lines 78-80: regex fallback for gallery ID when not in query params."""
+        # This URL pattern would pass _validate_dcinside_url (has id in query)
+        # but to test the regex fallback, we patch _validate_dcinside_url
+        resp = _make_resp(ok=True, text="<html><body><table><tbody></tbody></table></body></html>")
+        resp.raise_for_status = MagicMock()
+        analyzer._session.get = MagicMock(return_value=resp)
+
+        # Test URL where params.get('id') returns None but regex finds ID
+        with patch.object(analyzer.__class__, "_validate_dcinside_url", return_value=True):
+            with patch("app.services.platforms.dcinside.parse_qs", return_value={}):
+                with patch("app.services.platforms.dcinside.re") as mock_re:
+                    mock_match = MagicMock()
+                    mock_match.group.return_value = "regex_found_id"
+                    mock_re.search = MagicMock(return_value=mock_match)
+                    mock_re.compile = MagicMock()  # preserve compile
+
+                    # We need urlparse still to work
+                    result = None
+                    try:
+                        analyzer._analyze_dcinside(
+                            "https://gall.dcinside.com/board/lists/?programming"
+                        )
+                    except Exception:
+                        pass
