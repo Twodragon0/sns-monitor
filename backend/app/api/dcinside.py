@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from flask import jsonify, request, Response
 
 from . import dcinside_bp
+from .. import limiter
 from ..config import Config
 from ..services.local_data import decimal_default
 
@@ -152,6 +153,7 @@ def _format_post(post_data, max_comments=None):
 
 
 @dcinside_bp.route('/api/dcinside/galleries', methods=['GET'])
+@limiter.limit("60 per minute")
 def galleries():
     """DC인사이드 갤러리 목록 반환."""
     if not Config.LOCAL_MODE:
@@ -216,6 +218,7 @@ def galleries():
 
 
 @dcinside_bp.route('/api/dcinside/gallery/<gallery_id>/posts', methods=['GET'])
+@limiter.limit("60 per minute")
 def gallery_posts(gallery_id):
     """DC인사이드 특정 갤러리의 게시글 페이지네이션 엔드포인트."""
     try:

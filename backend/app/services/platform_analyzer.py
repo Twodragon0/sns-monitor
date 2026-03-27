@@ -29,10 +29,15 @@ logger = logging.getLogger(__name__)
 
 KST = timezone(timedelta(hours=9))
 
-# Hostnames that must never be fetched (cloud metadata, localhost)
+# Hostnames that must never be fetched (cloud metadata, localhost).
+# Note: numeric IP addresses like 169.254.169.254 are already blocked by the
+# IP-range check in _validate_url_host; only add hostnames here.
 _BLOCKED_HOSTS = frozenset({
     'metadata.google.internal',
     'metadata.google.com',
+    'fd00:ec2::254',
+    '100.100.100.200',
+    'metadata.azure.com',
 })
 
 

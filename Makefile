@@ -173,7 +173,9 @@ status-prod:
 # ============================================
 test:
 	@echo "🧪 Running tests..."
-	cd backend && python -m pytest tests/ -v --tb=short
+	cd backend && python -m pytest tests/ -v --tb=short \
+		--cov=app --cov-report=term-missing \
+		--cov-fail-under=85
 	@echo "✅ Tests complete!"
 
 test-local:

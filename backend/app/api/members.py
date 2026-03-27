@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from flask import request, Response, jsonify
 
 from flask import Blueprint
+from .. import limiter
 from ..config import Config
 from ..services.local_data import decimal_default, is_timestamp_comment
 
@@ -514,6 +515,7 @@ def _handle_channel_local(group_id: str) -> dict:
 # ---------------------------------------------------------------------------
 
 def _make_members_view(group_id: str):
+    @limiter.limit("60 per minute")
     def view():
         if not Config.LOCAL_MODE:
             return jsonify({"error": "S3 mode not supported. Set LOCAL_MODE=true"}), 501
@@ -532,6 +534,7 @@ def _make_members_view(group_id: str):
 
 
 def _make_channel_view(group_id: str):
+    @limiter.limit("60 per minute")
     def view():
         if not Config.LOCAL_MODE:
             return jsonify({"error": "S3 mode not supported. Set LOCAL_MODE=true"}), 501

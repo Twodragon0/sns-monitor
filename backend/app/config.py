@@ -97,7 +97,10 @@ class Config:
     # Session cookie security
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
-    SESSION_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "false").lower() in ("1", "true", "yes")
+    SESSION_COOKIE_SECURE = os.environ.get(
+        "SESSION_COOKIE_SECURE",
+        "false" if os.environ.get("FLASK_DEBUG", "false").lower() == "true" else "true"
+    ).lower() in ("1", "true", "yes")
 
     # JSON encoding
     JSON_AS_ASCII = False

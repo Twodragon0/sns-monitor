@@ -11,12 +11,14 @@ import json
 import logging
 import os
 import re
+import secrets
 from datetime import datetime
 
 import requests
 from flask import jsonify, request
 
 from . import data_bp
+from .. import limiter
 from ..config import Config
 from ..services.local_data import decimal_default
 
@@ -115,14 +117,21 @@ def _save_dcinside_result(result: dict, timestamp: str):
 # ---------------------------------------------------------------------------
 
 @data_bp.route('/api/data/<path:s3_key>', methods=['GET'])
+@limiter.limit("60 per minute")
 def get_data(s3_key):
     """S3 키(또는 로컬 경로)로 데이터 조회."""
     return jsonify({"error": "S3 mode not supported. Set LOCAL_MODE=true"}), 501
 
 
 @data_bp.route('/api/crawler/results', methods=['POST'])
+@limiter.limit("10 per minute")
 def crawler_results():
     """크롤러 결과 저장 엔드포인트 (DCInside + YouTube)."""
+    token = request.headers.get('X-Crawler-Token', '')
+    expected = os.environ.get('CRAWLER_INTERNAL_TOKEN', '')
+    if expected and not secrets.compare_digest(token, expected):
+        return jsonify({'error': 'Unauthorized'}), 401
+
     if not Config.LOCAL_MODE:
         return jsonify({"error": "S3 mode not supported. Set LOCAL_MODE=true"}), 501
 
@@ -154,6 +163,7 @@ def crawler_results():
 
 
 @data_bp.route('/api/twitter/search', methods=['POST'])
+@limiter.limit("60 per minute")
 def twitter_search():
     """Twitter 키워드 검색 엔드포인트."""
     if not Config.LOCAL_MODE:
