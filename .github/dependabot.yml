@@ -1,5 +1,23 @@
 version: 2
 updates:
+  # npm dependencies (frontend)
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "javascript"
+    commit-message:
+      prefix: "chore(deps):"
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
   # Python dependencies (backend)
   - package-ecosystem: "pip"
     directory: "/backend"
@@ -12,6 +30,11 @@ updates:
       - "python"
     commit-message:
       prefix: "chore(deps):"
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
 
   # Python dependencies (crawlers)
   - package-ecosystem: "pip"
@@ -25,17 +48,21 @@ updates:
       - "python"
     commit-message:
       prefix: "chore(deps):"
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
 
-  # npm dependencies (frontend)
-  - package-ecosystem: "npm"
-    directory: "/frontend"
+  # Docker dependencies
+  - package-ecosystem: "docker"
+    directory: "/docker"
     schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 10
+      interval: "monthly"
+    open-pull-requests-limit: 5
     labels:
       - "dependencies"
-      - "javascript"
+      - "docker"
     commit-message:
       prefix: "chore(deps):"
 
@@ -49,18 +76,6 @@ updates:
     labels:
       - "dependencies"
       - "github-actions"
-    commit-message:
-      prefix: "chore(deps):"
-
-  # Docker dependencies
-  - package-ecosystem: "docker"
-    directory: "/docker"
-    schedule:
-      interval: "monthly"
-    open-pull-requests-limit: 5
-    labels:
-      - "dependencies"
-      - "docker"
     commit-message:
       prefix: "chore(deps):"
 
