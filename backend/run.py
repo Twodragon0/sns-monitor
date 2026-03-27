@@ -6,7 +6,7 @@ import logging
 import os
 import sys
 
-# Add backend directory to Python path (for api_handlers import)
+# Add backend directory to Python path (for lambda/api_handlers import)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from app import create_app

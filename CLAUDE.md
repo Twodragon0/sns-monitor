@@ -60,15 +60,22 @@ User → Frontend (host :3080)
 ```
 ├── backend/                  # Flask API server
 │   ├── run.py                # Entry point
-│   ├── api_handlers.py       # Legacy API route handlers
+│   ├── lambda/
+│   │   └── api_handlers.py   # Lambda-only handler (standalone deployment)
 │   ├── app/
 │   │   ├── __init__.py       # Flask app factory (create_app)
 │   │   ├── config.py         # Centralized configuration
 │   │   ├── api/
 │   │   │   ├── analyze.py    # /api/analyze/url, /api/platforms
-│   │   │   └── legacy.py     # Bridge to api_handlers
+│   │   │   ├── dashboard.py  # /api/dashboard/stats, /api/scans, /api/channels
+│   │   │   ├── members.py    # /api/group-{a,b,c}/members, /api/group-{a,b,c}/channel
+│   │   │   ├── vuddy.py      # /api/vuddy/creators
+│   │   │   ├── dcinside.py   # /api/dcinside/galleries, /api/dcinside/gallery-posts
+│   │   │   └── data.py       # /api/data, /api/crawler/results, /api/twitter/search
 │   │   ├── services/
 │   │   │   ├── platform_analyzer.py  # Multi-platform URL analyzer
+│   │   │   ├── sentiment.py  # Sentiment analysis utilities
+│   │   │   ├── local_data.py # Local filesystem data operations
 │   │   │   └── redis_client.py       # Redis with graceful fallback
 │   │   └── utils/
 │   │       └── logger.py     # Logging configuration
