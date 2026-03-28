@@ -23,6 +23,7 @@ ENV/
 .pytest_cache/
 .coverage
 htmlcov/
+frontend/coverage/
 
 # IDE
 .vscode/
