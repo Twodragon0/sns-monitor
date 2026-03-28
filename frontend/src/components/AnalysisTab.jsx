@@ -327,7 +327,7 @@ function AnalysisTab() {
     } catch (err) {
       setLoading(false);
       setAnalysisState('error');
-      setError(err.response?.data?.error || err.message || 'Analysis failed');
+      setError(err.response?.data?.error || err.message || '분석 실패');
     }
   };
 
@@ -341,7 +341,7 @@ function AnalysisTab() {
         });
       }
     } catch (err) {
-      setError('Failed to load graph data');
+      setError('그래프 데이터를 불러오지 못했습니다');
     }
   };
 
@@ -573,7 +573,7 @@ function AnalysisTab() {
           borderRadius: '8px',
           marginBottom: '20px',
         }}>
-          <h4 style={{ margin: '0 0 8px 0' }}>Analysis Progress</h4>
+          <h4 style={{ margin: '0 0 8px 0' }}>분석 진행 상황</h4>
           <div style={{
             width: '100%',
             backgroundColor: '#bbdefb',
@@ -589,9 +589,9 @@ function AnalysisTab() {
             }} />
           </div>
           <p style={{ margin: 0, fontSize: '13px', color: '#1565c0' }}>
-            {analysisState === 'transforming' && 'Transforming SNS data into documents...'}
-            {analysisState === 'building' && (taskProgress?.message || 'Building knowledge graph...')}
-            {analysisState === 'generating' && 'Generating analysis report...'}
+            {analysisState === 'transforming' && 'SNS 데이터를 문서로 변환 중...'}
+            {analysisState === 'building' && (taskProgress?.message || '지식 그래프 구축 중...')}
+            {analysisState === 'generating' && '분석 보고서 생성 중...'}
           </p>
         </div>
       )}
@@ -606,7 +606,7 @@ function AnalysisTab() {
           marginBottom: '20px',
           color: '#721c24',
         }}>
-          <strong>Error:</strong> {error}
+          <strong>오류:</strong> {error}
         </div>
       )}
 
@@ -627,14 +627,14 @@ function AnalysisTab() {
           borderRadius: '8px',
           marginBottom: '20px',
         }}>
-          <h4 style={{ margin: '0 0 8px 0', color: '#155724' }}>Analysis Complete</h4>
+          <h4 style={{ margin: '0 0 8px 0', color: '#155724' }}>분석 완료</h4>
           <p style={{ margin: '0 0 8px 0', fontSize: '13px' }}>
-            Project: <strong>{currentProject.project_name || currentProject.project_id}</strong>
+            프로젝트: <strong>{currentProject.project_name || currentProject.project_id}</strong>
           </p>
           {currentProject.ontology && (
             <p style={{ margin: '0 0 8px 0', fontSize: '13px' }}>
-              Entities: {currentProject.ontology.entity_types?.length || 0} types /
-              Relations: {currentProject.ontology.edge_types?.length || 0} types
+              개체: {currentProject.ontology.entity_types?.length || 0}종 /
+              관계: {currentProject.ontology.edge_types?.length || 0}종
             </p>
           )}
           {taskProgress?.result?.graph_id && (
@@ -650,7 +650,7 @@ function AnalysisTab() {
                 fontSize: '13px',
               }}
             >
-              View Graph ({taskProgress.result.node_count} nodes, {taskProgress.result.edge_count} edges)
+              그래프 보기 ({taskProgress.result.node_count}개 노드, {taskProgress.result.edge_count}개 엣지)
             </button>
           )}
         </div>
@@ -665,10 +665,10 @@ function AnalysisTab() {
           border: '1px solid #dee2e6',
           marginBottom: '20px',
         }}>
-          <h3 style={{ marginTop: 0 }}>Knowledge Graph</h3>
+          <h3 style={{ marginTop: 0 }}>지식 그래프</h3>
           <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: '300px' }}>
-              <h4>Entities ({report.data.nodes?.length || 0})</h4>
+              <h4>개체 ({report.data.nodes?.length || 0})</h4>
               <div style={{ maxHeight: '400px', overflow: 'auto' }}>
                 {(report.data.nodes || []).map((node, i) => (
                   <div key={i} style={{
@@ -685,7 +685,7 @@ function AnalysisTab() {
               </div>
             </div>
             <div style={{ flex: 1, minWidth: '300px' }}>
-              <h4>Relationships ({report.data.edges?.length || 0})</h4>
+              <h4>관계 ({report.data.edges?.length || 0})</h4>
               <div style={{ maxHeight: '400px', overflow: 'auto' }}>
                 {(report.data.edges || []).map((edge, i) => (
                   <div key={i} style={{
@@ -753,7 +753,7 @@ function AnalysisTab() {
             ))}
             {chatLoading && (
               <div style={{ textAlign: 'center', color: '#999', padding: '8px' }}>
-                Thinking...
+                생각 중...
               </div>
             )}
           </div>
@@ -808,14 +808,14 @@ function AnalysisTab() {
           borderRadius: '8px',
           border: '1px solid #dee2e6',
         }}>
-          <h3 style={{ marginTop: 0 }}>Previous Analyses</h3>
+          <h3 style={{ marginTop: 0 }}>이전 분석</h3>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid #dee2e6' }}>
-                <th style={{ textAlign: 'left', padding: '8px' }}>Project</th>
-                <th style={{ textAlign: 'left', padding: '8px' }}>Status</th>
-                <th style={{ textAlign: 'left', padding: '8px' }}>Entities</th>
-                <th style={{ textAlign: 'left', padding: '8px' }}>Created</th>
+                <th style={{ textAlign: 'left', padding: '8px' }}>프로젝트</th>
+                <th style={{ textAlign: 'left', padding: '8px' }}>상태</th>
+                <th style={{ textAlign: 'left', padding: '8px' }}>개체</th>
+                <th style={{ textAlign: 'left', padding: '8px' }}>생성일</th>
               </tr>
             </thead>
             <tbody>
@@ -836,7 +836,7 @@ function AnalysisTab() {
                     </span>
                   </td>
                   <td style={{ padding: '8px' }}>
-                    {proj.ontology?.entity_types?.length || 0} types
+                    {proj.ontology?.entity_types?.length || 0}종
                   </td>
                   <td style={{ padding: '8px' }}>
                     {proj.created_at ? new Date(proj.created_at).toLocaleDateString() : '-'}

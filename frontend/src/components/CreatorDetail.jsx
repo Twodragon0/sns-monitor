@@ -17,13 +17,13 @@ const MONITORING_KEYWORDS = [
 ];
 
 const KEYWORD_CATEGORIES = {
-  'Creator': ['ExampleCreator', 'examplecreator'],
-  'Brand': ['CreatorBrand', 'creatorbrand'],
-  'Company': ['ExampleCorp', 'examplecorp'],
-  'Security': ['hack', 'hacked', 'hacking', 'security', 'leak', 'leaked', 'scam', 'phishing', 'malware'],
-  'Content': ['creator', 'vtuber', 'streamer', 'youtube', 'live', 'stream'],
-  'Merchandise': ['merch', 'goods', 'album', 'cover', 'original'],
-  'Fan Activity': ['fan', 'subscribe', 'membership'],
+  '크리에이터': ['ExampleCreator', 'examplecreator'],
+  '브랜드': ['CreatorBrand', 'creatorbrand'],
+  '기업': ['ExampleCorp', 'examplecorp'],
+  '보안': ['hack', 'hacked', 'hacking', 'security', 'leak', 'leaked', 'scam', 'phishing', 'malware'],
+  '콘텐츠': ['creator', 'vtuber', 'streamer', 'youtube', 'live', 'stream'],
+  '굿즈': ['merch', 'goods', 'album', 'cover', 'original'],
+  '팬 활동': ['fan', 'subscribe', 'membership'],
 };
 
 // Sentiment analysis helper
@@ -138,7 +138,7 @@ function CreatorDetail({ creatorId }) {
     return (
       <div className="dashboard-loading">
         <div className="spinner"></div>
-        <p>Loading creator data...</p>
+        <p>크리에이터 데이터 로딩 중...</p>
       </div>
     );
   }
@@ -161,9 +161,9 @@ function CreatorDetail({ creatorId }) {
   }, 0);
 
   const sentimentPieData = [
-    { name: 'Positive', value: totalPositive },
-    { name: 'Neutral', value: totalNeutral },
-    { name: 'Negative', value: totalNegative },
+    { name: '긍정', value: totalPositive },
+    { name: '중립', value: totalNeutral },
+    { name: '부정', value: totalNegative },
   ].filter(d => d.value > 0);
 
   const channelBarData = channelsData.map(ch => ({
@@ -181,13 +181,13 @@ function CreatorDetail({ creatorId }) {
           onClick={() => { window.history.pushState({}, '', '/'); window.dispatchEvent(new PopStateEvent('popstate')); }}
           style={{ padding: '8px 16px', background: '#667eea', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
         >
-          Back to Dashboard
+          대시보드로 돌아가기
         </button>
         <div>
-          <h1 style={{ margin: 0, fontSize: '24px', fontWeight: '900' }}>{creatorLabel} Creator Monitoring</h1>
+          <h1 style={{ margin: 0, fontSize: '24px', fontWeight: '900' }}>{creatorLabel} 크리에이터 모니터링</h1>
           {lastUpdated && (
             <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#888' }}>
-              Last updated: {new Date(lastUpdated).toLocaleString()}
+              마지막 업데이트: {new Date(lastUpdated).toLocaleString('ko-KR')}
             </p>
           )}
         </div>
@@ -196,10 +196,10 @@ function CreatorDetail({ creatorId }) {
       {/* Summary stats */}
       <div className="stats-grid" style={{ marginBottom: '32px' }}>
         {[
-          { icon: '📊', label: 'Channels Monitored', value: channelsData.length },
-          { icon: '💬', label: 'Total Comments', value: channelsData.reduce((s, c) => s + (c.total_comments || 0), 0) },
-          { icon: '😊', label: 'Positive Reactions', value: totalPositive },
-          { icon: '😞', label: 'Negative Reactions', value: totalNegative },
+          { icon: '📊', label: '모니터링 채널', value: channelsData.length },
+          { icon: '💬', label: '전체 댓글', value: channelsData.reduce((s, c) => s + (c.total_comments || 0), 0) },
+          { icon: '😊', label: '긍정 반응', value: totalPositive },
+          { icon: '😞', label: '부정 반응', value: totalNegative },
         ].map(({ icon, label, value }) => (
           <div key={label} className="stat-card">
             <div className="stat-icon">{icon}</div>
@@ -213,7 +213,7 @@ function CreatorDetail({ creatorId }) {
 
       {/* Monitoring keywords display */}
       <div style={{ marginBottom: '32px', padding: '20px', background: '#f8f9ff', border: '2px solid #667eea', borderRadius: '12px' }}>
-        <h2 style={{ marginTop: 0, color: '#667eea', fontSize: '18px' }}>Monitoring Keywords</h2>
+        <h2 style={{ marginTop: 0, color: '#667eea', fontSize: '18px' }}>모니터링 키워드</h2>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
           {Object.entries(KEYWORD_CATEGORIES).map(([category, keywords]) => (
             <div key={category} style={{ marginBottom: '8px' }}>
@@ -227,7 +227,7 @@ function CreatorDetail({ creatorId }) {
           ))}
         </div>
         <p style={{ margin: 0, fontSize: '12px', color: '#888' }}>
-          {MONITORING_KEYWORDS.length} keywords tracked across {Object.keys(KEYWORD_CATEGORIES).length} categories
+          {Object.keys(KEYWORD_CATEGORIES).length}개 카테고리에서 {MONITORING_KEYWORDS.length}개 키워드 추적 중
         </p>
       </div>
 
@@ -236,7 +236,7 @@ function CreatorDetail({ creatorId }) {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px', marginBottom: '32px' }}>
           {/* Sentiment Pie Chart */}
           <div style={{ padding: '20px', background: '#fff', border: '2px solid #e0e0e0', borderRadius: '12px' }}>
-            <h3 style={{ marginTop: 0, fontSize: '16px', color: '#333' }}>Overall Sentiment Distribution</h3>
+            <h3 style={{ marginTop: 0, fontSize: '16px', color: '#333' }}>전체 감성 분포</h3>
             {sentimentPieData.length > 0 ? (
               <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
@@ -249,13 +249,13 @@ function CreatorDetail({ creatorId }) {
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <p style={{ color: '#888', textAlign: 'center' }}>No sentiment data available</p>
+              <p style={{ color: '#888', textAlign: 'center' }}>감성 데이터가 없습니다</p>
             )}
           </div>
 
           {/* Channel comparison bar chart */}
           <div style={{ padding: '20px', background: '#fff', border: '2px solid #e0e0e0', borderRadius: '12px' }}>
-            <h3 style={{ marginTop: 0, fontSize: '16px', color: '#333' }}>Comments per Channel</h3>
+            <h3 style={{ marginTop: 0, fontSize: '16px', color: '#333' }}>채널별 댓글 수</h3>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={channelBarData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -290,7 +290,7 @@ function CreatorDetail({ creatorId }) {
               </div>
               <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
                 <span style={{ fontSize: '13px', background: 'rgba(255,255,255,0.2)', padding: '4px 10px', borderRadius: '12px' }}>
-                  {ch.total_comments || 0} comments
+                  댓글 {ch.total_comments || 0}개
                 </span>
                 <span style={{ fontSize: '20px' }}>{isExpanded ? '▲' : '▼'}</span>
               </div>
@@ -303,25 +303,25 @@ function CreatorDetail({ creatorId }) {
                   <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#2e7d32' }}>
                     {Math.round((dist.positive || 0) * 100)}%
                   </div>
-                  <div style={{ fontSize: '11px', color: '#388e3c' }}>Positive</div>
+                  <div style={{ fontSize: '11px', color: '#388e3c' }}>긍정</div>
                 </div>
                 <div style={{ textAlign: 'center', padding: '10px', background: '#fff3e0', borderRadius: '8px' }}>
                   <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#ef6c00' }}>
                     {Math.round((dist.neutral || 0) * 100)}%
                   </div>
-                  <div style={{ fontSize: '11px', color: '#f57c00' }}>Neutral</div>
+                  <div style={{ fontSize: '11px', color: '#f57c00' }}>중립</div>
                 </div>
                 <div style={{ textAlign: 'center', padding: '10px', background: '#ffebee', borderRadius: '8px' }}>
                   <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#c62828' }}>
                     {Math.round((dist.negative || 0) * 100)}%
                   </div>
-                  <div style={{ fontSize: '11px', color: '#d32f2f' }}>Negative</div>
+                  <div style={{ fontSize: '11px', color: '#d32f2f' }}>부정</div>
                 </div>
                 <div style={{ textAlign: 'center', padding: '10px', background: '#f3e5f5', borderRadius: '8px' }}>
                   <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#7b1fa2' }}>
                     {ch.overall_score || 0}
                   </div>
-                  <div style={{ fontSize: '11px', color: '#9c27b0' }}>Score</div>
+                  <div style={{ fontSize: '11px', color: '#9c27b0' }}>점수</div>
                 </div>
               </div>
 
@@ -342,15 +342,15 @@ function CreatorDetail({ creatorId }) {
                 {/* Recent videos */}
                 {ch.videos && ch.videos.length > 0 && (
                   <div style={{ marginBottom: '20px' }}>
-                    <h4 style={{ color: '#667eea', marginBottom: '10px', fontSize: '14px' }}>Recent Videos</h4>
+                    <h4 style={{ color: '#667eea', marginBottom: '10px', fontSize: '14px' }}>최근 영상</h4>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       {ch.videos.slice(0, 3).map((video, vIdx) => (
                         <div key={vIdx} style={{ padding: '10px', background: '#fafafa', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
                           <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#333', marginBottom: '4px' }}>{video.title}</div>
                           <div style={{ fontSize: '11px', color: '#888', display: 'flex', gap: '12px' }}>
-                            <span>Views: {(video.views || 0).toLocaleString()}</span>
-                            <span>Likes: {(video.likes || 0).toLocaleString()}</span>
-                            <span>Comments: {(video.comments || 0).toLocaleString()}</span>
+                            <span>조회수: {(video.views || 0).toLocaleString()}</span>
+                            <span>좋아요: {(video.likes || 0).toLocaleString()}</span>
+                            <span>댓글: {(video.comments || 0).toLocaleString()}</span>
                           </div>
                         </div>
                       ))}
@@ -362,7 +362,7 @@ function CreatorDetail({ creatorId }) {
                 {comments.length > 0 && (
                   <div>
                     <h4 style={{ color: '#667eea', marginBottom: '10px', fontSize: '14px' }}>
-                      Comments ({comments.length} total)
+                      댓글 (총 {comments.length}개)
                     </h4>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       {visibleComments.map((comment, cIdx) => {
@@ -382,10 +382,10 @@ function CreatorDetail({ creatorId }) {
                               {comment.text}
                             </div>
                             <div style={{ fontSize: '11px', color: '#888', display: 'flex', gap: '12px' }}>
-                              <span>Likes: {comment.likes || 0}</span>
-                              {comment.country && <span>Country: {comment.country}</span>}
+                              <span>좋아요: {comment.likes || 0}</span>
+                              {comment.country && <span>국가: {comment.country}</span>}
                               <span style={{ color: SENTIMENT_COLORS[sentiment] }}>
-                                {sentiment === 'positive' ? 'Positive' : sentiment === 'negative' ? 'Negative' : 'Neutral'}
+                                {sentiment === 'positive' ? '긍정' : sentiment === 'negative' ? '부정' : '중립'}
                               </span>
                             </div>
                           </div>
@@ -397,7 +397,7 @@ function CreatorDetail({ creatorId }) {
                         onClick={() => loadMoreComments(ch.name)}
                         style={{ marginTop: '12px', padding: '8px 20px', background: '#667eea', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }}
                       >
-                        Load more ({comments.length - displayLimit} remaining)
+                        더 불러오기 ({comments.length - displayLimit}개 남음)
                       </button>
                     )}
                   </div>
@@ -411,13 +411,13 @@ function CreatorDetail({ creatorId }) {
       {/* DC Galleries section (if data present) */}
       {dcGalleries.length > 0 && (
         <div style={{ marginTop: '32px' }}>
-          <h2 style={{ color: '#0253fe', marginBottom: '16px', fontWeight: '900' }}>DC Inside Gallery Monitoring</h2>
+          <h2 style={{ color: '#0253fe', marginBottom: '16px', fontWeight: '900' }}>DCInside 갤러리 모니터링</h2>
           {dcGalleries.map((gallery) => (
             <div key={gallery.gallery_id} style={{ marginBottom: '16px', padding: '16px', background: '#fff', border: '2px solid #0253fe', borderRadius: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={{ margin: 0, color: '#0253fe' }}>{gallery.gallery_name}</h3>
                 <div style={{ fontSize: '13px', color: '#666' }}>
-                  Posts: {gallery.total_posts || 0} | Comments: {gallery.total_comments || 0}
+                  게시글: {gallery.total_posts || 0} | 댓글: {gallery.total_comments || 0}
                 </div>
               </div>
             </div>
@@ -429,10 +429,10 @@ function CreatorDetail({ creatorId }) {
       {channelsData.length === 0 && (
         <div style={{ textAlign: 'center', padding: '60px 20px', color: '#888' }}>
           <div style={{ fontSize: '48px', marginBottom: '16px' }}>📊</div>
-          <h2>No data available for "{creatorLabel}"</h2>
-          <p>Configure the crawler to collect data for this creator group.</p>
+          <h2>"{creatorLabel}"에 대한 데이터가 없습니다</h2>
+          <p>크롤러를 구성하여 이 크리에이터 그룹의 데이터를 수집하세요.</p>
           <p style={{ fontSize: '13px' }}>
-            Use keywords like: {MONITORING_KEYWORDS.slice(0, 6).join(', ')}
+            사용 키워드 예시: {MONITORING_KEYWORDS.slice(0, 6).join(', ')}
           </p>
         </div>
       )}

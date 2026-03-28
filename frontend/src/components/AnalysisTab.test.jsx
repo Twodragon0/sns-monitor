@@ -212,7 +212,7 @@ describe('AnalysisTab - local analysis flow', () => {
     fireEvent.click(screen.getByRole('button', { name: /1개 소스/ }));
 
     await waitFor(() => {
-      expect(screen.getByText(/Error:/)).toBeInTheDocument();
+      expect(screen.getByText(/오류:/)).toBeInTheDocument();
     });
   });
 });

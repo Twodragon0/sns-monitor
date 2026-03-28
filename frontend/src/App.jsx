@@ -119,7 +119,7 @@ function App() {
             <div className="App-header__status">
               <span className={`status-dot ${isBackendOnline ? 'online' : 'offline'}`} aria-hidden="true" />
               <span className="status-label">
-                API {isBackendOnline ? 'Connected' : 'Offline'}
+                API {isBackendOnline ? '연결됨' : '오프라인'}
               </span>
             </div>
           </div>

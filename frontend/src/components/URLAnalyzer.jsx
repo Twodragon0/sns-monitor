@@ -96,7 +96,7 @@ function URLAnalyzer() {
         analyzed_at: response.data.analyzed_at,
       }, ...prev.filter(h => h.url !== trimmedUrl).slice(0, 9)]);
     } catch (err) {
-      const msg = err.response?.data?.error || err.message || 'Analysis failed';
+      const msg = err.response?.data?.error || err.message || '분석 실패';
       setError(
         !err.response && (err.message === 'Network Error' || err.code === 'ECONNABORTED')
           ? '서버 연결 실패 또는 요청 시간 초과입니다. 잠시 후 다시 시도해 주세요.'
@@ -123,8 +123,8 @@ function URLAnalyzer() {
   return (
     <div className="url-analyzer">
       <div className="analyzer-header">
-        <h1>SNS URL Analyzer</h1>
-        <p>Paste any supported URL to analyze content and sentiment</p>
+        <h1>SNS URL 분석기</h1>
+        <p>지원하는 URL을 붙여넣어 콘텐츠와 감성을 분석하세요</p>
       </div>
 
       <form className="analyzer-form" onSubmit={handleAnalyze}>
@@ -148,7 +148,7 @@ function URLAnalyzer() {
           )}
         </div>
         <button type="submit" className="analyze-button" disabled={loading || !url.trim()}>
-          {loading ? 'Analyzing...' : 'Analyze'}
+          {loading ? '분석 중...' : '분석'}
         </button>
       </form>
 
@@ -292,7 +292,7 @@ function URLAnalyzer() {
       {loading && (
         <div className="loading-container" aria-live="polite" aria-label="분석 중">
           <div className="loading-spinner" />
-          <p>Analyzing content...</p>
+          <p>콘텐츠 분석 중...</p>
         </div>
       )}
 
@@ -303,8 +303,8 @@ function URLAnalyzer() {
       {history.length > 0 && (
         <div className="analysis-history">
           <div className="history-header">
-            <h3>Recent Analyses</h3>
-            <button className="clear-history-button" onClick={clearHistory} aria-label="분석 기록 전체 삭제">Clear</button>
+            <h3>최근 분석</h3>
+            <button className="clear-history-button" onClick={clearHistory} aria-label="분석 기록 전체 삭제">삭제</button>
           </div>
           <ul>
             {history.map((item, idx) => (

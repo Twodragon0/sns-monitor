@@ -35,8 +35,8 @@ describe('URLAnalyzer', () => {
 
   it('renders the heading and description', () => {
     render(<URLAnalyzer />);
-    expect(screen.getByText('SNS URL Analyzer')).toBeInTheDocument();
-    expect(screen.getByText(/Paste any supported URL/i)).toBeInTheDocument();
+    expect(screen.getByText('SNS URL 분석기')).toBeInTheDocument();
+    expect(screen.getByText(/지원하는 URL을 붙여넣어/i)).toBeInTheDocument();
   });
 
   it('renders URL input field', () => {
@@ -64,14 +64,14 @@ describe('URLAnalyzer', () => {
 
   it('analyze button is disabled when URL is empty', () => {
     render(<URLAnalyzer />);
-    const button = screen.getByRole('button', { name: /Analyze/i });
+    const button = screen.getByRole('button', { name: /분석/i });
     expect(button).toBeDisabled();
   });
 
   it('analyze button is enabled after typing a URL', () => {
     render(<URLAnalyzer />);
     const input = screen.getByRole('textbox', { name: /분석할 URL 입력/i });
-    const button = screen.getByRole('button', { name: /Analyze/i });
+    const button = screen.getByRole('button', { name: /분석/i });
     fireEvent.change(input, { target: { value: 'https://www.youtube.com/watch?v=test' } });
     expect(button).toBeEnabled();
   });
@@ -92,7 +92,7 @@ describe('URLAnalyzer', () => {
     render(<URLAnalyzer />);
     const input = screen.getByRole('textbox', { name: /분석할 URL 입력/i });
     fireEvent.change(input, { target: { value: 'https://www.youtube.com/watch?v=abc' } });
-    fireEvent.submit(screen.getByRole('button', { name: /Analyze/i }).closest('form'));
+    fireEvent.submit(screen.getByRole('button', { name: /분석/i }).closest('form'));
     await waitFor(() => {
       expect(screen.getByRole('alert')).toBeInTheDocument();
     });
@@ -110,7 +110,7 @@ describe('URLAnalyzer', () => {
     const { container } = render(<URLAnalyzer />);
     const input = screen.getByRole('textbox', { name: /분석할 URL 입력/i });
     fireEvent.change(input, { target: { value: 'https://www.youtube.com/watch?v=abc' } });
-    fireEvent.submit(screen.getByRole('button', { name: /Analyze/i }).closest('form'));
+    fireEvent.submit(screen.getByRole('button', { name: /분석/i }).closest('form'));
     await waitFor(() => {
       expect(screen.getByRole('alert')).toBeInTheDocument();
     });
