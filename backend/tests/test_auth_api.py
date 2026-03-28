@@ -28,17 +28,24 @@ class TestAuthAnthropicStart:
     """Tests for GET /api/auth/anthropic."""
 
     def test_redirects_to_claude_oauth(self, client):
-        resp = client.get('/api/auth/anthropic')
+        with patch('app.api.auth._ANTHROPIC_CLIENT_ID', 'test-anthropic-client-id'):
+            resp = client.get('/api/auth/anthropic')
         assert resp.status_code == 302
         location = resp.headers['Location']
         assert 'claude.ai/oauth/authorize' in location
         assert 'code_challenge' in location
         assert 'state=' in location
 
+    def test_returns_503_when_not_configured(self, client):
+        """Without client ID configured, endpoint must return 503."""
+        with patch('app.api.auth._ANTHROPIC_CLIENT_ID', None):
+            resp = client.get('/api/auth/anthropic')
+        assert resp.status_code == 503
+
     def test_stores_pkce_in_session(self, client):
         """Verify PKCE verifier and state are set in session before redirect."""
-        # After the redirect, session should have pkce_verifier and oauth_provider
-        client.get('/api/auth/anthropic')
+        with patch('app.api.auth._ANTHROPIC_CLIENT_ID', 'test-anthropic-client-id'):
+            client.get('/api/auth/anthropic')
         with client.session_transaction() as sess:
             assert 'pkce_verifier' in sess
             assert sess.get('oauth_provider') == 'anthropic'
@@ -48,11 +55,22 @@ class TestAuthOpenaiStart:
     """Tests for GET /api/auth/openai."""
 
     def test_redirects_to_openai_oauth(self, client):
-        resp = client.get('/api/auth/openai')
+        with patch('app.api.auth._OPENAI_CLIENT_ID', 'test-openai-client-id'):
+            resp = client.get('/api/auth/openai')
         assert resp.status_code == 302
         location = resp.headers['Location']
         assert 'auth.openai.com' in location
         assert 'code_challenge' in location
+
+    def test_returns_503_when_not_configured(self, client):
+        """Without client ID configured, endpoint must return 503."""
+        with patch('app.api.auth._OPENAI_CLIENT_ID', None), \
+             patch('app.api.auth.Config') as mock_cfg:
+            mock_cfg.OPENAI_OAUTH_CLIENT_ID = ''
+            mock_cfg.OAUTH_REDIRECT_URI = ''
+            mock_cfg.OAUTH_AUTHORIZE_URL = ''
+            resp = client.get('/api/auth/openai')
+        assert resp.status_code == 503
 
 
 class TestAuthCallback:

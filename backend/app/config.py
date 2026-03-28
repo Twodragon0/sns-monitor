@@ -112,4 +112,11 @@ class Config:
         errors = []
         if not cls.YOUTUBE_API_KEY:
             errors.append("YOUTUBE_API_KEY is not set")
+        _raw_secret = os.environ.get("SECRET_KEY") or os.environ.get("FLASK_SECRET_KEY") or ""
+        if not _raw_secret:
+            logger.warning(
+                "SECRET_KEY is not set — a random key was generated at startup. "
+                "Sessions will NOT persist across restarts. "
+                "Set SECRET_KEY in .env for production deployments."
+            )
         return errors

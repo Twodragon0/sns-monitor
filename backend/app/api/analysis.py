@@ -289,6 +289,7 @@ def get_analysis_graph_data(graph_id):
 
 
 @analysis_bp.route('/api/analysis/report/generate', methods=['POST'])
+@csrf_protect
 @require_analysis_auth
 def generate_analysis_report():
     """Proxy report generation to AI analysis service."""
@@ -456,6 +457,7 @@ def _read_source_items(src_type, src_id):
 
 @analysis_bp.route('/api/analysis/local-summary', methods=['POST'])
 @limiter.limit("10 per minute")
+@csrf_protect
 def local_summary():
     """
     Local analysis: reads crawled data and runs keyword-based sentiment analysis.
@@ -637,6 +639,7 @@ def gallery_compare():
 
 
 @analysis_bp.route('/api/analysis/report/generate-daily', methods=['POST'])
+@csrf_protect
 def generate_daily_report():
     """Generate a daily sentiment report for all galleries.
 
@@ -795,6 +798,7 @@ def llm_status():
 
 @analysis_bp.route('/api/analysis/ai-summary', methods=['POST'])
 @limiter.limit("5 per minute")
+@csrf_protect
 def ai_summary():
     """
     AI-powered analysis using local LLM (Claude or ChatGPT).
@@ -853,6 +857,7 @@ def ai_summary():
 
 @analysis_bp.route('/api/analysis/ai-chat', methods=['POST'])
 @limiter.limit("20 per minute")
+@csrf_protect
 def ai_chat():
     """
     Chat with local LLM about SNS data.
@@ -877,6 +882,8 @@ def ai_chat():
 
     if not message:
         return jsonify({'error': 'Message is required'}), 400
+    if len(message) > 5000:
+        return jsonify({'error': 'Message exceeds maximum length of 5000 characters'}), 400
     if not sources_list:
         return jsonify({'error': 'No data sources specified'}), 400
 
@@ -912,6 +919,7 @@ def ai_chat():
 
 @analysis_bp.route('/api/analysis/ai-url-analyze', methods=['POST'])
 @limiter.limit("5 per minute")
+@csrf_protect
 def ai_url_analyze():
     """
     AI analysis of URL analyzer results (direct pass-through from URLAnalyzer).
@@ -989,6 +997,7 @@ def ai_url_analyze():
 
 @analysis_bp.route('/api/analysis/ai-url-chat', methods=['POST'])
 @limiter.limit("20 per minute")
+@csrf_protect
 def ai_url_chat():
     """
     Chat about URL analysis results with LLM.
@@ -1014,6 +1023,8 @@ def ai_url_chat():
 
     if not message:
         return jsonify({'error': 'Message is required'}), 400
+    if len(message) > 5000:
+        return jsonify({'error': 'Message exceeds maximum length of 5000 characters'}), 400
     if not url_result:
         return jsonify({'error': 'Analysis result is required'}), 400
 

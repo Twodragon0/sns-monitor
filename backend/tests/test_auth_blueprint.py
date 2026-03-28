@@ -37,32 +37,43 @@ class TestAuthAnthropicStart:
     """Tests for GET /api/auth/anthropic."""
 
     def test_redirects_to_anthropic_oauth(self, client):
-        resp = client.get("/api/auth/anthropic")
+        with patch("app.api.auth._ANTHROPIC_CLIENT_ID", "test-anthropic-client-id"):
+            resp = client.get("/api/auth/anthropic")
         assert resp.status_code == 302
         location = resp.headers["Location"]
         assert "claude.ai/oauth/authorize" in location
         assert "code_challenge" in location
         assert "state" in location
 
+    def test_returns_503_when_not_configured(self, client):
+        """Without ANTHROPIC_OAUTH_CLIENT_ID set, must return 503."""
+        with patch("app.api.auth._ANTHROPIC_CLIENT_ID", None):
+            resp = client.get("/api/auth/anthropic")
+        assert resp.status_code == 503
+
     def test_sets_session_oauth_state(self, client):
-        client.get("/api/auth/anthropic")
+        with patch("app.api.auth._ANTHROPIC_CLIENT_ID", "test-anthropic-client-id"):
+            client.get("/api/auth/anthropic")
         with client.session_transaction() as sess:
             assert "oauth_state" in sess
             assert "pkce_verifier" in sess
             assert sess["oauth_provider"] == "anthropic"
 
     def test_valid_return_to_saved_in_session(self, client):
-        client.get("/api/auth/anthropic?return_to=/analysis")
+        with patch("app.api.auth._ANTHROPIC_CLIENT_ID", "test-anthropic-client-id"):
+            client.get("/api/auth/anthropic?return_to=/analysis")
         with client.session_transaction() as sess:
             assert sess["oauth_return_to"] == "/analysis"
 
     def test_invalid_return_to_defaults_to_analysis(self, client):
-        client.get("/api/auth/anthropic?return_to=http://evil.com/phish")
+        with patch("app.api.auth._ANTHROPIC_CLIENT_ID", "test-anthropic-client-id"):
+            client.get("/api/auth/anthropic?return_to=http://evil.com/phish")
         with client.session_transaction() as sess:
             assert sess["oauth_return_to"] == "/analysis"
 
     def test_double_slash_return_to_defaults_to_analysis(self, client):
-        client.get("/api/auth/anthropic?return_to=//evil.com")
+        with patch("app.api.auth._ANTHROPIC_CLIENT_ID", "test-anthropic-client-id"):
+            client.get("/api/auth/anthropic?return_to=//evil.com")
         with client.session_transaction() as sess:
             assert sess["oauth_return_to"] == "/analysis"
 
@@ -71,13 +82,25 @@ class TestAuthOpenAIStart:
     """Tests for GET /api/auth/openai."""
 
     def test_redirects_to_openai_oauth(self, client):
-        resp = client.get("/api/auth/openai")
+        with patch("app.api.auth._OPENAI_CLIENT_ID", "test-openai-client-id"):
+            resp = client.get("/api/auth/openai")
         assert resp.status_code == 302
         location = resp.headers["Location"]
         assert "auth.openai.com/oauth/authorize" in location or "openai" in location.lower()
 
+    def test_returns_503_when_not_configured(self, client):
+        """Without OPENAI_OAUTH_CLIENT_ID set, must return 503."""
+        with patch("app.api.auth._OPENAI_CLIENT_ID", None), \
+             patch("app.api.auth.Config") as mock_cfg:
+            mock_cfg.OPENAI_OAUTH_CLIENT_ID = ""
+            mock_cfg.OAUTH_REDIRECT_URI = ""
+            mock_cfg.OAUTH_AUTHORIZE_URL = ""
+            resp = client.get("/api/auth/openai")
+        assert resp.status_code == 503
+
     def test_sets_session_oauth_provider_openai(self, client):
-        client.get("/api/auth/openai")
+        with patch("app.api.auth._OPENAI_CLIENT_ID", "test-openai-client-id"):
+            client.get("/api/auth/openai")
         with client.session_transaction() as sess:
             assert sess["oauth_provider"] == "openai"
             assert "pkce_verifier" in sess
@@ -86,7 +109,7 @@ class TestAuthOpenAIStart:
         with patch("app.api.auth.Config") as mock_cfg:
             mock_cfg.OAUTH_AUTHORIZE_URL = "https://custom-auth.example.com/oauth"
             mock_cfg.OAUTH_REDIRECT_URI = ""
-            mock_cfg.OPENAI_OAUTH_CLIENT_ID = ""
+            mock_cfg.OPENAI_OAUTH_CLIENT_ID = "test-client-id"
             resp = client.get("/api/auth/openai")
         assert resp.status_code == 302
         assert "custom-auth.example.com" in resp.headers["Location"]
@@ -488,13 +511,15 @@ class TestAuthOpenAIInvalidReturnTo:
     """Test invalid return_to for OpenAI OAuth start (line 158)."""
 
     def test_invalid_return_to_defaults_to_analysis(self, client):
-        resp = client.get("/api/auth/openai?return_to=http://evil.com/steal")
+        with patch("app.api.auth._OPENAI_CLIENT_ID", "test-openai-client-id"):
+            resp = client.get("/api/auth/openai?return_to=http://evil.com/steal")
         assert resp.status_code == 302
         with client.session_transaction() as sess:
             assert sess["oauth_return_to"] == "/analysis"
 
     def test_double_slash_return_to_defaults_to_analysis(self, client):
-        resp = client.get("/api/auth/openai?return_to=//evil.com/path")
+        with patch("app.api.auth._OPENAI_CLIENT_ID", "test-openai-client-id"):
+            resp = client.get("/api/auth/openai?return_to=//evil.com/path")
         assert resp.status_code == 302
         with client.session_transaction() as sess:
             assert sess["oauth_return_to"] == "/analysis"

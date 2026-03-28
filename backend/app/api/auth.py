@@ -18,7 +18,7 @@ from urllib.parse import urlencode, urlparse, quote
 import requests as http_requests
 from flask import request, jsonify, redirect, session
 
-from . import auth_bp
+from . import auth_bp, csrf_protect
 from .. import limiter
 from ..config import Config
 
@@ -26,9 +26,7 @@ logger = logging.getLogger(__name__)
 
 # Anthropic OAuth (Claude Code compatible)
 # redirect_uri MUST be http://localhost:{port}/callback (Claude Code pattern)
-_ANTHROPIC_CLIENT_ID = os.environ.get(
-    "ANTHROPIC_OAUTH_CLIENT_ID", "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
-)
+_ANTHROPIC_CLIENT_ID = os.environ.get("ANTHROPIC_OAUTH_CLIENT_ID") or None
 _ANTHROPIC_AUTHORIZE_URL = "https://claude.ai/oauth/authorize"
 _ANTHROPIC_TOKEN_URL = "https://claude.ai/oauth/token"
 _ANTHROPIC_SCOPES = "org:create_api_key user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload"
@@ -87,6 +85,8 @@ def auth_me():
 @limiter.limit("10 per minute")
 def auth_anthropic_start():
     """Start Anthropic OAuth with PKCE (same flow as Claude Code)."""
+    if not _ANTHROPIC_CLIENT_ID:
+        return jsonify({"error": "Anthropic OAuth is not configured. Set ANTHROPIC_OAUTH_CLIENT_ID."}), 503
     code_verifier = secrets.token_urlsafe(64)[:128]
     code_challenge = urlsafe_b64encode(
         hashlib.sha256(code_verifier.encode("ascii")).digest()
@@ -122,9 +122,7 @@ def auth_anthropic_start():
 # OpenAI OAuth (PKCE)
 # ==========================================
 # OpenAI OAuth (OpenCode / Codex CLI compatible)
-_OPENAI_CLIENT_ID = os.environ.get(
-    "OPENAI_OAUTH_CLIENT_ID", "app_EMoamEEZ73f0CkXaXp7hrann"
-)
+_OPENAI_CLIENT_ID = os.environ.get("OPENAI_OAUTH_CLIENT_ID") or None
 _OPENAI_AUTHORIZE_URL = "https://auth.openai.com/oauth/authorize"
 _OPENAI_TOKEN_URL = "https://auth.openai.com/oauth/token"
 _OPENAI_SCOPES = "openid profile email offline_access"
@@ -143,6 +141,8 @@ def _get_openai_callback_uri():
 def auth_openai_start():
     """Start OpenAI OAuth with PKCE (OpenCode compatible)."""
     client_id = Config.OPENAI_OAUTH_CLIENT_ID or _OPENAI_CLIENT_ID
+    if not client_id:
+        return jsonify({"error": "OpenAI OAuth is not configured. Set OPENAI_OAUTH_CLIENT_ID."}), 503
 
     code_verifier = secrets.token_urlsafe(64)[:128]
     code_challenge = urlsafe_b64encode(
@@ -323,6 +323,7 @@ def _handle_openai_callback(code):
 # ==========================================
 @auth_bp.route("/api/auth/apikey", methods=["POST"])
 @limiter.limit("10 per minute")
+@csrf_protect
 def set_api_key():
     """Store API key in session. Fallback for when OAuth is unavailable."""
     data = request.get_json() or {}
@@ -352,6 +353,7 @@ def set_api_key():
 # Logout
 # ==========================================
 @auth_bp.route("/api/auth/logout", methods=["POST"])
+@csrf_protect
 def auth_logout():
     """Clear session and log out."""
     session.clear()
