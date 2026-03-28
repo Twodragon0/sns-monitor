@@ -175,7 +175,7 @@ test:
 	@echo "🧪 Running tests..."
 	cd backend && python -m pytest tests/ -v --tb=short \
 		--cov=app --cov-report=term-missing \
-		--cov-fail-under=85
+		--cov-fail-under=95
 	@echo "✅ Tests complete!"
 
 test-local:

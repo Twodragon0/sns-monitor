@@ -4,15 +4,15 @@ import { axe } from 'jest-axe';
 import axios from 'axios';
 import App from './App';
 
-jest.mock('axios');
+vi.mock('axios');
 
 beforeEach(() => {
   // Stub axios methods used by child components
-  axios.get = jest.fn().mockResolvedValue({ data: { sources: [], channels: [], galleries: [], creators: [], status: 'idle', api_usage: {} } });
-  axios.post = jest.fn().mockResolvedValue({ data: {} });
+  axios.get = vi.fn().mockResolvedValue({ data: { sources: [], channels: [], galleries: [], creators: [], status: 'idle', api_usage: {} } });
+  axios.post = vi.fn().mockResolvedValue({ data: {} });
 
   // Stub fetch for health check, auth/me, and monitor data endpoints
-  global.fetch = jest.fn().mockResolvedValue({
+  global.fetch = vi.fn().mockResolvedValue({
     ok: true,
     json: async () => ({
       logged_in: false,
@@ -25,7 +25,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  jest.clearAllMocks();
+  vi.clearAllMocks();
 });
 
 describe('App (smoke)', () => {

@@ -11,9 +11,9 @@ RUN npm ci
 # 소스 코드 복사 및 빌드
 COPY frontend/ .
 
-# Docker 사용 시 같은 출처(nginx 프록시)로 요청. .env에 8080이 있어도 빌드에서는 비움.
-ENV REACT_APP_API_URL=""
-RUN sed -i.bak 's/^REACT_APP_API_URL=.*/REACT_APP_API_URL=/' .env 2>/dev/null || true; \
+# Docker 사용 시 같은 출처(nginx 프록시)로 요청. .env에 API URL이 있어도 빌드에서는 비움.
+ENV VITE_API_URL=""
+RUN sed -i.bak 's/^VITE_API_URL=.*/VITE_API_URL=/' .env 2>/dev/null || true; \
     rm -f .env.bak; \
     npm run build
 
@@ -29,7 +29,7 @@ RUN rm -f /etc/nginx/conf.d/default.conf
 COPY docker/nginx-frontend.conf /etc/nginx/conf.d/default.conf
 
 # 빌드된 파일 복사
-COPY --from=builder /app/build /usr/share/nginx/html
+COPY --from=builder /app/dist /usr/share/nginx/html
 
 # 비root 사용자 설정을 위한 디렉토리 권한 설정
 RUN chown -R nginx:nginx /usr/share/nginx/html && \

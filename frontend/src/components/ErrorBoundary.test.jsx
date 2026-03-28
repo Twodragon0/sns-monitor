@@ -13,7 +13,7 @@ function Bomb({ shouldThrow }) {
 
 // Suppress console.error noise from ErrorBoundary.componentDidCatch during tests
 beforeEach(() => {
-  jest.spyOn(console, 'error').mockImplementation(() => {});
+  vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 afterEach(() => {
   console.error.mockRestore();

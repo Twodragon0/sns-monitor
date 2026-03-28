@@ -4,27 +4,27 @@ import { axe } from 'jest-axe';
 import axios from 'axios';
 import URLAnalyzer from './URLAnalyzer';
 
-jest.mock('axios');
+vi.mock('axios');
 
 beforeEach(() => {
-  axios.get = jest.fn().mockResolvedValue({ data: { api_usage: null } });
-  axios.post = jest.fn().mockResolvedValue({ data: {} });
+  axios.get = vi.fn().mockResolvedValue({ data: { api_usage: null } });
+  axios.post = vi.fn().mockResolvedValue({ data: {} });
 
-  global.fetch = jest.fn().mockResolvedValue({
+  global.fetch = vi.fn().mockResolvedValue({
     ok: true,
     json: async () => ({}),
   });
 
   // localStorage stub
   const store = {};
-  jest.spyOn(Storage.prototype, 'getItem').mockImplementation((key) => store[key] ?? null);
-  jest.spyOn(Storage.prototype, 'setItem').mockImplementation((key, val) => { store[key] = val; });
-  jest.spyOn(Storage.prototype, 'removeItem').mockImplementation((key) => { delete store[key]; });
+  vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key) => store[key] ?? null);
+  vi.spyOn(Storage.prototype, 'setItem').mockImplementation((key, val) => { store[key] = val; });
+  vi.spyOn(Storage.prototype, 'removeItem').mockImplementation((key) => { delete store[key]; });
 });
 
 afterEach(() => {
-  jest.clearAllMocks();
-  jest.restoreAllMocks();
+  vi.clearAllMocks();
+  vi.restoreAllMocks();
 });
 
 describe('URLAnalyzer', () => {
@@ -88,7 +88,7 @@ describe('URLAnalyzer', () => {
   });
 
   it('shows error message when API call fails', async () => {
-    axios.post = jest.fn().mockRejectedValue({ message: 'Network Error' });
+    axios.post = vi.fn().mockRejectedValue({ message: 'Network Error' });
     render(<URLAnalyzer />);
     const input = screen.getByRole('textbox', { name: /분석할 URL 입력/i });
     fireEvent.change(input, { target: { value: 'https://www.youtube.com/watch?v=abc' } });
@@ -106,7 +106,7 @@ describe('URLAnalyzer', () => {
   });
 
   it('has no axe violations when showing an error', async () => {
-    axios.post = jest.fn().mockRejectedValue({ message: 'Network Error' });
+    axios.post = vi.fn().mockRejectedValue({ message: 'Network Error' });
     const { container } = render(<URLAnalyzer />);
     const input = screen.getByRole('textbox', { name: /분석할 URL 입력/i });
     fireEvent.change(input, { target: { value: 'https://www.youtube.com/watch?v=abc' } });
