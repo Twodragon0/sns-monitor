@@ -145,15 +145,18 @@ class TestValidOrigin:
         # http://localhost:3000 is also in the default allowed set when no
         # CORS_ORIGINS env var is present.  Force a fresh import without the var.
         import app.api as api_module
-        original = os.environ.pop("CORS_ORIGINS", None)
+        original_cors = os.environ.pop("CORS_ORIGINS", None)
+        original_frontend = os.environ.pop("FRONTEND_URL", None)
         try:
             # Re-evaluate _get_allowed_origins without env var so defaults kick in.
             allowed = api_module._get_allowed_origins()
             assert "http://localhost:3000" in allowed
             assert "http://localhost:3080" in allowed
         finally:
-            if original is not None:
-                os.environ["CORS_ORIGINS"] = original
+            if original_cors is not None:
+                os.environ["CORS_ORIGINS"] = original_cors
+            if original_frontend is not None:
+                os.environ["FRONTEND_URL"] = original_frontend
 
 
 # ---------------------------------------------------------------------------
@@ -346,7 +349,8 @@ class TestCustomCorsOriginsEnvVar:
 
     def test_empty_cors_origins_falls_back_to_defaults(self):
         """An empty CORS_ORIGINS string falls back to the hardcoded defaults."""
-        original = os.environ.get("CORS_ORIGINS")
+        original_cors = os.environ.get("CORS_ORIGINS")
+        original_frontend = os.environ.pop("FRONTEND_URL", None)
         os.environ["CORS_ORIGINS"] = "   "  # whitespace-only counts as empty
         try:
             import app.api as api_module
@@ -354,10 +358,12 @@ class TestCustomCorsOriginsEnvVar:
             assert "http://localhost:3080" in allowed
             assert "http://localhost:3000" in allowed
         finally:
-            if original is None:
+            if original_cors is None:
                 os.environ.pop("CORS_ORIGINS", None)
             else:
-                os.environ["CORS_ORIGINS"] = original
+                os.environ["CORS_ORIGINS"] = original_cors
+            if original_frontend is not None:
+                os.environ["FRONTEND_URL"] = original_frontend
 
 
 # ---------------------------------------------------------------------------
