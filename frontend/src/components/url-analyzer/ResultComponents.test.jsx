@@ -149,7 +149,7 @@ describe('AnalysisResult', () => {
 
   it('shows sentiment analysis section', () => {
     render(<AnalysisResult result={baseResult} />);
-    expect(screen.getByText(/Sentiment Analysis/i)).toBeInTheDocument();
+    expect(screen.getByText(/감성 분석/i)).toBeInTheDocument();
   });
 
   it('shows summary after clicking AI 요약 and API succeeds', async () => {
@@ -204,14 +204,14 @@ describe('AnalysisResult', () => {
     expect(screen.getByText('r/test')).toBeInTheDocument();
   });
 
-  it('falls back to "Analysis Result" title when no identifiable title', () => {
+  it('falls back to "분석 결과" title when no identifiable title', () => {
     const result = {
       platform: 'kakao',
       analysis: null,
       comments: [],
     };
     render(<AnalysisResult result={result} />);
-    expect(screen.getByText('Analysis Result')).toBeInTheDocument();
+    expect(screen.getByText('분석 결과')).toBeInTheDocument();
   });
 
   it('shows reddit blocked hint when fetch_status is blocked', () => {

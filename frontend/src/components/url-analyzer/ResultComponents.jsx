@@ -147,17 +147,17 @@ export function AnalysisResult({ result }) {
       const resp = await axios.post(`${API_BASE}/api/analyze/summarize`, { result: payload }, { timeout: 60000 });
       setSummary(resp.data);
     } catch (err) {
-      const msg = err.response?.data?.error || err.message || 'Summarization failed';
-      setSummaryError(err.response?.status === 413 ? 'Request too large. Payload was trimmed; try again.' : msg);
+      const msg = err.response?.data?.error || err.message || '요약 실패';
+      setSummaryError(err.response?.status === 413 ? '요청이 너무 큽니다. 페이로드가 축소되었습니다. 다시 시도하세요.' : msg);
     } finally {
       setSummaryLoading(false);
     }
   };
 
   const sentimentData = analysis ? [
-    { name: 'Positive', value: analysis.sentiment.positive, color: SENTIMENT_COLORS.positive },
-    { name: 'Neutral', value: analysis.sentiment.neutral, color: SENTIMENT_COLORS.neutral },
-    { name: 'Negative', value: analysis.sentiment.negative, color: SENTIMENT_COLORS.negative },
+    { name: '긍정', value: analysis.sentiment.positive, color: SENTIMENT_COLORS.positive },
+    { name: '중립', value: analysis.sentiment.neutral, color: SENTIMENT_COLORS.neutral },
+    { name: '부정', value: analysis.sentiment.negative, color: SENTIMENT_COLORS.negative },
   ] : [];
 
   const keywordData = analysis?.top_keywords?.slice(0, 10) || [];
@@ -168,7 +168,7 @@ export function AnalysisResult({ result }) {
         <div className="result-platform" style={{ backgroundColor: platform.color }}>
           {platform.name}
         </div>
-        <h2>{result.title || result.gallery_name || result.gallery_id || result.subreddit || result.channel_name || result.username || 'Analysis Result'}</h2>
+        <h2>{result.title || result.gallery_name || result.gallery_id || result.subreddit || result.channel_name || result.username || '분석 결과'}</h2>
         {result.analyzed_at && (
           <span className="result-time">
             {new Date(result.analyzed_at).toLocaleString('ko-KR')}
@@ -233,22 +233,22 @@ export function AnalysisResult({ result }) {
       )}
 
       <div className="result-stats">
-        {result.view_count != null && <StatCard label="Views" value={formatNumber(result.view_count)} />}
-        {result.like_count != null && <StatCard label="Likes" value={formatNumber(result.like_count)} />}
+        {result.view_count != null && <StatCard label="조회" value={formatNumber(result.view_count)} />}
+        {result.like_count != null && <StatCard label="좋아요" value={formatNumber(result.like_count)} />}
         {result.recommend != null && <StatCard label="추천" value={formatNumber(result.recommend)} />}
-        {result.comment_count != null && <StatCard label="Comments" value={formatNumber(result.comment_count)} />}
-        {result.subscriber_count != null && <StatCard label="Subscribers" value={formatNumber(result.subscriber_count)} />}
-        {result.video_count != null && <StatCard label="Videos" value={formatNumber(result.video_count)} />}
-        {result.subscribers != null && <StatCard label="Members" value={formatNumber(result.subscribers)} />}
-        {result.active_users != null && <StatCard label="Active" value={formatNumber(result.active_users)} />}
-        {result.total_posts != null && <StatCard label="Posts" value={formatNumber(result.total_posts)} />}
-        {result.total_messages != null && <StatCard label="Messages" value={formatNumber(result.total_messages)} />}
-        {result.score != null && <StatCard label="Score" value={formatNumber(result.score)} />}
-        {result.follower_count != null && <StatCard label="Followers" value={formatNumber(result.follower_count)} />}
-        {result.following_count != null && <StatCard label="Following" value={formatNumber(result.following_count)} />}
-        {result.tweet_count != null && <StatCard label="Tweets" value={formatNumber(result.tweet_count)} />}
-        {result.retweet_count != null && <StatCard label="Retweets" value={formatNumber(result.retweet_count)} />}
-        {result.reply_count != null && <StatCard label="Replies" value={formatNumber(result.reply_count)} />}
+        {result.comment_count != null && <StatCard label="댓글" value={formatNumber(result.comment_count)} />}
+        {result.subscriber_count != null && <StatCard label="구독" value={formatNumber(result.subscriber_count)} />}
+        {result.video_count != null && <StatCard label="영상" value={formatNumber(result.video_count)} />}
+        {result.subscribers != null && <StatCard label="멤버" value={formatNumber(result.subscribers)} />}
+        {result.active_users != null && <StatCard label="활성" value={formatNumber(result.active_users)} />}
+        {result.total_posts != null && <StatCard label="게시글" value={formatNumber(result.total_posts)} />}
+        {result.total_messages != null && <StatCard label="메시지" value={formatNumber(result.total_messages)} />}
+        {result.score != null && <StatCard label="점수" value={formatNumber(result.score)} />}
+        {result.follower_count != null && <StatCard label="팔로워" value={formatNumber(result.follower_count)} />}
+        {result.following_count != null && <StatCard label="팔로잉" value={formatNumber(result.following_count)} />}
+        {result.tweet_count != null && <StatCard label="트윗" value={formatNumber(result.tweet_count)} />}
+        {result.retweet_count != null && <StatCard label="리트윗" value={formatNumber(result.retweet_count)} />}
+        {result.reply_count != null && <StatCard label="답글" value={formatNumber(result.reply_count)} />}
       </div>
 
       {result.comment_fetch_note && (
@@ -334,7 +334,7 @@ export function AnalysisResult({ result }) {
 
       {analysis && (
         <div className="sentiment-section">
-          <h3>Sentiment Analysis ({analysis.total} items)</h3>
+          <h3>감성 분석 ({analysis.total}건)</h3>
           <div className="charts-row">
             {sentimentData.length > 0 && (
               <div className="chart-container">
@@ -360,7 +360,7 @@ export function AnalysisResult({ result }) {
             )}
             {keywordData.length > 0 && (
               <div className="chart-container">
-                <h4>Top Keywords</h4>
+                <h4>주요 키워드</h4>
                 <ResponsiveContainer width="100%" height={250}>
                   <BarChart data={keywordData} layout="vertical">
                     <XAxis type="number" />
@@ -373,7 +373,9 @@ export function AnalysisResult({ result }) {
             )}
           </div>
           <div className="sentiment-overall">
-            Overall: <span className={`sentiment-${analysis.overall}`}>{analysis.overall}</span>
+            전체 감성: <span className={`sentiment-${analysis.overall}`}>
+              {analysis.overall === 'positive' ? '긍정적' : analysis.overall === 'negative' ? '부정적' : '중립적'}
+            </span>
           </div>
         </div>
       )}
@@ -1114,7 +1116,7 @@ export function GenericItemsAccordion({ items, result }) {
     ? `댓글 (${items.length})`
     : result.replies
       ? `댓글 (${items.length})`
-      : `${result.comments ? 'Comments' : result.recent_videos ? 'Recent Videos' : 'Posts'} (${items.length})`;
+      : `${result.comments ? '댓글' : result.recent_videos ? '최근 영상' : '게시글'} (${items.length})`;
 
   return (
     <div className="items-section">
