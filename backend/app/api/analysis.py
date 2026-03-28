@@ -13,7 +13,7 @@ from pathlib import Path
 import requests
 from flask import request, jsonify, session
 
-from . import analysis_bp
+from . import analysis_bp, csrf_protect
 from .auth import require_analysis_auth
 from .. import limiter
 from ..config import Config
@@ -30,9 +30,12 @@ def _mirofish_headers():
     """Forward OpenAI OAuth access token to AI analysis service so it can call OpenAI API without LLM_API_KEY."""
     headers = {}
     token = session.get('access_token')
-    if token:
+    # Validate: must be a non-empty string containing no newlines (header-injection guard).
+    if isinstance(token, str) and token.strip() and "\n" not in token and "\r" not in token:
         headers['Authorization'] = f'Bearer {token}'
         headers['X-OpenAI-Access-Token'] = token  # service can use either header
+    elif token is not None:
+        logger.warning("Ignoring invalid access_token type in session: %s", type(token).__name__)
     return headers
 
 
@@ -143,6 +146,7 @@ def analysis_status():
 
 @analysis_bp.route('/api/analysis/transform', methods=['POST'])
 @limiter.limit("5 per minute")
+@csrf_protect
 @require_analysis_auth
 def transform_sns_data():
     """
@@ -234,6 +238,7 @@ def transform_sns_data():
 
 
 @analysis_bp.route('/api/analysis/graph/build', methods=['POST'])
+@csrf_protect
 @require_analysis_auth
 def build_analysis_graph():
     """Proxy graph build request to AI analysis service."""
@@ -318,6 +323,7 @@ def get_analysis_report(report_id):
 
 @analysis_bp.route('/api/analysis/report/chat', methods=['POST'])
 @limiter.limit("20 per minute")
+@csrf_protect
 @require_analysis_auth
 def chat_with_analysis():
     """Proxy chat with AI analysis ReportAgent."""

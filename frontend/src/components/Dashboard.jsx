@@ -9,6 +9,7 @@ import {
 import {
   OverviewPanel, YouTubePanel,
   DCInsidePanel, TwitterPanel, SocialPanel,
+  ScanHistoryPanel,
 } from './dashboard/MonitorPanels';
 import { AnalysisResult } from './dashboard/AnalysisResult';
 import { formatNumber } from './url-analyzer/ResultComponents';
@@ -133,16 +134,15 @@ function Dashboard({ onShowError }) {
       }, ...prev.filter(h => h.url !== trimmed).slice(0, 19)]);
     } catch (err) {
       const msg = err.response?.data?.error || err.message || '분석 실패';
-      const isConnectionError =
-        !err.response &&
-        (err.code === 'ERR_NETWORK' ||
-          err.message === 'Network Error' ||
-          err.code === 'ECONNABORTED');
-      setAnalysisError(
-        isConnectionError
-          ? 'API 서버에 연결할 수 없습니다. Docker를 실행했는지 확인해 주세요. (docker-compose up -d)'
-          : msg
-      );
+      if (!err.response && err.code === 'ECONNABORTED') {
+        setAnalysisError('요청 시간이 초과되었습니다. URL 대상의 데이터가 너무 크거나 서버가 응답하지 않습니다. 잠시 후 다시 시도해 주세요.');
+      } else if (!err.response && (err.code === 'ERR_NETWORK' || err.message === 'Network Error')) {
+        setAnalysisError('API 서버에 연결할 수 없습니다. Docker를 실행했는지 확인해 주세요. (docker-compose up -d)');
+      } else if (err.response?.status === 429) {
+        setAnalysisError('요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.');
+      } else {
+        setAnalysisError(msg);
+      }
     } finally {
       setAnalysisLoading(false);
     }
@@ -358,6 +358,14 @@ function Dashboard({ onShowError }) {
             </>
           )}
         </div>
+      </section>
+
+      {/* ===== SCAN HISTORY ===== */}
+      <section className="dash__scan-history" aria-labelledby="scan-history-title">
+        <h2 id="scan-history-title" className="dash__section-title" style={{ fontSize: '1rem', marginBottom: 14 }}>
+          스캔 기록
+        </h2>
+        <ScanHistoryPanel />
       </section>
 
       {/* ===== CREATOR LINKS ===== */}

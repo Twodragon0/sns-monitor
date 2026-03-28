@@ -454,6 +454,204 @@ export function SocialPanel() {
   );
 }
 
+/* --- Scan History helpers --- */
+function buildPageNums(page, totalPages) {
+  const near = new Set(
+    [1, totalPages, page - 1, page, page + 1].filter(n => n >= 1 && n <= totalPages)
+  );
+  const sorted = [...near].sort((a, b) => a - b);
+  const result = [];
+  sorted.forEach((n, i) => {
+    if (i > 0 && n - sorted[i - 1] > 1) result.push('…');
+    result.push(n);
+  });
+  return result;
+}
+
+function ScanPagination({ page, totalPages, loading, onPage }) {
+  const pageNums = buildPageNums(page, totalPages);
+  return (
+    <div className="scan-history__pagination">
+      <button
+        className="scan-history__page-btn"
+        onClick={() => onPage(p => Math.max(1, p - 1))}
+        disabled={page <= 1 || loading}
+      >
+        이전
+      </button>
+      {pageNums.map((n, i) =>
+        n === '…'
+          ? <span key={`gap-${i}`} className="scan-history__page-ellipsis">…</span>
+          : <button
+              key={n}
+              className={`scan-history__page-btn${page === n ? ' scan-history__page-btn--active' : ''}`}
+              onClick={() => onPage(n)}
+              disabled={loading}
+            >
+              {n}
+            </button>
+      )}
+      <button
+        className="scan-history__page-btn"
+        onClick={() => onPage(p => Math.min(totalPages, p + 1))}
+        disabled={page >= totalPages || loading}
+      >
+        다음
+      </button>
+    </div>
+  );
+}
+
+/* --- Scan History Panel --- */
+const SCAN_PLATFORMS = [
+  { value: '', label: '전체 플랫폼' },
+  { value: 'youtube',    label: 'YouTube' },
+  { value: 'dcinside',   label: 'DCInside' },
+  { value: 'reddit',     label: 'Reddit' },
+  { value: 'telegram',   label: 'Telegram' },
+  { value: 'kakao',      label: 'Kakao' },
+  { value: 'naver_cafe', label: '네이버 카페' },
+  { value: 'twitter',    label: 'X (Twitter)' },
+  { value: 'threads',    label: 'Threads' },
+];
+
+export function ScanHistoryPanel() {
+  const [scans, setScans] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [platform, setPlatform] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const LIMIT = 10;
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    const params = new URLSearchParams({ page, limit: LIMIT });
+    if (platform) params.set('platform', platform);
+    fetch(`${API_BASE}/api/scans?${params}`)
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then(data => {
+        if (cancelled) return;
+        setScans(data.scans || []);
+        setTotal(data.total || 0);
+      })
+      .catch(err => {
+        if (!cancelled) setError(err.message);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [page, platform]);
+
+  const totalPages = Math.max(1, Math.ceil(total / LIMIT));
+
+  function handlePlatformChange(e) {
+    setPlatform(e.target.value);
+    setPage(1);
+  }
+
+  function formatDate(val) {
+    if (!val) return '—';
+    try {
+      return new Date(val).toLocaleString('ko-KR', {
+        month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit',
+      });
+    } catch {
+      return val;
+    }
+  }
+
+  return (
+    <div className="scan-history">
+      <div className="scan-history__toolbar">
+        <div className="scan-history__meta">
+          {loading
+            ? <span className="scan-history__count">로딩 중…</span>
+            : <span className="scan-history__count">총 <strong>{total.toLocaleString()}</strong>건</span>
+          }
+          {totalPages > 1 && (
+            <span className="scan-history__page-info">{page} / {totalPages} 페이지</span>
+          )}
+        </div>
+        <select
+          className="scan-history__filter"
+          value={platform}
+          onChange={handlePlatformChange}
+          aria-label="플랫폼 필터"
+        >
+          {SCAN_PLATFORMS.map(p => (
+            <option key={p.value} value={p.value}>{p.label}</option>
+          ))}
+        </select>
+      </div>
+
+      {error && (
+        <div className="scan-history__error" role="alert">
+          데이터를 불러오지 못했습니다: {error}
+        </div>
+      )}
+
+      {!loading && !error && scans.length === 0 && (
+        <div className="scan-history__empty">
+          <span aria-hidden="true">📭</span>
+          <p>스캔 기록이 없습니다.</p>
+        </div>
+      )}
+
+      {scans.length > 0 && (
+        <ul className="scan-history__list">
+          {scans.map((scan, i) => {
+            const pInfo = PLATFORMS[scan.platform] || { label: scan.platform, color: '#6b7280', icon: '🔗' };
+            return (
+              <li key={scan.id || i} className="scan-history__item">
+                <span
+                  className="scan-history__platform-badge"
+                  style={{ background: pInfo.color }}
+                  title={pInfo.label}
+                >
+                  {pInfo.icon} {pInfo.label}
+                </span>
+                <div className="scan-history__item-body">
+                  <span className="scan-history__item-title">
+                    {scan.title || scan.url || '(제목 없음)'}
+                  </span>
+                  {scan.url && scan.url !== scan.title && (
+                    <a
+                      href={scan.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="scan-history__item-url"
+                    >
+                      {scan.url}
+                    </a>
+                  )}
+                </div>
+                <span className="scan-history__item-time">{formatDate(scan.analyzed_at || scan.created_at)}</span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {totalPages > 1 && (
+        <ScanPagination
+          page={page}
+          totalPages={totalPages}
+          loading={loading}
+          onPage={setPage}
+        />
+      )}
+    </div>
+  );
+}
+
 export function EmptyHint({ title, description, text }) {
   const heading = title || '데이터 없음';
   const body = description || text || '상단 URL 검색으로 즉시 분석할 수 있습니다.';

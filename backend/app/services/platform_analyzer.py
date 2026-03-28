@@ -427,7 +427,15 @@ class PlatformAnalyzer(
                 pipe = self._redis.pipeline()
                 pipe.incr(rkey)
                 pipe.expire(rkey, ttl)
-                pipe.execute()
+                results = pipe.execute()
+                # Validate that both commands succeeded (neither returned None/False).
+                # pipeline() without raise_on_error=True swallows per-command errors;
+                # a None result indicates the command did not complete successfully.
+                if results is None or len(results) < 2 or results[0] is None:
+                    logger.warning(
+                        "Redis pipeline partial failure for rate key %s: %s",
+                        rkey, results,
+                    )
                 return
             except Exception:
                 pass

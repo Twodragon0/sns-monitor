@@ -1499,3 +1499,214 @@
   .dash__stats { grid-template-columns: 1fr; }
   .dash__creator-grid { grid-template-columns: 1fr; }
 }
+
+/* ===== Scan History ===== */
+.dash__scan-history {
+  background: var(--c-surface);
+  border-radius: var(--radius);
+  padding: 24px;
+  box-shadow: var(--shadow-md);
+}
+
+.scan-history__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.scan-history__meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.scan-history__count {
+  font-size: 0.85rem;
+  color: var(--c-text-secondary);
+}
+
+.scan-history__count strong {
+  color: var(--c-primary);
+  font-weight: 700;
+}
+
+.scan-history__page-info {
+  font-size: 0.78rem;
+  color: var(--c-text-secondary);
+}
+
+.scan-history__filter {
+  padding: 7px 12px;
+  border: 1px solid var(--c-border);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  background: var(--c-bg);
+  color: var(--c-text);
+  cursor: pointer;
+  outline: none;
+}
+
+.scan-history__filter:focus {
+  border-color: var(--c-primary);
+  box-shadow: 0 0 0 2px rgba(2, 83, 254, 0.1);
+}
+
+.scan-history__error {
+  padding: 10px 14px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  color: var(--c-danger);
+  font-size: 0.85rem;
+  margin-bottom: 12px;
+}
+
+.scan-history__empty {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px;
+  background: var(--c-bg);
+  border: 1px dashed var(--c-border);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: var(--c-text-secondary);
+}
+
+.scan-history__list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.scan-history__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--c-border);
+  transition: background 0.12s;
+}
+
+.scan-history__item:last-child {
+  border-bottom: none;
+}
+
+.scan-history__item:hover {
+  background: var(--c-bg);
+  border-radius: 8px;
+}
+
+.scan-history__platform-badge {
+  flex-shrink: 0;
+  padding: 3px 8px;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  margin-top: 2px;
+}
+
+.scan-history__item-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.scan-history__item-title {
+  font-size: 0.87rem;
+  font-weight: 600;
+  color: var(--c-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scan-history__item-url {
+  font-size: 0.72rem;
+  color: var(--c-primary);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scan-history__item-url:hover {
+  text-decoration: underline;
+}
+
+.scan-history__item-time {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  color: var(--c-text-secondary);
+  white-space: nowrap;
+  margin-top: 4px;
+}
+
+/* Pagination */
+.scan-history__pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+}
+
+.scan-history__page-btn {
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  color: var(--c-text);
+  background: var(--c-bg);
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  font-family: inherit;
+}
+
+.scan-history__page-btn:hover:not(:disabled) {
+  color: var(--c-primary);
+  border-color: var(--c-primary);
+}
+
+.scan-history__page-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.scan-history__page-btn--active {
+  background: var(--c-primary);
+  color: #fff;
+  border-color: var(--c-primary);
+  font-weight: 700;
+}
+
+.scan-history__page-btn--active:hover:not(:disabled) {
+  color: #fff;
+}
+
+.scan-history__page-ellipsis {
+  padding: 6px 4px;
+  font-size: 0.82rem;
+  color: var(--c-text-secondary);
+  user-select: none;
+}
+
+@media (max-width: 480px) {
+  .scan-history__toolbar { flex-direction: column; align-items: flex-start; }
+  .scan-history__filter { width: 100%; }
+  .scan-history__item { flex-wrap: wrap; }
+  .scan-history__item-time { width: 100%; margin-top: 2px; }
+}

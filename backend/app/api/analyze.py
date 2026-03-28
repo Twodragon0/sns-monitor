@@ -7,7 +7,7 @@ GET  /api/platforms   - List supported platforms
 import logging
 from flask import request, jsonify, session
 
-from . import analyze_bp
+from . import analyze_bp, csrf_protect
 from .. import limiter
 from ..config import Config
 
@@ -32,6 +32,7 @@ MAX_ANALYZE_URL_LENGTH = 2048
 
 @analyze_bp.route("/api/analyze/url", methods=["POST"])
 @limiter.limit("30 per minute")
+@csrf_protect
 def analyze_url():
     """Analyze content from any supported platform URL."""
     data = request.get_json(silent=True)
@@ -64,6 +65,7 @@ def analyze_url():
 
 @analyze_bp.route("/api/analyze/summarize", methods=["POST"])
 @limiter.limit("10 per minute")
+@csrf_protect
 def summarize_analysis():
     """Summarize analysis results using AI service."""
     data = request.get_json(silent=True)
@@ -187,11 +189,16 @@ def summarize_analysis():
     # 2) Local LLM (Claude / ChatGPT via API key or OAuth token)
     try:
         from ..services.llm_analyzer import summarize_with_llm
+
+        def _str_or_none(val):
+            """Return val only if it is a non-empty string, else None."""
+            return val if isinstance(val, str) and val.strip() else None
+
         llm_kwargs = {
-            'oauth_token': session.get('access_token'),
-            'token_provider': session.get('token_provider'),
-            'session_api_key': session.get('session_api_key'),
-            'session_api_provider': session.get('session_api_provider'),
+            'oauth_token': _str_or_none(session.get('access_token')),
+            'token_provider': _str_or_none(session.get('token_provider')),
+            'session_api_key': _str_or_none(session.get('session_api_key')),
+            'session_api_provider': _str_or_none(session.get('session_api_provider')),
         }
         llm_result = summarize_with_llm(document, **llm_kwargs)
         if llm_result and llm_result.get("summary"):
