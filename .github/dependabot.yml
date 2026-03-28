@@ -36,9 +36,45 @@ updates:
           - "minor"
           - "patch"
 
-  # Python dependencies (crawlers)
+  # Python dependencies (crawlers/youtube)
   - package-ecosystem: "pip"
-    directory: "/crawlers"
+    directory: "/crawlers/youtube"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "python"
+    commit-message:
+      prefix: "chore(deps):"
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Python dependencies (crawlers/dcinside)
+  - package-ecosystem: "pip"
+    directory: "/crawlers/dcinside"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "python"
+    commit-message:
+      prefix: "chore(deps):"
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Python dependencies (crawlers/naver_cafe)
+  - package-ecosystem: "pip"
+    directory: "/crawlers/naver_cafe"
     schedule:
       interval: "weekly"
       day: "monday"
