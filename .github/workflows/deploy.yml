@@ -63,13 +63,17 @@ jobs:
         run: |
           ENV="${INPUT_ENVIRONMENT:-dev}"
           if [ "$ENV" == "prod" ]; then
-            echo "cluster=prod-cluster" >> $GITHUB_OUTPUT
-            echo "values_file=values-production.yaml" >> $GITHUB_OUTPUT
-            echo "environment=prod" >> $GITHUB_OUTPUT
+            {
+              echo "cluster=prod-cluster"
+              echo "values_file=values-production.yaml"
+              echo "environment=prod"
+            } >> "$GITHUB_OUTPUT"
           else
-            echo "cluster=dev-cluster" >> $GITHUB_OUTPUT
-            echo "values_file=values.yaml" >> $GITHUB_OUTPUT
-            echo "environment=dev" >> $GITHUB_OUTPUT
+            {
+              echo "cluster=dev-cluster"
+              echo "values_file=values.yaml"
+              echo "environment=dev"
+            } >> "$GITHUB_OUTPUT"
           fi
 
       - name: Configure AWS Credentials (OIDC)
@@ -149,9 +153,9 @@ jobs:
           INPUT_IMAGE_TAG: ${{ github.event.inputs.image_tag }}
         run: |
           if [ -n "$INPUT_IMAGE_TAG" ]; then
-            echo "tag=$INPUT_IMAGE_TAG" >> $GITHUB_OUTPUT
+            echo "tag=$INPUT_IMAGE_TAG" >> "$GITHUB_OUTPUT"
           else
-            echo "tag=${{ github.sha }}" >> $GITHUB_OUTPUT
+            echo "tag=${{ github.sha }}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Deploy with Helm (dry-run)
