@@ -671,7 +671,7 @@ function AnalysisTab() {
               <h4>개체 ({report.data.nodes?.length || 0})</h4>
               <div style={{ maxHeight: '400px', overflow: 'auto' }}>
                 {(report.data.nodes || []).map((node, i) => (
-                  <div key={i} style={{
+                  <div key={node.id || node.name || i} style={{
                     padding: '8px',
                     marginBottom: '4px',
                     backgroundColor: '#f8f9fa',
@@ -688,7 +688,7 @@ function AnalysisTab() {
               <h4>관계 ({report.data.edges?.length || 0})</h4>
               <div style={{ maxHeight: '400px', overflow: 'auto' }}>
                 {(report.data.edges || []).map((edge, i) => (
-                  <div key={i} style={{
+                  <div key={edge.source && edge.target ? `${edge.source}-${edge.target}-${i}` : i} style={{
                     padding: '8px',
                     marginBottom: '4px',
                     backgroundColor: '#f0f7ff',
@@ -737,7 +737,7 @@ function AnalysisTab() {
               </p>
             )}
             {chatMessages.map((msg, i) => (
-              <div key={i} style={{
+              <div key={`${msg.role}-${i}`} style={{
                 padding: '8px 12px',
                 marginBottom: '8px',
                 borderRadius: '8px',

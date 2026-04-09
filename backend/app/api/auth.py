@@ -44,6 +44,23 @@ def require_analysis_auth(f):
     return wrapped
 
 
+def _is_safe_redirect(url):
+    """Validate redirect target to prevent open redirect attacks."""
+    if not url or not isinstance(url, str):
+        return False
+    url = url.strip()
+    if not url.startswith("/"):
+        return False
+    if url.startswith("//") or url.startswith("/\\"):
+        return False
+    parsed = urlparse(url)
+    if parsed.netloc or parsed.scheme:
+        return False
+    if any(c < ' ' for c in url):
+        return False
+    return True
+
+
 def _oauth_configured():
     return bool(Config.OPENAI_OAUTH_CLIENT_ID)
 
@@ -98,8 +115,7 @@ def auth_anthropic_start():
     session["oauth_provider"] = "anthropic"
 
     return_to = request.args.get("return_to", "").strip() or "/analysis"
-    parsed = urlparse(return_to)
-    if return_to.startswith("/") and not return_to.startswith("//") and not parsed.netloc:
+    if _is_safe_redirect(return_to):
         session["oauth_return_to"] = return_to
     else:
         session["oauth_return_to"] = "/analysis"
@@ -155,8 +171,7 @@ def auth_openai_start():
     session["oauth_provider"] = "openai"
 
     return_to = request.args.get("return_to", "").strip() or "/analysis"
-    parsed = urlparse(return_to)
-    if return_to.startswith("/") and not return_to.startswith("//") and not parsed.netloc:
+    if _is_safe_redirect(return_to):
         session["oauth_return_to"] = return_to
     else:
         session["oauth_return_to"] = "/analysis"

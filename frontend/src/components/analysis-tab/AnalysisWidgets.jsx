@@ -63,7 +63,7 @@ export function WordCloudAndCompare({ keywords }) {
                 const size = Math.max(12, Math.round(ratio * 32 + 10));
                 const colors = ['#1d4ed8', '#7c3aed', '#0891b2', '#059669', '#d97706', '#dc2626', '#6366f1', '#0d9488'];
                 return (
-                  <span key={i} style={{
+                  <span key={kw.word} style={{
                     fontSize: `${size}px`,
                     fontWeight: ratio > 0.5 ? 700 : 400,
                     color: colors[i % colors.length],

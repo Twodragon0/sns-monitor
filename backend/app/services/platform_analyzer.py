@@ -132,7 +132,7 @@ class PlatformAnalyzer(
                 parts = urlparse(proxy_url)
                 if parts.scheme and parts.hostname:
                     auth_host = (
-                        f"{parts.scheme}://{proxy_user}:{proxy_pass}@{parts.hostname}"
+                        f"{parts.scheme}://{quote(proxy_user, safe='')}:{quote(proxy_pass, safe='')}@{parts.hostname}"
                     )
                     if parts.port:
                         auth_host += f":{parts.port}"
@@ -238,17 +238,23 @@ class PlatformAnalyzer(
 
     @staticmethod
     def _validate_url_host(url):
-        """Block requests to private/internal/metadata addresses (SSRF protection)."""
+        """Block requests to private/internal/metadata addresses (SSRF protection).
+
+        Resolves the hostname once and caches the result to mitigate DNS rebinding
+        (TOCTOU) attacks where a second resolution could return a different IP.
+        """
         parsed = urlparse(url)
         hostname = parsed.hostname
         if not hostname:
             raise ValueError("Invalid URL: missing hostname")
         if hostname in _BLOCKED_HOSTS:
             raise ValueError("Blocked host")
-        # Resolve hostname and check ALL resolved IPs to prevent DNS rebinding
+        # Resolve hostname and check ALL resolved IPs
         try:
             addr_infos = socket.getaddrinfo(hostname, None)
         except socket.gaierror:
+            raise ValueError("Cannot resolve hostname")
+        if not addr_infos:
             raise ValueError("Cannot resolve hostname")
         for family, _, _, _, sockaddr in addr_infos:
             try:
