@@ -218,12 +218,14 @@ jobs:
           CLUSTER_NAME: ${{ steps.env.outputs.cluster }}
           IMAGE_TAG: ${{ steps.image_tag.outputs.tag }}
         run: |
-          echo "## 🎉 Deployment Complete" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Environment | $ENVIRONMENT |" >> $GITHUB_STEP_SUMMARY
-          echo "| Cluster | $CLUSTER_NAME |" >> $GITHUB_STEP_SUMMARY
-          echo "| Namespace | ${{ env.NAMESPACE }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Image Tag | $IMAGE_TAG |" >> $GITHUB_STEP_SUMMARY
-          echo "| Release | ${{ env.HELM_RELEASE_NAME }} |" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## Deployment Complete"
+            echo ""
+            echo "| Item | Value |"
+            echo "|------|-------|"
+            echo "| Environment | $ENVIRONMENT |"
+            echo "| Cluster | $CLUSTER_NAME |"
+            echo "| Namespace | ${{ env.NAMESPACE }} |"
+            echo "| Image Tag | $IMAGE_TAG |"
+            echo "| Release | ${{ env.HELM_RELEASE_NAME }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
