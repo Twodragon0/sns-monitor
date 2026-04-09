@@ -210,14 +210,16 @@ jobs:
     steps:
       - name: Generate summary
         run: |
-          echo "## 🐳 Docker Build Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Image | Status | Platforms |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------|--------|-----------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Frontend | ${{ needs.build-frontend.result == 'success' && '✅' || '❌' }} | amd64, arm64 |" >> $GITHUB_STEP_SUMMARY
-          echo "| API Backend | ${{ needs.build-api-backend.result == 'success' && '✅' || '❌' }} | amd64, arm64 |" >> $GITHUB_STEP_SUMMARY
-          echo "| YouTube Crawler | ${{ needs.build-youtube-crawler.result == 'success' && '✅' || '❌' }} | amd64, arm64 |" >> $GITHUB_STEP_SUMMARY
-          echo "| DCInside Crawler | ${{ needs.build-dcinside-crawler.result == 'success' && '✅' || '❌' }} | amd64, arm64 |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Registry:** \`ghcr.io/${{ github.repository_owner }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## Docker Build Results"
+            echo ""
+            echo "| Image | Status | Platforms |"
+            echo "|-------|--------|-----------|"
+            echo "| Frontend | ${{ needs.build-frontend.result == 'success' && 'pass' || 'fail' }} | amd64, arm64 |"
+            echo "| API Backend | ${{ needs.build-api-backend.result == 'success' && 'pass' || 'fail' }} | amd64, arm64 |"
+            echo "| YouTube Crawler | ${{ needs.build-youtube-crawler.result == 'success' && 'pass' || 'fail' }} | amd64, arm64 |"
+            echo "| DCInside Crawler | ${{ needs.build-dcinside-crawler.result == 'success' && 'pass' || 'fail' }} | amd64, arm64 |"
+            echo ""
+            echo "**Registry:** \`ghcr.io/${{ github.repository_owner }}\`"
+            echo "**Commit:** \`${{ github.sha }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

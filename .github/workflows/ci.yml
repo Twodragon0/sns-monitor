@@ -68,7 +68,7 @@ jobs:
         run: npm audit --audit-level=high
 
       - name: Test
-        run: npm test -- --watchAll=false --ci
+        run: npm test
         env:
           CI: true
 
@@ -101,9 +101,11 @@ jobs:
     steps:
       - name: Generate summary
         run: |
-          echo "## CI Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Backend Tests | ${{ needs.backend-tests.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Frontend Build | ${{ needs.frontend-build.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## CI Results"
+            echo ""
+            echo "| Check | Status |"
+            echo "|-------|--------|"
+            echo "| Backend Tests | ${{ needs.backend-tests.result == 'success' && 'pass' || 'fail' }} |"
+            echo "| Frontend Build | ${{ needs.frontend-build.result == 'success' && 'pass' || 'fail' }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
