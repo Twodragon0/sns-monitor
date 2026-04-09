@@ -255,7 +255,7 @@ function Dashboard({ onShowError }) {
             <ul className="dash__history-list">
               {history.slice(0, 6).map((h, i) => (
                 <li
-                  key={i}
+                  key={h.url || i}
                   className="dash__history-item"
                   onClick={() => {
                     setUrl(h.url);
@@ -377,7 +377,7 @@ function Dashboard({ onShowError }) {
               const handle = c.youtube_channel?.replace('@', '') || `creator-${i}`;
               return (
                 <a
-                  key={i}
+                  key={c.name || handle}
                   className="dash__creator-card"
                   href={`/creator/${handle}`}
                   onClick={e => {

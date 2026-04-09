@@ -30,8 +30,8 @@ def _mirofish_headers():
     """Forward OpenAI OAuth access token to AI analysis service so it can call OpenAI API without LLM_API_KEY."""
     headers = {}
     token = session.get('access_token')
-    # Validate: must be a non-empty string containing no newlines (header-injection guard).
-    if isinstance(token, str) and token.strip() and "\n" not in token and "\r" not in token:
+    # Validate: must be a non-empty ASCII string with no control characters (header-injection guard).
+    if isinstance(token, str) and token.strip() and all(c >= ' ' and c <= '~' for c in token):
         headers['Authorization'] = f'Bearer {token}'
         headers['X-OpenAI-Access-Token'] = token  # service can use either header
     elif token is not None:
@@ -225,7 +225,12 @@ def transform_sns_data():
         for tmp_path in temp_files:
             os.unlink(tmp_path)
 
-        result = resp.json()
+        if resp.status_code != 200:
+            logger.warning("MiroFish returned %d: %s", resp.status_code, resp.text[:200])
+        try:
+            result = resp.json()
+        except ValueError:
+            return jsonify({'error': 'Invalid response from AI analysis service'}), 502
         return jsonify(result), resp.status_code
 
     except requests.ConnectionError:
@@ -559,12 +564,13 @@ def sentiment_trend():
 
                 if items:
                     sentiment = analyzer._analyze_sentiment(items)
+                    s = sentiment.get('sentiment', {})
                     trend.append({
                         'timestamp': ts,
-                        'total': sentiment['total'],
-                        'positive': sentiment['sentiment']['positive'],
-                        'neutral': sentiment['sentiment']['neutral'],
-                        'negative': sentiment['sentiment']['negative'],
+                        'total': sentiment.get('total', 0),
+                        'positive': s.get('positive', 0),
+                        'neutral': s.get('neutral', 0),
+                        'negative': s.get('negative', 0),
                         'keywords': [k['word'] for k in sentiment.get('top_keywords', [])[:5]],
                     })
             except Exception as e:

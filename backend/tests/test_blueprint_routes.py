@@ -234,8 +234,9 @@ class TestDashboardStats:
 class TestDCInsideBlueprintExtra:
     """Extra coverage for dcinside.py uncovered paths."""
 
+    @patch('app.api.dcinside._discover_gallery_ids', return_value=['test-gallery'])
     @patch('app.api.dcinside._load_gallery_data_local')
-    def test_galleries_with_data(self, mock_load, client):
+    def test_galleries_with_data(self, mock_load, mock_discover, client):
         """galleries route processes posts with comments."""
         mock_load.return_value = (
             [
@@ -454,8 +455,9 @@ class TestDCInsideBlueprintErrorPaths:
             result = _load_gallery_data_local("testgal2")
         assert result[0] == []  # no posts loaded
 
+    @patch('app.api.dcinside._discover_gallery_ids', return_value=['test-gallery'])
     @patch('app.api.dcinside._load_gallery_data_local')
-    def test_galleries_with_total_comments_redistribution(self, mock_load, client):
+    def test_galleries_with_total_comments_redistribution(self, mock_load, mock_discover, client):
         """galleries redistributes avg comments when posts have no comments (lines 189-195)."""
         mock_load.return_value = (
             [

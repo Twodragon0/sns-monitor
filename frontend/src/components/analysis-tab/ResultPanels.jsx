@@ -55,7 +55,7 @@ export function LocalResultPanel({ localResult }) {
           <h4 style={{ margin: '0 0 10px', fontSize: '14px', color: '#555' }}>주요 키워드</h4>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
             {localResult.overall.top_keywords.slice(0, 15).map((kw, i) => (
-              <span key={i} style={{
+              <span key={kw.word} style={{
                 padding: '4px 10px', borderRadius: '12px',
                 backgroundColor: i < 3 ? '#dbeafe' : '#f1f5f9',
                 color: i < 3 ? '#1d4ed8' : '#475569',
@@ -74,7 +74,7 @@ export function LocalResultPanel({ localResult }) {
           <h4 style={{ margin: '0 0 10px', fontSize: '14px', color: '#555' }}>소스별 분석</h4>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             {localResult.sources.map((src, i) => (
-              <div key={i} style={{
+              <div key={src.name ? `${src.type}-${src.name}` : i} style={{
                 flex: '1 1 280px', padding: '12px',
                 backgroundColor: '#f8f9fa', borderRadius: '6px',
                 border: '1px solid #e2e8f0',
@@ -180,7 +180,7 @@ export function AiResultPanel({ aiResult }) {
           <h4 style={{ margin: '0 0 10px', fontSize: '14px', color: '#555' }}>주요 토픽</h4>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
             {aiResult.topics.map((t, i) => (
-              <div key={i} style={{
+              <div key={t.topic ? `${t.topic}-${i}` : i} style={{
                 padding: '8px 14px', borderRadius: '8px',
                 backgroundColor: i < 3 ? '#dbeafe' : '#f1f5f9',
                 border: `1px solid ${i < 3 ? '#93c5fd' : '#e2e8f0'}`,
@@ -202,7 +202,7 @@ export function AiResultPanel({ aiResult }) {
         <div style={{ marginBottom: '16px' }}>
           <h4 style={{ margin: '0 0 10px', fontSize: '14px', color: '#555' }}>주요 의견</h4>
           {aiResult.key_opinions.map((op, i) => (
-            <div key={i} style={{
+            <div key={op.text ? `${op.text.slice(0,20)}-${i}` : i} style={{
               padding: '10px 14px', marginBottom: '6px', borderRadius: '6px',
               backgroundColor: op.type === 'positive' ? '#f0fdf4' : op.type === 'negative' ? '#fef2f2' : '#f8f9fa',
               borderLeft: `3px solid ${op.type === 'positive' ? '#10b981' : op.type === 'negative' ? '#ef4444' : '#9ca3af'}`,
@@ -220,7 +220,7 @@ export function AiResultPanel({ aiResult }) {
         <div>
           <h4 style={{ margin: '0 0 10px', fontSize: '14px', color: '#555' }}>인사이트</h4>
           {aiResult.insights.map((ins, i) => (
-            <div key={i} style={{
+            <div key={typeof ins === 'string' ? `${ins.slice(0,20)}-${i}` : i} style={{
               padding: '8px 12px', marginBottom: '4px', fontSize: '13px',
               color: '#374151', lineHeight: '1.5',
             }}>

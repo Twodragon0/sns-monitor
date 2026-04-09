@@ -87,7 +87,7 @@ export function ThreadsPostBlock({ embedHtml, url, replies, description, content
         <>
           <ul className="comments-sublist">
             {displayReplies.map((r, i) => (
-              <li key={i} className="comment-item">
+              <li key={r.author ? `${r.author}-${i}` : i} className="comment-item">
                 <span className="comment-meta-inline">
                   {r.author && <span className="comment-author">{r.author}</span>}
                   {r.date && <span className="comment-date">{r.date}</span>}
@@ -539,7 +539,7 @@ export function DCInsideGalleryPosts({ posts, totalPosts, loginVerified, isNaver
         <div className="all-comments-box" aria-label="전체 댓글 통합">
           <ul className="comments-sublist comments-sublist--all">
             {sortedAllComments.map((c, i) => (
-              <li key={i} className="comment-item">
+              <li key={c.author ? `${c.author}-${c.postTitle?.slice(0,10)}-${i}` : i} className="comment-item">
                 <span className="comment-meta">
                   [{c.postTitle}]
                   {c.postUrl && (
@@ -607,7 +607,7 @@ export function DCInsideGalleryPosts({ posts, totalPosts, loginVerified, isNaver
                       aria-label={`댓글 ${post.comments.length}개`}
                     >
                       {sortedPostComments.slice(0, commentVisibleCounts[postKey] || COMMENT_PAGE_SIZE).map((c, i) => (
-                        <li key={i} className="comment-item">
+                        <li key={c.author ? `${c.author}-${c.date || i}` : i} className="comment-item">
                           <span className="comment-meta-inline">
                             <span className="comment-author">{c.author}</span>
                             {c.date && <span className="comment-date">{c.date}</span>}
@@ -703,7 +703,7 @@ export function RedditSubredditPosts({ posts, totalPosts }) {
                   {isExpanded && (
                     <ul className="comments-sublist">
                       {post.comments.slice(0, commentVisibleCounts[postKey] || COMMENT_PAGE_SIZE).map((c, i) => (
-                        <li key={i} className="comment-item">
+                        <li key={c.author ? `${c.author}-${i}` : i} className="comment-item">
                           <span className="comment-meta-inline">
                             <span className="comment-author">{c.author}</span>
                             {c.score != null && <span className="comment-score">⬆ {c.score}</span>}
@@ -778,7 +778,7 @@ export function RedditPostComments({ result }) {
       {expanded && (
         <ul className="comments-sublist">
           {sorted.slice(0, visibleCount).map((c, i) => (
-            <li key={i} className="comment-item">
+            <li key={c.author ? `${c.author}-${c.created_utc || i}` : i} className="comment-item">
               <span className="comment-meta-inline">
                 <span className="comment-author">{c.author}</span>
                 {c.score != null && <span className="comment-score">⬆ {c.score}</span>}
@@ -853,7 +853,7 @@ export function TelegramMessages({ messages, totalMessages }) {
       {expanded && (
         <div className="items-list">
           {sorted.slice(0, visibleCount).map((msg, idx) => (
-            <div key={idx} className="item-card">
+            <div key={msg.date ? `${msg.date}-${idx}` : idx} className="item-card">
               <div className="item-text">{msg.text || ''}</div>
               <div className="item-meta">
                 {msg.date && <span className="item-date">{msg.date}</span>}
@@ -997,7 +997,7 @@ export function YouTubeCommentsInline({ comments, totalComments }) {
                   aria-label={`${group.title} 댓글 ${group.comments.length}개`}
                 >
                   {group.comments.slice(0, visibleCounts[gi] || PAGE_SIZE).map((c, i) => (
-                    <li key={i} className="yt-comment-row">
+                    <li key={c.author ? `${c.author}-${c.published_at || i}` : i} className="yt-comment-row">
                       <div className="yt-comment-meta">
                         {c.author && <span className="yt-comment-author">{c.author}</span>}
                         {c.published_at && (
@@ -1076,7 +1076,7 @@ export function TwitterReplies({ comments, replyCount }) {
       {expanded && (
         <div className="items-list">
           {sorted.slice(0, visibleCount).map((c, idx) => (
-            <div key={idx} className="item-card">
+            <div key={c.author ? `${c.author}-${c.date || idx}` : idx} className="item-card">
               <div className="item-text">{c.text}</div>
               <div className="item-meta">
                 {c.author && <span className="item-author">{c.author}</span>}
@@ -1136,7 +1136,7 @@ export function GenericItemsAccordion({ items, result }) {
       {expanded && (
         <div className="items-list">
           {items.slice(0, visibleCount).map((item, idx) => (
-            <div key={idx} className="item-card">
+            <div key={item.url || item.permalink || (item.author ? `${item.author}-${idx}` : idx)} className="item-card">
               <div className="item-text">{item.text || item.title || item.selftext || ''}</div>
               <div className="item-meta">
                 {item.author && <span className="item-author">{item.author}</span>}

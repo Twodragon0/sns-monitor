@@ -62,12 +62,20 @@ class Config:
     ).strip()
     OAUTH_SCOPES = os.environ.get("OAUTH_SCOPES", "openid profile email").strip()
     _secret = os.environ.get("SECRET_KEY") or os.environ.get("FLASK_SECRET_KEY") or ""
+    _is_debug = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
     if not _secret:
-        _secret = secrets.token_hex(32)
-        logging.getLogger("sns-monitor").error(
-            "SECRET_KEY not set — using random key. Sessions will NOT survive restarts. "
-            "Set SECRET_KEY in .env for production."
-        )
+        if _is_debug:
+            _secret = secrets.token_hex(32)
+            logging.getLogger("sns-monitor").warning(
+                "SECRET_KEY not set — using random key (debug mode). "
+                "Sessions will NOT survive restarts."
+            )
+        else:
+            _secret = secrets.token_hex(32)
+            logging.getLogger("sns-monitor").critical(
+                "SECRET_KEY not set in production! Sessions will NOT survive restarts. "
+                "Set SECRET_KEY in .env immediately."
+            )
     SECRET_KEY = _secret
     AUTH_REQUIRED_FOR_ANALYSIS = os.environ.get("AUTH_REQUIRED_FOR_ANALYSIS", "false").lower() in ("1", "true", "yes")
     MIROFISH_SSL_VERIFY = os.environ.get("MIROFISH_SSL_VERIFY", "true").lower() in (
@@ -98,9 +106,9 @@ class Config:
     # Session cookie security
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
+    # Default to false for local/Docker HTTP; only enable via env var for HTTPS deployments
     SESSION_COOKIE_SECURE = os.environ.get(
-        "SESSION_COOKIE_SECURE",
-        "false" if os.environ.get("FLASK_DEBUG", "false").lower() == "true" else "true"
+        "SESSION_COOKIE_SECURE", "false"
     ).lower() in ("1", "true", "yes")
 
     # JSON encoding

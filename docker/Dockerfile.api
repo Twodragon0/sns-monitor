@@ -2,11 +2,18 @@ FROM python:3.11-slim-bookworm
 
 WORKDIR /app
 
-# Install Python dependencies
+# Install Python dependencies (cached unless requirements.txt changes)
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Application code
+# Playwright Chromium (cached layer — only re-runs when pip deps change)
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers
+RUN (apt-get update -qq \
+    && playwright install-deps chromium \
+    && playwright install chromium \
+    && rm -rf /var/lib/apt/lists/*) || true
+
+# Application code (changes frequently — placed after heavy layers)
 COPY backend/ .
 
 # Create local-data directory structure and non-root user
@@ -15,15 +22,8 @@ RUN mkdir -p /app/local-data/youtube/channels \
              /app/local-data/vuddy/comprehensive_analysis \
              /app/local-data/analysis \
              /app/logs \
-    && groupadd -r appuser && useradd -r -g appuser -d /app -s /sbin/nologin appuser
-
-# Playwright Chromium for DCInside comment fallback (when API blocks server-side)
-ENV PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers
-RUN (apt-get update -qq \
-    && playwright install-deps chromium \
-    && playwright install chromium \
-    && chown -R appuser:appuser /opt/pw-browsers \
-    && rm -rf /var/lib/apt/lists/*) || true
+    && groupadd -r appuser && useradd -r -g appuser -d /app -s /sbin/nologin appuser \
+    && chown -R appuser:appuser /opt/pw-browsers 2>/dev/null || true
 
 RUN chown -R appuser:appuser /app
 
@@ -34,4 +34,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')" || exit 1
 
-CMD ["python", "run.py"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "2", "--threads", "4", "--timeout", "300", "--access-logfile", "-", "app:create_app()"]

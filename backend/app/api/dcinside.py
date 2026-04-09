@@ -21,21 +21,33 @@ logger = logging.getLogger(__name__)
 
 _SAFE_ID_RE = re.compile(r'^[a-zA-Z0-9_@-]{1,128}$')
 
-# DC인사이드 갤러리 목록 (정적 설정)
-_GALLERY_IDS = [
-    'example-gallery-1',
-    'example-gallery-2',
-    'example-gallery-3',
-    'example-gallery-4',
-    'example-gallery-5',
-]
-_GALLERY_NAMES = {
-    'example-gallery-1': 'Example Gallery 1',
-    'example-gallery-2': 'Example Gallery 2',
-    'example-gallery-3': 'Example Gallery 3',
-    'example-gallery-4': 'Example Gallery 4',
-    'example-gallery-5': 'Example Gallery 5',
-}
+# DC인사이드 갤러리 목록: local-data/dcinside/ 하위 디렉토리에서 동적으로 탐색
+def _discover_gallery_ids():
+    """Scan local-data/dcinside/ for gallery directories that contain JSON data."""
+    dc_dir = os.path.join(Config.LOCAL_DATA_DIR, 'dcinside')
+    if not os.path.isdir(dc_dir):
+        return []
+    ids = []
+    for entry in sorted(os.listdir(dc_dir)):
+        full = os.path.join(dc_dir, entry)
+        if os.path.isdir(full) and not entry.startswith('.') and not entry.startswith('example'):
+            if glob.glob(os.path.join(full, '*.json')):
+                ids.append(entry)
+    return ids
+
+
+def _gallery_display_name(gallery_id):
+    """Try to read gallery name from the latest crawled JSON file."""
+    gallery_dir = os.path.join(Config.LOCAL_DATA_DIR, 'dcinside', gallery_id)
+    files = sorted(glob.glob(os.path.join(gallery_dir, '*.json')), reverse=True)
+    if files:
+        try:
+            with open(files[0], 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            return data.get('gallery_name', gallery_id)
+        except Exception:
+            pass
+    return gallery_id
 
 
 def _distribute_comments_to_posts(all_posts_data, total_comments):
@@ -161,7 +173,8 @@ def galleries():
 
     galleries_data = []
 
-    for gallery_id in _GALLERY_IDS:
+    gallery_ids = _discover_gallery_ids()
+    for gallery_id in gallery_ids:
         try:
             all_posts_data, crawled_at, keywords, total_comments, positive_count, negative_count = \
                 _load_gallery_data_local(gallery_id, max_files=0, days_back=14)
@@ -200,7 +213,7 @@ def galleries():
 
                 galleries_data.append({
                     'gallery_id': gallery_id,
-                    'gallery_name': _GALLERY_NAMES.get(gallery_id, gallery_id),
+                    'gallery_name': _gallery_display_name(gallery_id),
                     'total_posts': len(all_posts_data),
                     'total_comments': total_comments,
                     'positive_count': positive_count,
@@ -229,8 +242,15 @@ def gallery_posts(gallery_id):
                 content_type='application/json',
             )
 
-        page = int(request.args.get('page', 1))
-        limit = min(int(request.args.get('limit', 20)), 100)
+        try:
+            page = int(request.args.get('page', 1))
+            limit = min(int(request.args.get('limit', 20)), 100)
+        except (ValueError, TypeError):
+            return Response(
+                json.dumps({'error': 'Invalid page or limit parameter'}),
+                status=400,
+                content_type='application/json',
+            )
         offset = (page - 1) * limit
 
         if not Config.LOCAL_MODE:
