@@ -5,7 +5,6 @@ All DCInside-specific methods extracted from PlatformAnalyzer.
 
 import json
 import logging
-import os
 import re
 import time
 from urllib.parse import urlparse, parse_qs
@@ -104,6 +103,7 @@ class DCInsideMixin:
             "Referer": "https://gall.dcinside.com/",
         }
         posts = []
+        seen_post_numbers = set()
         gallery_name = gallery_id
         max_pages = 100
         try:
@@ -136,6 +136,10 @@ class DCInsideMixin:
                 if not rows:
                     break
 
+                # DCInside returns page 1 content for out-of-range pages, so
+                # dedupe by post number. If an entire page adds no new posts,
+                # we've run past the last real page — stop scraping.
+                posts_before = len(posts)
                 for row in rows:
                     title_el = row.select_one(".gall_tit a")
                     if not title_el:
@@ -160,6 +164,9 @@ class DCInsideMixin:
                             comment_count = int(match.group(1))
 
                     post_number = int(post_num)
+                    if post_number in seen_post_numbers:
+                        continue
+                    seen_post_numbers.add(post_number)
                     post_url = self._build_dcinside_view_url(
                         gallery_type, gallery_id, post_number
                     )
@@ -188,6 +195,11 @@ class DCInsideMixin:
                         }
                     )
 
+                # If this page produced no new posts, DCInside is looping —
+                # we've hit the end of the gallery. Stop.
+                if len(posts) == posts_before:
+                    break
+
                 time.sleep(0.3)
         except ImportError:
             logger.warning("beautifulsoup4 not installed, using basic scraping")
@@ -203,10 +215,18 @@ class DCInsideMixin:
         comment_time_budget = min(max_comment_posts * 10, 180)  # ~10s per post, max 3min
 
         comment_fetch_stats = {"attempted": 0, "collected": 0, "timed_out": False}
-        if fetch_comments:
+        if fetch_comments and posts:
+            # Reset session cookies before comment collection — stale cookies from
+            # gallery list scraping (especially 'csid') cause DCInside to block the
+            # comment API with "정상적인 접근이 아닙니다".
+            self._session.cookies.clear()
+            try:
+                self._session.get(list_url_base, headers=headers, timeout=15)
+            except Exception as e:
+                logger.debug("DCInside cookie rehydration request failed: %s", e)
             t_start = time.monotonic()
-            for i, post in enumerate(posts):
-                if i >= max_comment_posts:
+            for post in posts:
+                if comment_fetch_stats["attempted"] >= max_comment_posts:
                     break
                 if not post.get("comment_count", 0):
                     continue
@@ -219,6 +239,9 @@ class DCInsideMixin:
                     comment_fetch_stats["timed_out"] = True
                     break
                 comment_fetch_stats["attempted"] += 1
+                # Delay between posts to avoid DCInside rate limiting on view/token pages
+                if comment_fetch_stats["attempted"] > 1:
+                    time.sleep(1.5)
                 try:
                     comments = self._fetch_dcinside_post_comments(
                         gallery_id, post["number"], gallery_type, headers
@@ -262,6 +285,16 @@ class DCInsideMixin:
         if gallery_type in ("board", "major"):
             return f"https://gall.dcinside.com/board/view/?id={gallery_id}&no={post_no}"
         return f"https://gall.dcinside.com/{gallery_type}/board/view/?id={gallery_id}&no={post_no}"
+
+    @staticmethod
+    def _dcinside_galltype_value(gallery_type):
+        """Map gallery_type to the _GALLTYPE_ form value expected by DCInside comment API."""
+        if gallery_type in ("board", "major"):
+            return "G"
+        if gallery_type == "mini":
+            return "MI"
+        # mgallery
+        return "M"
 
     def _build_dcinside_comment_api_url(self, gallery_type):
         """Comment API base URL; mini/mgallery use type-prefixed path. 'major' => board."""
@@ -357,6 +390,10 @@ class DCInsideMixin:
             "Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
         )
         try:
+            # Clear stale tracking cookies that cause DCInside to block subsequent requests
+            for stale_cookie in ("csid", "gallRecom", "service_code"):
+                if stale_cookie in self._session.cookies:
+                    del self._session.cookies[stale_cookie]
             resp = self._session.get(view_url, headers=view_headers, timeout=12)
             if resp.status_code != 200:
                 logger.debug(
@@ -469,7 +506,7 @@ class DCInsideMixin:
             "comment_page": "1",
             "sort": "",
             "prevCnt": "0",
-            "_GALLTYPE_": "G" if gallery_type in ("board", "major") else "M",
+            "_GALLTYPE_": self._dcinside_galltype_value(referer_gallery_type or gallery_type),
         }
         opts = getattr(self, "_analyze_options", {})
         max_comments = int(opts.get("max_comments", 500))

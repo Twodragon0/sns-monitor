@@ -1155,7 +1155,7 @@ class TestFetchDCInsideCommentsAjaxExtra:
         assert any(c["text"] == "No token comment" for c in comments)
 
     def test_mgallery_galltype_G_for_board(self, analyzer):
-        """_GALLTYPE_ is 'G' for board type, 'M' for mini/mgallery."""
+        """_GALLTYPE_ is 'G' for board/major, 'MI' for mini, 'M' for mgallery."""
         token_resp = _make_resp(ok=True, text="e_s_n_o = 'tok'")
         data = {"comments": [{"memo": "GALLTYPE test", "name": "U"}]}
         api_resp = _make_resp(ok=True, status_code=200, text=json.dumps(data))
@@ -1174,7 +1174,7 @@ class TestFetchDCInsideCommentsAjaxExtra:
         with patch("app.services.platforms.dcinside.time") as mt:
             mt.sleep = MagicMock()
             analyzer._fetch_dcinside_comments_ajax("gall", 209, "mini", self._headers())
-        assert captured_form.get("_GALLTYPE_") == "M"
+        assert captured_form.get("_GALLTYPE_") == "MI"
 
 
 # ── _extract_dcinside_comments_from_view_html: edge cases ────────
