@@ -5,6 +5,14 @@ import axios from 'axios';
 import Dashboard from './Dashboard';
 
 vi.mock('axios');
+vi.mock('./dashboard/MonitorPanels', () => ({
+  OverviewPanel: () => <div data-testid="overview-panel">OverviewPanel</div>,
+  YouTubePanel: () => <div data-testid="youtube-panel">YouTubePanel</div>,
+  DCInsidePanel: () => <div data-testid="dcinside-panel">DCInsidePanel</div>,
+  TwitterPanel: () => <div data-testid="twitter-panel">TwitterPanel</div>,
+  SocialPanel: () => <div data-testid="social-panel">SocialPanel</div>,
+  ScanHistoryPanel: () => <div data-testid="scan-history-panel">ScanHistoryPanel</div>,
+}));
 
 // Mock AuthContext so AnalysisResult (which uses useAuth) doesn't throw
 vi.mock('../contexts/AuthContext', () => ({
@@ -28,6 +36,21 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+async function flushMicrotasks(times = 20) {
+  for (let i = 0; i < times; i += 1) {
+    await Promise.resolve();
+  }
+}
+
+async function mountDashboard(props = {}) {
+  let view;
+  await act(async () => {
+    view = render(<Dashboard {...props} />);
+    await flushMicrotasks();
+  });
+  return view;
+}
+
 describe('Dashboard loadMonitorData errors', () => {
   it('calls onShowError when all 3 monitor endpoints fail', async () => {
     global.fetch = vi.fn().mockImplementation((url) => {
@@ -41,7 +64,7 @@ describe('Dashboard loadMonitorData errors', () => {
     });
 
     const onShowError = vi.fn();
-    render(<Dashboard onShowError={onShowError} />);
+    await mountDashboard({ onShowError });
 
     await waitFor(() => {
       expect(onShowError).toHaveBeenCalledTimes(1);
@@ -67,9 +90,10 @@ describe('Dashboard loadMonitorData errors', () => {
     });
 
     const onShowError = vi.fn();
-    render(<Dashboard onShowError={onShowError} />);
-
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await mountDashboard({ onShowError });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    });
     expect(onShowError).not.toHaveBeenCalled();
   });
 
@@ -79,7 +103,7 @@ describe('Dashboard loadMonitorData errors', () => {
     );
 
     const onShowError = vi.fn();
-    render(<Dashboard onShowError={onShowError} />);
+    await mountDashboard({ onShowError });
 
     await waitFor(() => {
       expect(onShowError).toHaveBeenCalledTimes(1);
@@ -96,12 +120,6 @@ describe('Dashboard loadMonitorData errors', () => {
     // Stub AbortSignal.timeout so fake timers don't interfere with it
     const abortStub = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(new AbortController().signal);
 
-    // Helper: flush the microtask queue (Promise chains) without touching timers.
-    // Promise.resolve() microtasks are NOT controlled by fake timers.
-    const flushMicrotasks = async () => {
-      for (let i = 0; i < 20; i++) await Promise.resolve();
-    };
-
     vi.useFakeTimers();
     let unmount;
     try {
@@ -109,10 +127,12 @@ describe('Dashboard loadMonitorData errors', () => {
 
       // --- Cycle 1: mount triggers loadMonitorData — all 3 fail → toast fires ---
       global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({}) });
-      ({ unmount } = render(<Dashboard onShowError={onShowError} />));
+      ({ unmount } = await mountDashboard({ onShowError }));
 
       // Flush the fetch promises from the mount-time loadMonitorData call
-      await flushMicrotasks();
+      await act(async () => {
+        await flushMicrotasks();
+      });
 
       expect(onShowError).toHaveBeenCalledTimes(1);
       expect(onShowError.mock.calls[0][0]).toContain('모니터링 데이터 로드 실패');
@@ -126,9 +146,11 @@ describe('Dashboard loadMonitorData errors', () => {
       });
 
       // Advance clock synchronously — this fires the setInterval callback which calls loadMonitorData
-      vi.advanceTimersByTime(60000);
+      await act(async () => {
+        vi.advanceTimersByTime(60000);
+        await flushMicrotasks();
+      });
       // Flush the resulting fetch promise chain
-      await flushMicrotasks();
 
       // Partial failure: flag reset but no new toast
       expect(onShowError).toHaveBeenCalledTimes(1);
@@ -136,8 +158,10 @@ describe('Dashboard loadMonitorData errors', () => {
       // --- Cycle 3: 60s tick — all 3 fail again → toast fires again ---
       global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({}) });
 
-      vi.advanceTimersByTime(60000);
-      await flushMicrotasks();
+      await act(async () => {
+        vi.advanceTimersByTime(60000);
+        await flushMicrotasks();
+      });
 
       expect(onShowError).toHaveBeenCalledTimes(2);
       expect(onShowError.mock.calls[1][0]).toContain('모니터링 데이터 로드 실패');
@@ -150,18 +174,18 @@ describe('Dashboard loadMonitorData errors', () => {
 });
 
 describe('Dashboard (smoke)', () => {
-  it('renders without crashing', () => {
-    const { container } = render(<Dashboard onShowError={() => {}} />);
+  it('renders without crashing', async () => {
+    const { container } = await mountDashboard({ onShowError: () => {} });
     expect(container).toBeTruthy();
   });
 
-  it('shows main content without throwing', () => {
-    const { container } = render(<Dashboard onShowError={() => {}} />);
+  it('shows main content without throwing', async () => {
+    const { container } = await mountDashboard({ onShowError: () => {} });
     expect(container.firstChild).toBeTruthy();
   });
 
   it('has no accessibility violations', async () => {
-    const { container } = render(<Dashboard onShowError={vi.fn()} />);
+    const { container } = await mountDashboard({ onShowError: vi.fn() });
     await waitFor(() => expect(container.querySelector('.dashboard')).toBeTruthy(), { timeout: 3000 }).catch(() => {});
     const results = await axe(container);
     expect(results).toHaveNoViolations();
@@ -218,6 +242,10 @@ describe('Dashboard interactions', () => {
     let result;
     await act(async () => {
       result = render(<Dashboard onShowError={vi.fn()} {...props} />);
+      await flushMicrotasks();
+    });
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalled();
     });
     return result;
   };

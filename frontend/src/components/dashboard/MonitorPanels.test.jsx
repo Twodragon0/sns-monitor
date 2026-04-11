@@ -177,6 +177,9 @@ describe('OverviewPanel', () => {
   it('renders without crashing', async () => {
     axios.get = vi.fn().mockResolvedValue({ data: { sources: [] } });
     const { container } = render(<OverviewPanel stats={defaultStats} channels={[]} />);
+    await waitFor(() => {
+      expect(axios.get).toHaveBeenCalled();
+    });
     expect(container).toBeTruthy();
   });
 

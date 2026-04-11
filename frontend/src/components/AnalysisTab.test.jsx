@@ -1,9 +1,16 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import axios from 'axios';
 import AnalysisTab from './AnalysisTab';
 
 vi.mock('axios');
+vi.mock('./analysis-tab/AnalysisWidgets', async () => {
+  const actual = await vi.importActual('./analysis-tab/AnalysisWidgets');
+  return {
+    ...actual,
+    DailyReportsPanel: () => <div data-testid="daily-reports-stub">DailyReportsPanel</div>,
+  };
+});
 
 // Silence console.error noise from React during tests
 beforeAll(() => {
@@ -60,24 +67,34 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+async function renderAnalysisTab() {
+  let view;
+  await act(async () => {
+    view = render(<AnalysisTab />);
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  return view;
+}
+
 describe('AnalysisTab (smoke)', () => {
-  it('renders without crashing', () => {
-    const { container } = render(<AnalysisTab />);
+  it('renders without crashing', async () => {
+    const { container } = await renderAnalysisTab();
     expect(container).toBeTruthy();
   });
 
-  it('renders the main heading', () => {
-    render(<AnalysisTab />);
+  it('renders the main heading', async () => {
+    await renderAnalysisTab();
     expect(screen.getByText('수집 데이터 분석 · 요약')).toBeInTheDocument();
   });
 
-  it('renders the back-to-dashboard button', () => {
-    render(<AnalysisTab />);
+  it('renders the back-to-dashboard button', async () => {
+    await renderAnalysisTab();
     expect(screen.getByRole('button', { name: /대시보드로 돌아가기/ })).toBeInTheDocument();
   });
 
-  it('renders the data-source selection section', () => {
-    render(<AnalysisTab />);
+  it('renders the data-source selection section', async () => {
+    await renderAnalysisTab();
     expect(screen.getByText('데이터 소스 선택')).toBeInTheDocument();
   });
 
@@ -222,7 +239,7 @@ describe('AnalysisTab - back navigation', () => {
     const pushStateSpy = vi.spyOn(window.history, 'pushState').mockImplementation(() => {});
     const dispatchSpy = vi.spyOn(window, 'dispatchEvent').mockImplementation(() => {});
 
-    render(<AnalysisTab />);
+    await renderAnalysisTab();
     fireEvent.click(screen.getByRole('button', { name: /대시보드로 돌아가기/ }));
 
     expect(pushStateSpy).toHaveBeenCalledWith({}, '', '/');

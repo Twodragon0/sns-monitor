@@ -16,6 +16,21 @@ import {
   POSTS_PER_PAGE,
   POST_SORT_OPTIONS,
 } from './AnalysisResult';
+
+const authState = {
+  loggedIn: false,
+  authRequired: false,
+  loading: false,
+  login: vi.fn(),
+  logout: vi.fn(),
+  refreshAuth: vi.fn(),
+};
+
+vi.mock('../../contexts/AuthContext', () => ({
+  AuthProvider: ({ children }) => children,
+  useAuth: () => authState,
+}));
+
 import { AuthProvider } from '../../contexts/AuthContext';
 
 vi.mock('axios');
@@ -42,6 +57,13 @@ afterAll(() => {
 });
 
 beforeEach(() => {
+  authState.loggedIn = false;
+  authState.authRequired = false;
+  authState.loading = false;
+  authState.login = vi.fn();
+  authState.logout = vi.fn();
+  authState.refreshAuth = vi.fn();
+
   axios.get = vi.fn().mockImplementation((url) => {
     if (url.includes('/api/auth/me')) {
       return Promise.resolve({ data: { logged_in: false, auth_required: false } });
@@ -398,10 +420,7 @@ describe('AiCtaButton', () => {
   });
 
   it('shows login button when authRequired and not loggedIn', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ logged_in: false, auth_required: true }),
-    });
+    authState.authRequired = true;
     renderWithAuth(<AiCtaButton result={baseResult} />);
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /OpenAI/i })).toBeInTheDocument();
