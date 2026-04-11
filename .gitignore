@@ -87,3 +87,4 @@ terraform/tfplan
 terraform/terraform.tfvars
 terraform/*.auto.tfvars
 .playwright-mcp/
+.omx/
