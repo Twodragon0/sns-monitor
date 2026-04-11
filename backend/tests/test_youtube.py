@@ -34,8 +34,8 @@ class TestYouTubeURLParsing:
     def test_raises_without_api_key(self):
         with patch.dict("os.environ", {"YOUTUBE_API_KEY": "", "REDDIT_CLIENT_ID": "", "REDDIT_CLIENT_SECRET": ""}):
             pa = PlatformAnalyzer()
-        with pytest.raises(ValueError, match="YouTube API key"):
-            pa._analyze_youtube("https://www.youtube.com/watch?v=abc123")
+            with pytest.raises(ValueError, match="YouTube API key"):
+                pa._analyze_youtube("https://www.youtube.com/watch?v=abc123")
 
     def test_raises_for_placeholder_key(self):
         with patch.dict(
@@ -43,8 +43,8 @@ class TestYouTubeURLParsing:
             {"YOUTUBE_API_KEY": "your_youtube_api_key_here", "REDDIT_CLIENT_ID": "", "REDDIT_CLIENT_SECRET": ""},
         ):
             pa = PlatformAnalyzer()
-        with pytest.raises(ValueError, match="YouTube API key"):
-            pa._analyze_youtube("https://www.youtube.com/watch?v=abc123")
+            with pytest.raises(ValueError, match="YouTube API key"):
+                pa._analyze_youtube("https://www.youtube.com/watch?v=abc123")
 
     def test_raises_for_unrecognized_url(self, analyzer):
         with patch.dict("os.environ", {"YOUTUBE_API_KEY": "test_api_key"}):
