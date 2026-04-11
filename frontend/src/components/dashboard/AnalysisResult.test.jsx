@@ -996,6 +996,167 @@ describe('DCInsideResultPosts', () => {
     await new Promise((resolve) => setTimeout(resolve, 100));
     expect(axios.post).not.toHaveBeenCalled();
   });
+
+  it('allows parallel refetch for two different posts without single-flight blocking', async () => {
+    // Both posts have no comments initially → totalCommentCount=0 → no 통합보기 button
+    // So postCards()[0] = Post A, postCards()[1] = Post B (no extra aria-expanded buttons)
+    let resolveA;
+    let resolveB;
+    const promiseA = new Promise((r) => { resolveA = r; });
+    const promiseB = new Promise((r) => { resolveB = r; });
+
+    axios.post = vi.fn().mockImplementation((_url, body) => {
+      if (body.url && body.url.includes('/A')) return promiseA;
+      return promiseB;
+    });
+
+    const posts = [
+      {
+        number: 101,
+        text: 'Post A',
+        url: 'https://gall.dcinside.com/A',
+        comment_count: 3,
+        comments: [],
+      },
+      {
+        number: 102,
+        text: 'Post B',
+        url: 'https://gall.dcinside.com/B',
+        comment_count: 3,
+        comments: [],
+      },
+    ];
+
+    render(<DCInsideResultPosts posts={posts} />);
+    const postCards = () =>
+      screen.getAllByRole('button').filter(b => b.getAttribute('aria-expanded') !== null);
+
+    // Click Post A — inflight, not resolved yet
+    // No comments yet → no 통합보기 button → index 0 is Post A
+    fireEvent.click(postCards()[0]);
+    expect(axios.post).toHaveBeenCalledTimes(1);
+    expect(axios.post.mock.calls[0][1].url).toBe('https://gall.dcinside.com/A');
+
+    // Click Post B while A is still in flight (Set-based gate allows independent parallel refetch)
+    // expandedNo switches to Post B; Post A's in-flight axios.post call continues unblocked
+    fireEvent.click(postCards()[1]);
+    expect(axios.post).toHaveBeenCalledTimes(2);
+    expect(axios.post.mock.calls[1][1].url).toBe('https://gall.dcinside.com/B');
+
+    // Resolve both promises — state settles for both posts
+    resolveA({ data: { comments: [{ text: 'cA', author: 'uA' }], comment_count: 1 } });
+    resolveB({ data: { comments: [{ text: 'cB', author: 'uB' }], comment_count: 1 } });
+
+    // Post B is currently expanded → cB should be visible
+    await waitFor(() => {
+      expect(screen.getByText('cB')).toBeInTheDocument();
+    });
+
+    // Expand Post A to confirm its state was also updated (url-based mutation)
+    // Find Post A's card by aria-controls targeting its postKey (the URL)
+    const postACard = screen
+      .getAllByRole('button')
+      .find(b => b.getAttribute('aria-controls') === 'result-cmt-https://gall.dcinside.com/A');
+    fireEvent.click(postACard);
+    await waitFor(() => {
+      expect(screen.getByText('cA')).toBeInTheDocument();
+    });
+  });
+
+  it('sets comment_count to 0 when refetch returns empty comments without comment_count field', async () => {
+    // Response has comments:[] and NO comment_count field
+    axios.post = vi.fn().mockResolvedValue({ data: { comments: [] } });
+
+    const posts = [{
+      number: 9,
+      text: 'Post empty refetch',
+      url: 'https://gall.dcinside.com/9',
+      comment_count: 3,
+      comments: [],
+    }];
+
+    render(<DCInsideResultPosts posts={posts} />);
+
+    // Before refetch: collectionFailed badge should be visible
+    expect(screen.getByText(/수집 실패/)).toBeInTheDocument();
+
+    const postCards = screen.getAllByRole('button').filter(b => b.getAttribute('aria-expanded') !== null);
+    fireEvent.click(postCards[0]);
+
+    await waitFor(() => {
+      expect(axios.post).toHaveBeenCalledTimes(1);
+    });
+
+    // After refetch: comment_count becomes 0 (newComments.length = 0)
+    // listCount (0) > 0 is false → collectionFailed is false → badge gone
+    await waitFor(() => {
+      expect(screen.queryByText(/수집 실패/)).not.toBeInTheDocument();
+    });
+
+    // Label should reflect listCount=0, collectedCount=0
+    await waitFor(() => {
+      expect(screen.getByText(/목록 0 \/ 수집 0/)).toBeInTheDocument();
+    });
+  });
+
+  it('mutates only the clicked post when multiple posts exist (url-based mapping)', async () => {
+    axios.post = vi.fn().mockResolvedValue({
+      data: {
+        comments: [{ text: 'only post 2 got this', author: 'u2' }],
+        comment_count: 1,
+      },
+    });
+
+    const posts = [
+      {
+        number: 201,
+        text: 'Post One',
+        url: 'https://gall.dcinside.com/201',
+        comment_count: 1,
+        comments: [{ text: 'original comment post1', author: 'orig1' }],
+      },
+      {
+        // collectionFailed: comment_count > 0 but comments empty
+        number: 202,
+        text: 'Post Two',
+        url: 'https://gall.dcinside.com/202',
+        comment_count: 2,
+        comments: [],
+      },
+      {
+        number: 203,
+        text: 'Post Three',
+        url: 'https://gall.dcinside.com/203',
+        comment_count: 1,
+        comments: [{ text: 'original comment post3', author: 'orig3' }],
+      },
+    ];
+
+    render(<DCInsideResultPosts posts={posts} />);
+
+    // Use aria-controls to find Post Two's card directly — avoids fragile index arithmetic
+    // (the 통합보기 button also has aria-expanded, making index-based selection unreliable)
+    const postTwoCard = screen
+      .getAllByRole('button')
+      .find(b => b.getAttribute('aria-controls') === 'result-cmt-https://gall.dcinside.com/202');
+
+    // Click the only collectionFailed post
+    fireEvent.click(postTwoCard);
+
+    await waitFor(() => {
+      expect(axios.post).toHaveBeenCalledTimes(1);
+    });
+
+    // Refetched comment appears in Post Two (currently expanded)
+    await waitFor(() => {
+      expect(screen.getByText('only post 2 got this')).toBeInTheDocument();
+    });
+
+    // axios.post called exactly once — url-based mapper only mutated Post Two,
+    // not the other posts (old closure-idx code would have mutated the wrong post)
+    expect(axios.post).toHaveBeenCalledTimes(1);
+    expect(axios.post.mock.calls[0][1].url).toBe('https://gall.dcinside.com/202');
+  });
 });
 
 // ─── YouTubeComments ──────────────────────────────────────────────────────────
