@@ -6,29 +6,7 @@ import {
   LineChart, Line,
 } from 'recharts';
 import { API_BASE } from '../../config';
-
-const PLATFORMS = {
-  youtube:    { label: 'YouTube',       color: '#FF0000', icon: '▶' },
-  dcinside:   { label: 'DCInside',      color: '#0253fe', icon: '📋' },
-  naver_cafe: { label: '네이버 카페',   color: '#03c75a', icon: '☕' },
-  reddit:     { label: 'Reddit',       color: '#FF4500', icon: '🔗' },
-  telegram:   { label: 'Telegram',     color: '#0088cc', icon: '✈' },
-  kakao:      { label: 'Kakao',        color: '#FEE500', icon: '💬' },
-  twitter:    { label: 'X (Twitter)',  color: '#000000', icon: '𝕏' },
-  instagram:  { label: 'Instagram',    color: '#E1306C', icon: '📸' },
-  facebook:   { label: 'Facebook',     color: '#1877F2', icon: '👥' },
-  threads:    { label: 'Threads',      color: '#000000', icon: '🧵' },
-};
-
-
-function formatNumber(num) {
-  if (num == null) return null;
-  const n = typeof num === 'string' ? parseInt(num.replace(/[,\s]/g, ''), 10) : Number(num);
-  if (isNaN(n)) return '0';
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toLocaleString();
-}
+import { PLATFORMS, formatNumber } from '../../constants/platforms';
 
 export function MiniStat({ icon, value, label }) {
   return (
@@ -40,7 +18,7 @@ export function MiniStat({ icon, value, label }) {
   );
 }
 
-/** Mini sentiment bar (inline, no chart library needed) */
+/** Mini sentiment bar (CSS classes, dark mode compatible) */
 export function SentimentMiniBar({ sentiment }) {
   if (!sentiment) return null;
   const { positive = 0, neutral = 0, negative = 0 } = sentiment;
@@ -48,16 +26,16 @@ export function SentimentMiniBar({ sentiment }) {
   if (total === 0) return null;
   const pct = (v) => Math.round((v / total) * 100);
   return (
-    <div style={{ marginTop: 6 }}>
-      <div style={{ display: 'flex', height: 6, borderRadius: 3, overflow: 'hidden', background: '#e5e7eb' }}>
-        {positive > 0 && <div style={{ width: `${pct(positive)}%`, background: '#10b981' }} />}
-        {neutral > 0 && <div style={{ width: `${pct(neutral)}%`, background: '#9ca3af' }} />}
-        {negative > 0 && <div style={{ width: `${pct(negative)}%`, background: '#ef4444' }} />}
+    <div className="sentiment-mini-bar">
+      <div className="sentiment-mini-bar__track">
+        {positive > 0 && <div className="sentiment-mini-bar__seg--pos" style={{ width: `${pct(positive)}%` }} />}
+        {neutral > 0 && <div className="sentiment-mini-bar__seg--neu" style={{ width: `${pct(neutral)}%` }} />}
+        {negative > 0 && <div className="sentiment-mini-bar__seg--neg" style={{ width: `${pct(negative)}%` }} />}
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: '#6b7280', marginTop: 2 }}>
-        <span style={{ color: '#10b981' }}>+{positive}</span>
+      <div className="sentiment-mini-bar__labels">
+        <span className="sentiment-mini-bar__pos">+{positive}</span>
         <span>{total}건</span>
-        <span style={{ color: '#ef4444' }}>-{negative}</span>
+        <span className="sentiment-mini-bar__neg">-{negative}</span>
       </div>
     </div>
   );
@@ -72,7 +50,7 @@ export function GalleryTrendChart({ galleryId }) {
       .catch(() => setTrend([]));
   }, [galleryId]);
 
-  if (!trend || trend.length < 2) return <p style={{ fontSize: '0.7rem', color: '#9ca3af', margin: '4px 0' }}>트렌드 데이터 부족 (2회 이상 수집 필요)</p>;
+  if (!trend || trend.length < 2) return <p className="panel-card__hint" style={{ margin: '4px 0' }}>트렌드 데이터 부족 (2회 이상 수집 필요)</p>;
 
   const chartData = trend.map(t => ({
     time: t.timestamp?.slice(5, 16).replace('T', ' ') || '',
@@ -150,57 +128,42 @@ export function GalleryMonitorPanel() {
     .filter(Boolean);
 
   return (
-    <div style={{ marginTop: 20 }}>
+    <div className="gallery-monitor">
       <h4 className="dash__section-title" style={{ marginBottom: 12 }}>DCInside 갤러리 모니터링</h4>
 
-      {/* Negative alert banner */}
       {alerts.length > 0 && (
-        <div style={{
-          padding: '10px 14px', marginBottom: 12,
-          background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8,
-          fontSize: '0.8rem',
-        }}>
-          <strong style={{ color: '#dc2626' }}>부정 감성 경고</strong>
+        <div className="gallery-monitor__alert">
+          <strong className="gallery-monitor__alert-title">부정 감성 경고</strong>
           {alerts.map(a => (
-            <span key={a.id} style={{ marginLeft: 10, color: '#7f1d1d' }}>
+            <span key={a.id} className="gallery-monitor__alert-item">
               {a.name}: <strong>{a.negPct}%</strong> ({a.negative}건)
             </span>
           ))}
         </div>
       )}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-        gap: 12,
-      }}>
+      <div className="gallery-monitor__grid">
         {dcSources.map(src => (
-          <div key={src.id} className="panel-card" style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 14 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h5 className="panel-card__title" style={{ margin: 0, fontSize: '0.85rem' }}>{src.name || src.id}</h5>
+          <div key={src.id} className="panel-card gallery-monitor__card">
+            <div className="gallery-monitor__card-head">
+              <h5 className="panel-card__title gallery-monitor__card-title">{src.name || src.id}</h5>
               <button
                 type="button"
+                className="gallery-monitor__trend-btn"
                 onClick={() => setExpanded(expanded === src.id ? null : src.id)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.7rem', color: '#6366f1' }}
               >
                 {expanded === src.id ? '닫기' : '트렌드'}
               </button>
             </div>
-            <div className="panel-card__body" style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+            <div className="panel-card__body gallery-monitor__meta">
               <span>수집 {src.files || 0}회</span>
-              <span style={{ marginLeft: 8 }}>{parseLatestDate(src.latest)}</span>
+              <span>{parseLatestDate(src.latest)}</span>
             </div>
             <SentimentMiniBar sentiment={sentiments[src.id]} />
             {expanded === src.id && <GalleryTrendChart galleryId={src.id} />}
             <button
               type="button"
+              className="gallery-monitor__analyze-btn"
               onClick={() => goAnalysis(src)}
-              style={{
-                padding: '5px 12px', marginTop: 4,
-                background: 'var(--c-primary)', color: '#fff',
-                border: 'none', borderRadius: 6,
-                fontSize: '0.75rem', fontWeight: 700,
-                cursor: 'pointer', alignSelf: 'flex-start',
-              }}
             >
               분석
             </button>
@@ -384,13 +347,13 @@ export function DCInsidePanel({ galleries }) {
 export function TwitterPanel() {
   const [keyword, setKeyword] = useState('');
   const QUICK_KEYWORDS = [
-    { label: 'CreatorBrand',  query: 'CreatorBrand' },
-    { label: 'ExampleCorp',   query: 'ExampleCorp' },
-    { label: 'ExampleCreator', query: 'ExampleCreator' },
-    { label: 'Creator1',      query: 'Creator1' },
-    { label: 'Creator2',      query: 'Creator2' },
-    { label: 'Creator3',      query: 'Creator3' },
-    { label: 'Creator4',      query: 'Creator4' },
+    { label: '유튜브 클립',   query: '유튜브 클립' },
+    { label: 'SNS 이슈',      query: 'SNS 이슈 -filter:retweets' },
+    { label: '트위터 트렌드', query: '실시간 트렌드' },
+    { label: '커뮤니티 반응', query: '커뮤니티 반응' },
+    { label: '인터넷 밈',     query: '인터넷 밈' },
+    { label: '핫클립',        query: '핫클립 -filter:retweets' },
+    { label: '뉴스 이슈',     query: '뉴스 이슈 lang:ko' },
   ];
 
   const openTwitterSearch = (q) => {

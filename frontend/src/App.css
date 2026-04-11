@@ -1,23 +1,53 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800;900&display=swap');
+
 /* ===== Reset & Base ===== */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
-  --c-bg: #f5f7fa;
+  --c-bg: #f0f2f7;
   --c-surface: #ffffff;
-  --c-primary: #0253fe;
+  --c-surface-input: #ffffff;
+  --c-primary: #1a56f0;
+  --c-primary-dark: #1240c8;
   --c-primary-light: #e8eeff;
   --c-accent: #cfff0b;
-  --c-text: #1a1a2e;
+  --c-text: #111827;
   --c-text-secondary: #5a6377;
   --c-border: #e2e6ed;
   --c-success: #10b981;
   --c-danger: #ef4444;
   --c-negative: #c00;
   --c-warn: #f59e0b;
-  --radius: 12px;
-  --shadow-sm: 0 1px 3px rgba(0,0,0,.06);
-  --shadow-md: 0 4px 12px rgba(0,0,0,.08);
-  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  --c-error-bg: #fef2f2;
+  --c-error-border: #fecaca;
+  --radius: 14px;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md: 0 4px 16px rgba(0,0,0,.08), 0 2px 6px rgba(0,0,0,.04);
+  --shadow-lg: 0 12px 32px rgba(0,0,0,.10), 0 4px 12px rgba(0,0,0,.06);
+  --font: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', sans-serif;
+}
+
+/* ===== Dark Mode Tokens ===== */
+[data-theme="dark"] {
+  --c-bg: #0f1117;
+  --c-surface: #1a1d27;
+  --c-surface-input: #252830;
+  --c-primary: #4d7cfe;
+  --c-primary-dark: #3a68f0;
+  --c-primary-light: rgba(77,124,254,.12);
+  --c-accent: #cfff0b;
+  --c-text: #e4e6eb;
+  --c-text-secondary: #8b8fa3;
+  --c-border: #2d3140;
+  --c-success: #34d399;
+  --c-danger: #f87171;
+  --c-negative: #f87171;
+  --c-warn: #fbbf24;
+  --c-error-bg: rgba(248,113,113,.08);
+  --c-error-border: rgba(248,113,113,.3);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.3), 0 1px 2px rgba(0,0,0,.2);
+  --shadow-md: 0 4px 16px rgba(0,0,0,.4), 0 2px 6px rgba(0,0,0,.2);
+  --shadow-lg: 0 12px 32px rgba(0,0,0,.5), 0 4px 12px rgba(0,0,0,.3);
 }
 
 .App {
@@ -29,30 +59,72 @@
 
 /* ===== Header ===== */
 .App-header {
-  background: var(--c-primary);
+  background: linear-gradient(135deg, #0f2ed4 0%, #1a56f0 45%, #2563eb 75%, #3b5cf6 100%);
   color: #fff;
-  padding: 28px 24px 20px;
+  padding: 28px 24px 22px;
   text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Subtle dot pattern overlay */
+.App-header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(255,255,255,.08) 1px, transparent 1px);
+  background-size: 28px 28px;
+  pointer-events: none;
+}
+
+/* Glowing orb accents */
+.App-header::after {
+  content: '';
+  position: absolute;
+  top: -40px;
+  right: 10%;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(99,179,237,.25) 0%, transparent 70%);
+  pointer-events: none;
 }
 
 .App-header__inner {
   max-width: 1400px;
   margin: 0 auto;
+  position: relative;
+  z-index: 1;
 }
 
 .App-header__title {
-  font-size: 28px;
-  font-weight: 800;
+  font-size: 30px;
+  font-weight: 900;
   cursor: pointer;
-  letter-spacing: -0.5px;
+  letter-spacing: -1px;
   margin-bottom: 6px;
+  background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,.85) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  transition: opacity 0.2s;
+}
+
+.App-header__title:hover {
+  opacity: 0.9;
 }
 
 .App-header__desc {
   font-size: 13px;
-  opacity: 0.8;
+  opacity: 0.75;
   font-weight: 500;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
+  letter-spacing: 0.01em;
+}
+
+.App-header__controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .App-header__status {
@@ -61,18 +133,60 @@
   gap: 6px;
   font-size: 12px;
   font-weight: 600;
-  background: rgba(255,255,255,.15);
-  padding: 4px 12px;
+  background: rgba(255,255,255,.14);
+  backdrop-filter: blur(8px);
+  padding: 5px 14px;
   border-radius: 20px;
+  border: 1px solid rgba(255,255,255,.2);
+  transition: background 0.2s;
+}
+
+.App-header__status:hover {
+  background: rgba(255,255,255,.2);
+}
+
+.App-header__theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,.25);
+  background: rgba(255,255,255,.12);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  transition: background 0.2s, transform 0.2s, border-color 0.2s;
+  color: #fff;
+}
+
+.App-header__theme-toggle:hover {
+  background: rgba(255,255,255,.22);
+  transform: rotate(20deg) scale(1.08);
+}
+
+.App-header__theme-toggle:active {
+  transform: rotate(0deg) scale(0.95);
 }
 
 .status-dot {
-  width: 8px; height: 8px;
+  width: 7px; height: 7px;
   border-radius: 50%;
   display: inline-block;
 }
-.status-dot.online  { background: var(--c-success); box-shadow: 0 0 6px var(--c-success); }
+.status-dot.online  {
+  background: var(--c-success);
+  box-shadow: 0 0 0 2px rgba(16,185,129,.3);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
 .status-dot.offline { background: var(--c-danger); }
+
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(16,185,129,.3); }
+  50%       { box-shadow: 0 0 0 4px rgba(16,185,129,.15); }
+}
 
 .status-label { opacity: 0.9; }
 
@@ -80,16 +194,17 @@
 .App-main {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 24px 20px;
+  padding: 28px 20px;
   min-height: calc(100vh - 220px);
 }
 
 /* ===== Footer ===== */
 .App-footer {
   text-align: center;
-  padding: 20px;
+  padding: 24px 20px;
   color: var(--c-text-secondary);
   font-size: 12px;
+  border-top: 1px solid var(--c-border);
 }
 
 /* ===== Analysis auth gate (OpenAI OAuth) ===== */
@@ -128,9 +243,29 @@
   transform: translateY(-1px);
 }
 
+/* ===== Global smooth transitions ===== */
+button { font-family: inherit; }
+a { transition: color 0.15s; }
+
+/* Theme transition — only on key containers, not all elements (perf) */
+html,
+.App,
+.App-header,
+.App-main,
+.App-footer,
+.dash__hero,
+.dash__monitoring,
+.dash__scan-history,
+.panel-card,
+.dash__stat-box,
+.dash__tab,
+.result {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
 /* ===== Responsive ===== */
 @media (max-width: 768px) {
-  .App-header__title { font-size: 22px; }
+  .App-header__title { font-size: 24px; }
   .App-header__desc  { font-size: 12px; }
   .App-main { padding: 16px 12px; }
 }

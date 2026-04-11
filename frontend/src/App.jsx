@@ -14,12 +14,29 @@ if (API_BASE) axios.defaults.withCredentials = true;
 
 const HEALTH_CHECK_INTERVAL_MS = 120000; // 2분
 
+function getInitialTheme() {
+  const stored = localStorage.getItem('sns-monitor-theme');
+  if (stored === 'dark' || stored === 'light') return stored;
+  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) return 'dark';
+  return 'light';
+}
+
 function App() {
   const [servicesStatus, setServicesStatus] = useState({});
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
+  const [theme, setTheme] = useState(getInitialTheme);
   const { toasts, removeToast, error: showError } = useToast();
   const showErrorRef = useRef(showError);
   showErrorRef.current = showError;
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('sns-monitor-theme', theme);
+  }, [theme]);
+
+  const toggleTheme = useCallback(() => {
+    setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
+  }, []);
 
   const checkServicesStatus = useCallback(async () => {
     try {
@@ -116,11 +133,22 @@ function App() {
             <p className="App-header__desc">
               YouTube · DCInside · Reddit · Telegram · Kakao · X(Twitter) · Instagram · Facebook · Threads
             </p>
-            <div className="App-header__status">
-              <span className={`status-dot ${isBackendOnline ? 'online' : 'offline'}`} aria-hidden="true" />
-              <span className="status-label">
-                API {isBackendOnline ? '연결됨' : '오프라인'}
-              </span>
+            <div className="App-header__controls">
+              <div className="App-header__status">
+                <span className={`status-dot ${isBackendOnline ? 'online' : 'offline'}`} aria-hidden="true" />
+                <span className="status-label">
+                  API {isBackendOnline ? '연결됨' : '오프라인'}
+                </span>
+              </div>
+              <button
+                type="button"
+                className="App-header__theme-toggle"
+                onClick={toggleTheme}
+                aria-label={theme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
+                title={theme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
+              >
+                {theme === 'dark' ? '☀️' : '🌙'}
+              </button>
             </div>
           </div>
         </header>

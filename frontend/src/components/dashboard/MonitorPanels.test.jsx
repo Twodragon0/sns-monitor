@@ -302,8 +302,8 @@ describe('TwitterPanel', () => {
 
   it('renders quick keyword buttons', () => {
     render(<TwitterPanel />);
-    expect(screen.getByText('CreatorBrand')).toBeInTheDocument();
-    expect(screen.getByText('ExampleCorp')).toBeInTheDocument();
+    expect(screen.getByText('유튜브 클립')).toBeInTheDocument();
+    expect(screen.getByText('SNS 이슈')).toBeInTheDocument();
   });
 
   it('renders search input', () => {
