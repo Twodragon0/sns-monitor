@@ -6,32 +6,52 @@ import {
   loadResultsCache as _loadCache, saveResultsCache as _saveCache,
   trimResultForSummarize, detectPlatform,
 } from '../utils/analysis';
+import { PLATFORMS, formatNumber } from '../constants/platforms';
 import {
   OverviewPanel, YouTubePanel,
   DCInsidePanel, TwitterPanel, SocialPanel,
   ScanHistoryPanel,
 } from './dashboard/MonitorPanels';
 import { AnalysisResult } from './dashboard/AnalysisResult';
-import { formatNumber } from './url-analyzer/ResultComponents';
 
 const RESULTS_CACHE_KEY = 'sns-monitor-results';
 
 function loadResultsCache() { return _loadCache(RESULTS_CACHE_KEY); }
 function saveResultsCache(url, result) { _saveCache(RESULTS_CACHE_KEY, url, result); }
 
-const PLATFORMS = {
-  youtube:    { label: 'YouTube',       color: '#FF0000', icon: '▶' },
-  dcinside:   { label: 'DCInside',      color: '#0253fe', icon: '📋' },
-  naver_cafe: { label: '네이버 카페',   color: '#03c75a', icon: '☕' },
-  reddit:     { label: 'Reddit',       color: '#FF4500', icon: '🔗' },
-  telegram:   { label: 'Telegram',     color: '#0088cc', icon: '✈' },
-  kakao:      { label: 'Kakao',        color: '#FEE500', icon: '💬' },
-  twitter:    { label: 'X (Twitter)',  color: '#000000', icon: '𝕏' },
-  instagram:  { label: 'Instagram',    color: '#E1306C', icon: '📸' },
-  facebook:   { label: 'Facebook',     color: '#1877F2', icon: '👥' },
-  threads:    { label: 'Threads',      color: '#000000', icon: '🧵' },
-};
 
+/* ============================================================
+   usePlaceholderRotation Hook
+   ============================================================ */
+const PLACEHOLDER_URLS = [
+  'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+  'https://gall.dcinside.com/mgallery/board/list/?id=example',
+  'https://www.reddit.com/r/korea/comments/...',
+  'https://t.me/example_channel',
+  'https://cafe.naver.com/example',
+  'https://x.com/username/status/123456',
+  'https://www.instagram.com/p/ABC123/',
+  'https://www.threads.net/@username/post/ABC',
+];
+
+function usePlaceholderRotation(isActive) {
+  const [index, setIndex] = useState(0);
+  const [fading, setFading] = useState(false);
+
+  useEffect(() => {
+    if (!isActive) return;
+    const iv = setInterval(() => {
+      setFading(true);
+      setTimeout(() => {
+        setIndex(prev => (prev + 1) % PLACEHOLDER_URLS.length);
+        setFading(false);
+      }, 400);
+    }, 3000);
+    return () => clearInterval(iv);
+  }, [isActive]);
+
+  return { placeholder: PLACEHOLDER_URLS[index], fading };
+}
 
 /* ============================================================
    Main Dashboard Component
@@ -63,27 +83,52 @@ function Dashboard({ onShowError }) {
   }, [history]);
 
   const detectedPlatform = detectPlatform(url);
+  const { placeholder: rotatePlaceholder, fading: placeholderFading } = usePlaceholderRotation(!url);
 
   // --- Load monitoring data ---
+  // 한 번만 에러 토스트를 띄워 스팸 방지 (60초 주기 재조회마다 알림 울리지 않도록)
+  const monitorErrorNotifiedRef = useRef(false);
   const loadMonitorData = useCallback(async () => {
-    try {
-      const [channelsRes, galleriesRes, creatorsRes] = await Promise.allSettled([
-        fetch(`${API_BASE}/api/channels`).then(r => r.ok ? r.json() : { channels: [] }),
-        fetch(`${API_BASE}/api/dcinside/galleries`, { signal: AbortSignal.timeout(10000) })
-          .then(r => r.ok ? r.json() : { galleries: [] }),
-        fetch(`${API_BASE}/api/vuddy/creators`).then(r => r.ok ? r.json() : { creators: [] }),
-      ]);
+    const okOrThrow = (r) => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    };
+    const [channelsRes, galleriesRes, creatorsRes] = await Promise.allSettled([
+      fetch(`${API_BASE}/api/channels`).then(okOrThrow),
+      fetch(`${API_BASE}/api/dcinside/galleries`, { signal: AbortSignal.timeout(10000) }).then(okOrThrow),
+      fetch(`${API_BASE}/api/vuddy/creators`).then(okOrThrow),
+    ]);
 
-      setMonitorData({
-        channels: channelsRes.status === 'fulfilled' ? (channelsRes.value.channels || []) : [],
-        galleries: galleriesRes.status === 'fulfilled' ? (galleriesRes.value.galleries || []) : [],
-        creators: creatorsRes.status === 'fulfilled' ? (creatorsRes.value.creators || []) : [],
-        loading: false,
-      });
-    } catch {
-      setMonitorData(prev => ({ ...prev, loading: false }));
+    const failures = [];
+    const pick = (res, label, key) => {
+      if (res.status === 'fulfilled') return res.value[key] || [];
+      failures.push(label);
+      return [];
+    };
+
+    setMonitorData({
+      channels: pick(channelsRes, 'YouTube 채널', 'channels'),
+      galleries: pick(galleriesRes, 'DCInside 갤러리', 'galleries'),
+      creators: pick(creatorsRes, '크리에이터', 'creators'),
+      loading: false,
+    });
+
+    // 세 엔드포인트 모두 실패 → 백엔드 오프라인 가능성 → 한 번만 알림
+    // 부분 실패 또는 완전 복구 → 플래그 초기화 (다음 전체 실패 시 다시 알림)
+    if (failures.length === 3) {
+      if (!monitorErrorNotifiedRef.current) {
+        monitorErrorNotifiedRef.current = true;
+        onShowError?.(`모니터링 데이터 로드 실패 (${failures.join(', ')}). 백엔드 상태와 네트워크를 확인해 주세요.`);
+      }
+    } else {
+      // 부분 복구 또는 완전 복구 → 다음 전체 실패 때 다시 알릴 수 있도록 플래그 초기화
+      monitorErrorNotifiedRef.current = false;
+      if (failures.length > 0) {
+        // 부분 실패는 개발자 콘솔에만 남김
+        console.warn('[Dashboard] partial monitor data failure:', failures);
+      }
     }
-  }, []);
+  }, [onShowError]);
 
   useEffect(() => {
     loadMonitorData();
@@ -140,6 +185,8 @@ function Dashboard({ onShowError }) {
         setAnalysisError('API 서버에 연결할 수 없습니다. Docker를 실행했는지 확인해 주세요. (docker-compose up -d)');
       } else if (err.response?.status === 429) {
         setAnalysisError('요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.');
+      } else if (err.response?.status >= 500) {
+        setAnalysisError(`서버 오류 (${err.response.status}): 백엔드에서 분석 처리 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요. ${msg ? `(${msg})` : ''}`);
       } else {
         setAnalysisError(msg);
       }
@@ -157,8 +204,17 @@ function Dashboard({ onShowError }) {
       const { data } = await axios.post(`${API_BASE}/api/analyze/summarize`, { result: payload }, { timeout: 60000 });
       setAnalysisSummary(data);
     } catch (err) {
-      const msg = err.response?.data?.error || err.message || '요약 실패';
-      setAnalysisError(err.response?.status === 413 ? '요청 크기가 서버 제한을 초과했습니다.' : msg);
+      if (!err.response && err.code === 'ECONNABORTED') {
+        setAnalysisError('요약 요청 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.');
+      } else if (!err.response && (err.code === 'ERR_NETWORK' || err.message === 'Network Error')) {
+        setAnalysisError('API 서버에 연결할 수 없습니다. Docker를 실행했는지 확인해 주세요. (docker-compose up -d)');
+      } else if (err.response?.status === 413) {
+        setAnalysisError('요청 크기가 서버 제한을 초과했습니다.');
+      } else if (err.response?.status === 429) {
+        setAnalysisError('요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.');
+      } else {
+        setAnalysisError(err.response?.data?.error || err.message || '요약 실패');
+      }
     } finally {
       setSummaryLoading(false);
     }
@@ -200,11 +256,11 @@ function Dashboard({ onShowError }) {
         <form className="dash__search" onSubmit={handleAnalyze}>
           <div className="dash__search-wrap">
             <input
-              className="dash__search-input"
+              className={`dash__search-input${placeholderFading ? ' dash__search-input--ph-fade' : ''}`}
               type="url"
               value={url}
               onChange={e => { setUrl(e.target.value); setAnalysisError(null); }}
-              placeholder="https://www.youtube.com/... 또는 갤러리·네이버 카페·서브레딧 등 URL"
+              placeholder={rotatePlaceholder}
               disabled={analysisLoading}
               aria-label="분석할 URL"
             />
@@ -414,5 +470,4 @@ function StatBox({ icon, label, value }) {
   );
 }
 
-/** 요약 텍스트 표시: 줄바꿈 유지, **bold** 만 <strong>으로 렌더 (마크다운 미지원 시 가독성) */
 export default Dashboard;

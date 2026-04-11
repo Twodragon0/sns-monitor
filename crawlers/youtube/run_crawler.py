@@ -6,7 +6,7 @@ import json
 import logging
 import sys
 import os
-from lambda_function import lambda_handler, YOUTUBE_CHANNELS
+from crawler import lambda_handler, YOUTUBE_CHANNELS
 
 logger = logging.getLogger(__name__)
 

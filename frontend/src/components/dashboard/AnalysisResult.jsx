@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import DOMPurify from 'dompurify';
 import axios from 'axios';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -10,34 +11,13 @@ import {
   NAVER_FETCH_STATUS_LABELS,
   formatNaverFetchReason, parseNaverReasonTokens, getNaverDiagnosticActions,
 } from '../../utils/analysis';
+import {
+  PLATFORMS, SENTIMENT_COLORS, formatNumber,
+  sortComments, sortYoutubeComments,
+} from '../../constants/platforms';
 
-export const SENTIMENT_COLORS = {
-  positive: '#10b981',
-  neutral:  '#9ca3af',
-  negative: '#ef4444',
-};
-
-export const PLATFORMS = {
-  youtube:    { label: 'YouTube',       color: '#FF0000', icon: '▶' },
-  dcinside:   { label: 'DCInside',      color: '#0253fe', icon: '📋' },
-  naver_cafe: { label: '네이버 카페',   color: '#03c75a', icon: '☕' },
-  reddit:     { label: 'Reddit',       color: '#FF4500', icon: '🔗' },
-  telegram:   { label: 'Telegram',     color: '#0088cc', icon: '✈' },
-  kakao:      { label: 'Kakao',        color: '#FEE500', icon: '💬' },
-  twitter:    { label: 'X (Twitter)',  color: '#000000', icon: '𝕏' },
-  instagram:  { label: 'Instagram',    color: '#E1306C', icon: '📸' },
-  facebook:   { label: 'Facebook',     color: '#1877F2', icon: '👥' },
-  threads:    { label: 'Threads',      color: '#000000', icon: '🧵' },
-};
-
-function formatNumber(num) {
-  if (num == null) return null;
-  const n = typeof num === 'string' ? parseInt(num.replace(/[,\s]/g, ''), 10) : Number(num);
-  if (isNaN(n)) return '0';
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toLocaleString();
-}
+// Re-export shared constants/utilities so existing imports from this file keep working
+export { PLATFORMS, SENTIMENT_COLORS, sortComments, sortYoutubeComments };
 
 /** 요약 텍스트 표시: 줄바꿈 유지, **bold** 만 <strong>으로 렌더 (마크다운 미지원 시 가독성) */
 export function renderSummaryContent(text) {
@@ -137,7 +117,12 @@ export function AnalysisResult({ result, summary, summaryLoading, onSummarize, o
   const sentiment = analysis?.sentiment;
   const hasYoutubeComments =
     result.platform === 'youtube' && Array.isArray(result.comments) && result.comments.length > 0;
-  const items = !hasYoutubeComments ? (result.comments || result.posts || result.recent_videos || []) : [];
+  const hasTwitterComments =
+    result.platform === 'twitter' && result.type === 'tweet' && Array.isArray(result.comments) && result.comments.length > 0;
+  // When YouTube or Twitter has dedicated comment sections, exclude comments from generic items
+  const items = (hasYoutubeComments || hasTwitterComments)
+    ? (result.posts || result.recent_videos || [])
+    : (result.comments || result.replies || result.posts || result.recent_videos || []);
   const isNaverSinglePost = result.platform === 'naver_cafe' && result.type === 'post';
   const naverFetchStatus = result.fetch_status || 'ok';
   const naverFetchReason = result.fetch_reason || '';
@@ -265,7 +250,19 @@ export function AnalysisResult({ result, summary, summaryLoading, onSummarize, o
         </div>
       )}
 
-      {result.description && (
+      {/* Threads 게시글 임베드 + 댓글 */}
+      {result.platform === 'threads' && result.type === 'post' && (
+        <ThreadsPostBlock
+          embedHtml={result.embed_html}
+          url={result.url}
+          replies={result.replies}
+          description={result.description}
+          content={result.content}
+          result={result}
+        />
+      )}
+
+      {result.description && !(result.platform === 'threads' && result.type === 'post') && (
         <div className="result__desc">
           <h4>설명</h4>
           <p>{result.description}</p>
@@ -333,62 +330,40 @@ export function AnalysisResult({ result, summary, summaryLoading, onSummarize, o
         />
       )}
 
-      {/* 수집된 콘텐츠: 댓글 / 게시글 / 최근 영상 (제목·목록·미리보기 개선) */}
-      {!((result.platform === 'dcinside' || result.platform === 'naver_cafe') && result.type === 'gallery') && items.length > 0 && (
-        <div className="result__items">
-          <div className="result__items-head">
-            <h4 className="result__items-title">
-              수집된 콘텐츠
-              <span className="result__items-count">{result.comments ? '댓글' : result.recent_videos ? '영상' : '게시글'} {formatNumber(items.length)}건</span>
-            </h4>
-          </div>
-          {result.platform === 'instagram' && (
-            <p className="result__items-hint">게시글 내용은 og:meta로 수집됩니다. 댓글 수집은 Instagram 공식 API가 필요합니다.</p>
-          )}
-          <div className="result__items-list">
-            {items.slice(0, (result.platform === 'dcinside' || result.platform === 'instagram') ? 50 : 15).map((item, i) => (
-              <div
-                key={i}
-                className={`result__item ${item.url ? 'result__item--clickable' : ''}`}
-                onClick={() => {
-                  if (item.url) {
-                    window.open(item.url, '_blank', 'noopener,noreferrer');
-                  }
-                }}
-              >
-                {result.platform === 'instagram' && result.thumbnail && i === 0 && (
-                  <a href={item.url || result.url} target="_blank" rel="noopener noreferrer" className="result__item-thumb">
-                    <img src={result.thumbnail} alt="" width={120} height={120} style={{ objectFit: 'cover', borderRadius: 8 }} />
-                  </a>
-                )}
-                <div className="result__item-text">{(item.text || item.title || item.selftext || '').trim() || '(내용 없음)'}</div>
-                <div className="result__item-meta">
-                  {item.author && <span className="result__item-author">{item.author}</span>}
-                  {(item.like_count ?? item.score ?? item.recommend) != null && <span>👍 {formatNumber(item.like_count ?? item.score ?? item.recommend ?? 0)}</span>}
-                  {item.view_count != null && <span>👁 {formatNumber(item.view_count)}</span>}
-                  {(item.published_at || item.date) && <span>{item.published_at || item.date}</span>}
-                </div>
-                {item.url && (
-                  <a href={item.url} target="_blank" rel="noopener noreferrer" className="result__item-link">원문 →</a>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
+      {/* Twitter/X: 트윗 댓글(리플라이) */}
+      {(hasTwitterComments || (result.platform === 'twitter' && result.type === 'tweet' && (result.reply_count > 0 || result.comment_count > 0))) && (
+        <TwitterReplies
+          comments={result.comments || []}
+          replyCount={result.reply_count || result.comment_count || (result.comments || []).length}
+        />
+      )}
+
+      {/* Reddit: 서브레딧 게시글 목록 */}
+      {result.platform === 'reddit' && result.type === 'subreddit' && result.posts?.length > 0 && (
+        <RedditSubredditPosts posts={result.posts} totalPosts={result.total_posts} />
+      )}
+
+      {/* Reddit: 단일 게시글 댓글 */}
+      {result.platform === 'reddit' && result.type === 'post' && result.comments?.length > 0 && (
+        <RedditPostComments result={result} />
+      )}
+
+      {/* Telegram: 채널 메시지 */}
+      {result.platform === 'telegram' && (result.posts?.length > 0 || result.comments?.length > 0) && (
+        <TelegramMessages
+          messages={result.posts?.length > 0 ? result.posts : result.comments}
+          totalMessages={result.total_messages}
+        />
+      )}
+
+      {/* Generic fallback: 기타 플랫폼 콘텐츠 */}
+      {!((result.platform === 'dcinside' || result.platform === 'naver_cafe') && result.type === 'gallery') && !(result.platform === 'reddit' && (result.type === 'subreddit' || result.type === 'post')) && !(result.platform === 'telegram') && !(result.platform === 'threads' && result.type === 'post') && !(result.platform === 'twitter' && result.type === 'tweet') && items.length > 0 && (
+        <GenericItemsAccordion items={items} result={result} />
       )}
     </div>
   );
 }
 
-/* 댓글 정렬: 등록순(기본) | 최신순 | 답글순(동일) */
-export function sortComments(comments, order) {
-  if (!comments?.length) return comments || [];
-  const list = [...comments];
-  if (order === '최신순' && list.some(c => c.date)) {
-    list.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-  }
-  return list;
-}
 
 export const POSTS_PER_PAGE = 50;
 
@@ -398,18 +373,6 @@ export const POST_SORT_OPTIONS = [
   { value: 'popular', label: '인기순' },
   { value: 'comments', label: '댓글 많은 순' },
 ];
-
-export function sortYoutubeComments(comments, order) {
-  if (!comments?.length) return comments || [];
-  const list = [...comments];
-  if (order === '최신순' && list.some(c => c.published_at)) {
-    list.sort((a, b) => (b.published_at || '').localeCompare(a.published_at || ''));
-  }
-  if (order === '좋아요순') {
-    list.sort((a, b) => (b.like_count ?? 0) - (a.like_count ?? 0));
-  }
-  return list;
-}
 
 export function sortPosts(posts, sortBy) {
   if (!posts?.length) return posts || [];
@@ -443,7 +406,11 @@ export function DCInsideResultPosts({ posts, totalPosts, loginVerified, isNaverC
   const [currentPage, setCurrentPage] = useState(1);
   const [postSort, setPostSort] = useState('date_desc');
   const [localPosts, setLocalPosts] = useState(posts);
-  const [loadingPostNo, setLoadingPostNo] = useState(null);
+  // 단건 URL 재수집 진행 중인 postKey 집합 (Set<key>): 게시글별 독립 single-flight
+  const [loadingPostKeys, setLoadingPostKeys] = useState(() => new Set());
+  // 단건 URL 재수집을 게시글당 1회로 제한 (실패한 경우 해머링 방지)
+  // 값: 'done'(성공/실패 관계없이 시도 완료) 또는 에러 메시지
+  const [refetchState, setRefetchState] = useState(() => new Map());
 
   useEffect(() => {
     setLocalPosts(posts);
@@ -578,7 +545,8 @@ export function DCInsideResultPosts({ posts, totalPosts, loginVerified, isNaverC
 
       <div className="result__items-list">
         {postsOnPage.map((post, idx) => {
-          const postKey = post.number ?? post.post_id ?? idx;
+          // Fix 1: use post.url as primary stable key; fall back to post_id/number/page+idx
+          const postKey = post.url ?? post.post_id ?? post.number ?? `page${currentPage}-idx${idx}`;
           const commentList = post.comments ?? [];
           const collectedCount = commentList.length;
           const listCount = post.comment_count ?? null;
@@ -589,37 +557,50 @@ export function DCInsideResultPosts({ posts, totalPosts, loginVerified, isNaverC
             : `댓글 (${collectedCount})`;
           const collectionFailed = listCount != null && listCount > 0 && collectedCount === 0;
 
+          const refetchInfo = refetchState.get(postKey);
+          const alreadyAttempted = refetchInfo !== undefined;
+          const refetchErrorMsg = typeof refetchInfo === 'string' && refetchInfo !== 'done' ? refetchInfo : null;
+          // Fix 2: per-post loading check (Set-based, not scalar)
+          const isLoadingThis = loadingPostKeys.has(postKey);
+
           const toggleComments = async (e) => {
             if (e.target.closest('a')) return;
             const willExpand = !isExpanded;
             // 댓글이 목록상 1개 이상인데 아직 수집되지 않은 경우, 단건 URL로 재수집 시도
-            if (willExpand && collectionFailed && post.url && !loadingPostNo) {
+            // - 게시글당 최대 1회만 재시도 (alreadyAttempted 가드)로 해머링 방지
+            // Fix 2: guard per-post, not global — allows parallel refetches for different posts
+            if (willExpand && collectionFailed && post.url && !isLoadingThis && !alreadyAttempted) {
               try {
-                setLoadingPostNo(postKey);
+                setLoadingPostKeys((prev) => new Set(prev).add(postKey));
                 const { data } = await axios.post(
                   `${API_BASE}/api/analyze/url`,
                   { url: post.url },
                   { timeout: 300000 },
                 );
                 const newComments = Array.isArray(data.comments) ? data.comments : [];
+                // Fix 1: match by p.url — avoids closure-idx footgun
+                // Fix 3: drop || p.comment_count so empty refetch returns 0, not stale count
                 setLocalPosts((prev) =>
                   prev.map((p) =>
-                    (p.number ?? p.post_id ?? idx) === postKey
+                    p.url === post.url
                       ? {
                           ...p,
                           comments: newComments,
                           comment_count:
                             typeof data.comment_count === 'number'
                               ? data.comment_count
-                              : newComments.length || p.comment_count,
+                              : newComments.length,
                         }
                       : p,
                   ),
                 );
+                setRefetchState((prev) => new Map(prev).set(postKey, 'done'));
               } catch (err) {
-                // 실패 시 기존 수집 실패 메시지 유지
+                // 실패 메시지를 인라인 표시하여 침묵 실패 방지
+                const msg = err?.response?.data?.error || err?.message || '댓글 재수집 실패';
+                setRefetchState((prev) => new Map(prev).set(postKey, msg));
               } finally {
-                setLoadingPostNo(null);
+                setLoadingPostKeys((prev) => { const s = new Set(prev); s.delete(postKey); return s; });
               }
             }
             setExpandedNo(willExpand ? postKey : null);
@@ -665,7 +646,7 @@ export function DCInsideResultPosts({ posts, totalPosts, loginVerified, isNaverC
                 <div className="result__comment-count">
                   <span className="result__comment-hint" aria-hidden="true">
                     💬 {commentLabel}
-                    {collectionFailed && !loadingPostNo && (
+                    {collectionFailed && !isLoadingThis && (
                       <span
                         className="result__comment-fail"
                         title="목록에는 댓글이 있으나 초기 수집에 실패했습니다. 클릭 시 단건 URL로 다시 시도합니다."
@@ -674,8 +655,16 @@ export function DCInsideResultPosts({ posts, totalPosts, loginVerified, isNaverC
                         (수집 실패)
                       </span>
                     )}
-                    {loadingPostNo === postKey && (
+                    {isLoadingThis && (
                       <span className="result__comment-fail"> (댓글 불러오는 중…)</span>
+                    )}
+                    {refetchErrorMsg && !isLoadingThis && (
+                      <span
+                        className="result__comment-fail"
+                        title={refetchErrorMsg}
+                      >
+                        {' '}(재수집 실패: {refetchErrorMsg})
+                      </span>
                     )}
                     {' '}{isExpanded ? '접기 ▲' : '클릭 시 보기 ▼'}
                   </span>
@@ -849,6 +838,480 @@ export function YouTubeComments({ comments, totalComments }) {
               </ul>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* --- Threads Post Block --- */
+export function ThreadsPostBlock({ embedHtml, url, replies, description, content, result }) {
+  const embedRef = React.useRef(null);
+  const [showAllReplies, setShowAllReplies] = useState(false);
+
+  useEffect(() => {
+    if (!embedHtml) return;
+    const container = embedRef.current;
+    if (!container) return;
+    if (container.querySelector('[data-text-post-permalink]')) return;
+    const sanitized = DOMPurify.sanitize(embedHtml, {
+      ADD_TAGS: ['blockquote'],
+      ADD_ATTR: ['data-text-post-permalink', 'data-text-post-version', 'class', 'style', 'cite'],
+      FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form'],
+    });
+    container.innerHTML = sanitized;
+    const existing = document.querySelector('script[src="https://www.threads.com/embed.js"]');
+    if (existing) return;
+    const script = document.createElement('script');
+    script.src = 'https://www.threads.com/embed.js';
+    script.async = true;
+    document.body.appendChild(script);
+    return () => {
+      if (script.parentNode) script.parentNode.removeChild(script);
+    };
+  }, [embedHtml]);
+
+  const replyList = Array.isArray(replies) ? replies : [];
+  const hasEmbed = !!embedHtml?.trim();
+  const postContent = content || description || '';
+  const displayReplies = showAllReplies ? replyList : replyList.slice(0, 20);
+  const hasToken = result?.source === 'threads_api';
+
+  return (
+    <div className="result__desc result__threads-block">
+      <h4>게시글</h4>
+      {hasEmbed ? (
+        <div ref={embedRef} className="result__threads-embed" />
+      ) : postContent ? (
+        <div className="result__threads-content">
+          <p className="result__threads-text">{postContent}</p>
+        </div>
+      ) : (
+        <p className="result__threads-no-embed">게시글 내용을 불러오지 못했습니다. 원문 링크에서 확인해 주세요.</p>
+      )}
+      {url && (
+        <a href={url} target="_blank" rel="noopener noreferrer" className="result__link" style={{ display: 'inline-block', marginTop: 8 }}>
+          Threads 원문 보기 →
+        </a>
+      )}
+      <h4>
+        댓글 {replyList.length > 0
+          ? `(${replyList.length}${result?.reply_count > replyList.length ? ` / ${result.reply_count}` : ''})`
+          : result?.reply_count > 0 ? `(${result.reply_count}건)` : ''}
+      </h4>
+      {replyList.length > 0 ? (
+        <>
+          <ul className="result__comments-sublist">
+            {displayReplies.map((r, i) => (
+              <li key={i} className="result__comment-item">
+                <span className="result__comment-meta-inline">
+                  {r.author && <span className="result__comment-author">{r.author}</span>}
+                  {r.date && <span className="result__comment-date">{r.date}</span>}
+                </span>
+                <span className="result__comment-text">{r.text || r.title || ''}</span>
+              </li>
+            ))}
+          </ul>
+          {replyList.length > 20 && !showAllReplies && (
+            <button className="result__show-more-btn" onClick={() => setShowAllReplies(true)}>
+              나머지 {replyList.length - 20}개 댓글 더 보기
+            </button>
+          )}
+        </>
+      ) : !hasToken ? (
+        <div className="result__threads-hint">
+          <p>THREADS_ACCESS_TOKEN을 설정하면 댓글(답글)을 수집할 수 있습니다.</p>
+          <p className="result__threads-hint-detail">
+            Meta Developer 앱에서 Threads API 권한(threads_basic, threads_read_replies)을 활성화하고,
+            발급받은 Access Token을 .env에 설정하세요.
+          </p>
+        </div>
+      ) : (
+        <p className="result__threads-hint">이 게시글에 댓글이 없습니다.</p>
+      )}
+    </div>
+  );
+}
+
+/* --- Reddit Subreddit Posts --- */
+export function RedditSubredditPosts({ posts, totalPosts }) {
+  const [expandedNo, setExpandedNo] = useState(null);
+  const [commentVisibleCounts, setCommentVisibleCounts] = useState({});
+  const COMMENT_PAGE_SIZE = 10;
+
+  const showMoreComments = (postKey) => {
+    setCommentVisibleCounts(prev => ({
+      ...prev,
+      [postKey]: (prev[postKey] || COMMENT_PAGE_SIZE) + COMMENT_PAGE_SIZE,
+    }));
+  };
+
+  const postsWithComments = posts.filter(p => p.comments?.length > 0).length;
+
+  return (
+    <div className="result__items">
+      <div className="result__items-head">
+        <h4>Posts ({posts.length}건{totalPosts > posts.length ? ` / 전체 ${totalPosts}건` : ''})</h4>
+        <p className="result__items-hint" aria-hidden="true">
+          각 항목을 클릭하면 댓글이 표시됩니다. (댓글 있는 글 {postsWithComments}건)
+        </p>
+      </div>
+      <div className="result__items-list">
+        {posts.slice(0, 50).map((post, idx) => {
+          const postKey = idx;
+          const hasComments = post.comments?.length > 0;
+          const isExpanded = expandedNo === postKey;
+          return (
+            <div key={postKey} className="result__item result__item--dcinside">
+              {post.permalink ? (
+                <a href={post.permalink} target="_blank" rel="noopener noreferrer" className="result__item-text result__item-text--link">
+                  {post.text}
+                </a>
+              ) : (
+                <div className="result__item-text">{post.text}</div>
+              )}
+              {post.selftext && <div className="result__item-selftext">{post.selftext}</div>}
+              <div className="result__item-meta">
+                {post.author && <span className="result__item-author">{post.author}</span>}
+                {post.score != null && <span>⬆ {formatNumber(post.score)}</span>}
+                {post.num_comments != null && <span>💬 {post.num_comments}</span>}
+                {post.created_utc > 0 && (
+                  <span>{new Date(post.created_utc * 1000).toLocaleString('ko-KR')}</span>
+                )}
+              </div>
+              {post.permalink && (
+                <a href={post.permalink} target="_blank" rel="noopener noreferrer" className="result__item-link">
+                  View →
+                </a>
+              )}
+              {hasComments && (
+                <div className="result__comment-wrap">
+                  <div className="result__comment-count">
+                    <button
+                      type="button"
+                      className="result__comments-toggle result__comments-toggle--post"
+                      onClick={() => setExpandedNo(isExpanded ? null : postKey)}
+                      aria-expanded={isExpanded}
+                    >
+                      💬 댓글 {post.comments.length}개 {isExpanded ? '접기 ▲' : '클릭 시 보기 ▼'}
+                    </button>
+                  </div>
+                  {isExpanded && (
+                    <ul className="result__comments-sublist">
+                      {post.comments.slice(0, commentVisibleCounts[postKey] || COMMENT_PAGE_SIZE).map((c, i) => (
+                        <li key={i} className="result__comment-item">
+                          <span className="result__comment-meta-inline">
+                            <span className="result__comment-author">{c.author}</span>
+                            {c.score != null && <span className="result__comment-score">⬆ {c.score}</span>}
+                          </span>
+                          <span className="result__comment-text">{c.text}</span>
+                        </li>
+                      ))}
+                      {post.comments.length > (commentVisibleCounts[postKey] || COMMENT_PAGE_SIZE) && (
+                        <li className="result__comment-show-more">
+                          <button
+                            type="button"
+                            className="result__show-more-btn"
+                            onClick={() => showMoreComments(postKey)}
+                          >
+                            더 보기 ({commentVisibleCounts[postKey] || COMMENT_PAGE_SIZE}/{post.comments.length})
+                          </button>
+                        </li>
+                      )}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* --- Reddit Post Comments --- */
+export function RedditPostComments({ result }) {
+  const [expanded, setExpanded] = useState(true);
+  const [visibleCount, setVisibleCount] = useState(10);
+  const [order, setOrder] = useState('등록순');
+  const PAGE_SIZE = 10;
+
+  const sorted = useMemo(() => {
+    if (!result.comments?.length) return [];
+    const list = [...result.comments];
+    if (order === '최신순') list.sort((a, b) => (b.created_utc || 0) - (a.created_utc || 0));
+    if (order === '좋아요순') list.sort((a, b) => (b.score || 0) - (a.score || 0));
+    return list;
+  }, [result.comments, order]);
+
+  return (
+    <div className="result__items">
+      <div className="result__comment-count-bar">
+        <div className="result__comment-count-inner">
+          <span className="result__comment-count-label">💬 Comments ({sorted.length})</span>
+          <div className="result__comment-sort">
+            {['등록순', '최신순', '좋아요순'].map(o => (
+              <button
+                key={o}
+                type="button"
+                className={`result__comment-sort-btn ${order === o ? 'is-active' : ''}`}
+                onClick={() => setOrder(o)}
+              >
+                {o}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            className="result__comments-toggle result__comments-toggle--all"
+            onClick={() => setExpanded(v => !v)}
+            aria-expanded={expanded}
+          >
+            {expanded ? '접기' : '펼치기'}
+          </button>
+        </div>
+      </div>
+      {expanded && (
+        <ul className="result__comments-sublist">
+          {sorted.slice(0, visibleCount).map((c, i) => (
+            <li key={i} className="result__comment-item">
+              <span className="result__comment-meta-inline">
+                <span className="result__comment-author">{c.author}</span>
+                {c.score != null && <span className="result__comment-score">⬆ {c.score}</span>}
+                {c.created_utc > 0 && (
+                  <span className="result__comment-date">{new Date(c.created_utc * 1000).toLocaleString('ko-KR')}</span>
+                )}
+              </span>
+              <span className="result__comment-text">{c.text}</span>
+            </li>
+          ))}
+          {sorted.length > visibleCount && (
+            <li className="result__comment-show-more">
+              <button
+                type="button"
+                className="result__show-more-btn"
+                onClick={() => setVisibleCount(v => v + PAGE_SIZE)}
+              >
+                더 보기 ({visibleCount}/{sorted.length})
+              </button>
+            </li>
+          )}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/* --- Telegram Messages --- */
+export function TelegramMessages({ messages, totalMessages }) {
+  const [expanded, setExpanded] = useState(true);
+  const [visibleCount, setVisibleCount] = useState(20);
+  const [order, setOrder] = useState('등록순');
+  const PAGE_SIZE = 20;
+
+  const sorted = useMemo(() => {
+    if (!messages?.length) return [];
+    const list = [...messages];
+    if (order === '최신순' && list.some(m => m.date)) {
+      list.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    }
+    return list;
+  }, [messages, order]);
+
+  const label = totalMessages ? `${messages.length}건 / 전체 ${formatNumber(totalMessages)}건` : `${messages.length}건`;
+
+  return (
+    <div className="result__items">
+      <div className="result__items-head">
+        <h4>수집된 콘텐츠</h4>
+      </div>
+      <div className="result__comment-count-bar">
+        <div className="result__comment-count-inner">
+          <span className="result__comment-count-label">메시지 ({label})</span>
+          <div className="result__comment-sort">
+            {['등록순', '최신순'].map(o => (
+              <button
+                key={o}
+                type="button"
+                className={`result__comment-sort-btn ${order === o ? 'is-active' : ''}`}
+                onClick={() => setOrder(o)}
+              >
+                {o}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            className="result__comments-toggle result__comments-toggle--all"
+            onClick={() => setExpanded(v => !v)}
+            aria-expanded={expanded}
+          >
+            {expanded ? '접기' : '펼치기'}
+          </button>
+        </div>
+      </div>
+      {expanded && (
+        <div className="result__items-list">
+          {sorted.slice(0, visibleCount).map((msg, idx) => (
+            <div key={idx} className="result__item">
+              <div className="result__item-text">{msg.text || ''}</div>
+              <div className="result__item-meta">
+                {msg.date && <span>{msg.date}</span>}
+                {msg.views && <span>👁 {msg.views}</span>}
+              </div>
+            </div>
+          ))}
+          {sorted.length > visibleCount && (
+            <button
+              type="button"
+              className="result__show-more-btn"
+              onClick={() => setVisibleCount(v => v + PAGE_SIZE)}
+              style={{ margin: '12px auto', display: 'block' }}
+            >
+              더 보기 ({visibleCount}/{sorted.length})
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* --- Twitter Replies --- */
+export function TwitterReplies({ comments, replyCount }) {
+  const [expanded, setExpanded] = useState(true);
+  const [visibleCount, setVisibleCount] = useState(20);
+  const [sortOrder, setSortOrder] = useState('좋아요순');
+  const PAGE_SIZE = 20;
+
+  const sorted = useMemo(() => {
+    const list = [...comments];
+    if (sortOrder === '좋아요순') {
+      list.sort((a, b) => (b.like_count ?? 0) - (a.like_count ?? 0));
+    } else if (sortOrder === '최신순') {
+      list.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    }
+    return list;
+  }, [comments, sortOrder]);
+
+  return (
+    <div className="result__items">
+      <div className="result__comment-count-bar">
+        <div className="result__comment-count-inner">
+          <span className="result__comment-count-label">💬 댓글 ({replyCount}건 중 {comments.length}건 수집)</span>
+          <select
+            className="result__comment-sort-select"
+            value={sortOrder}
+            onChange={e => setSortOrder(e.target.value)}
+          >
+            <option value="좋아요순">좋아요순</option>
+            <option value="최신순">최신순</option>
+            <option value="등록순">등록순</option>
+          </select>
+          <button
+            type="button"
+            className="result__comments-toggle result__comments-toggle--all"
+            onClick={() => setExpanded(v => !v)}
+            aria-expanded={expanded}
+          >
+            {expanded ? '접기' : '펼치기'}
+          </button>
+        </div>
+      </div>
+      {expanded && (
+        <div className="result__items-list">
+          {sorted.slice(0, visibleCount).map((c, idx) => (
+            <div key={idx} className="result__item">
+              <div className="result__item-text">{c.text}</div>
+              <div className="result__item-meta">
+                {c.author && <span className="result__item-author">{c.author}</span>}
+                {c.like_count != null && <span>👍 {formatNumber(c.like_count)}</span>}
+                {c.date && <span>{c.date}</span>}
+              </div>
+            </div>
+          ))}
+          {sorted.length > visibleCount && (
+            <button
+              type="button"
+              className="result__show-more-btn"
+              onClick={() => setVisibleCount(v => v + PAGE_SIZE)}
+              style={{ margin: '12px auto', display: 'block' }}
+            >
+              더 보기 ({visibleCount}/{sorted.length})
+            </button>
+          )}
+        </div>
+      )}
+      {!comments.length && replyCount > 0 && (
+        <div className="result__twitter-hint" role="status">
+          <p><strong>댓글을 수집하려면 TWITTER_BEARER_TOKEN이 필요합니다.</strong></p>
+          <p>.env에 <code>TWITTER_BEARER_TOKEN</code>을 설정하고 재시작하면 트윗의 댓글(리플라이)이 함께 수집됩니다.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* --- Generic Items Accordion (fallback) --- */
+export function GenericItemsAccordion({ items, result }) {
+  const [expanded, setExpanded] = useState(result.platform === 'reddit');
+  const [visibleCount, setVisibleCount] = useState(20);
+  const PAGE_SIZE = 20;
+
+  const label = result.platform === 'dcinside' && result.type === 'post'
+    ? `댓글 (${items.length})`
+    : result.replies
+      ? `댓글 (${items.length})`
+      : `${result.comments ? '댓글' : result.recent_videos ? '최근 영상' : '게시글'} (${items.length})`;
+
+  return (
+    <div className="result__items">
+      <div className="result__comment-count-bar">
+        <div className="result__comment-count-inner">
+          <span className="result__comment-count-label">💬 {label}</span>
+          <button
+            type="button"
+            className="result__comments-toggle result__comments-toggle--all"
+            onClick={() => setExpanded(v => !v)}
+            aria-expanded={expanded}
+          >
+            {expanded ? '접기' : '펼치기'}
+          </button>
+        </div>
+      </div>
+      {expanded && (
+        <div className="result__items-list">
+          {items.slice(0, visibleCount).map((item, idx) => (
+            <div key={idx} className="result__item">
+              <div className="result__item-text">{item.text || item.title || item.selftext || ''}</div>
+              <div className="result__item-meta">
+                {item.author && <span className="result__item-author">{item.author}</span>}
+                {(item.like_count != null || item.score != null || item.recommend != null) && (
+                  <span>👍 {formatNumber(item.like_count ?? item.score ?? item.recommend ?? 0)}</span>
+                )}
+                {item.view_count != null && <span>👁 {formatNumber(item.view_count)}</span>}
+                {item.num_comments != null && <span>💬 {item.num_comments}</span>}
+                {(item.published_at || item.date) && <span>{item.published_at || item.date}</span>}
+                {item.views && <span>👁 {item.views}</span>}
+              </div>
+              {(item.permalink || item.url) && (
+                <a href={item.permalink || item.url} target="_blank" rel="noopener noreferrer" className="result__item-link">
+                  View →
+                </a>
+              )}
+            </div>
+          ))}
+          {items.length > visibleCount && (
+            <button
+              type="button"
+              className="result__show-more-btn"
+              onClick={() => setVisibleCount(v => v + PAGE_SIZE)}
+              style={{ margin: '12px auto', display: 'block' }}
+            >
+              더 보기 ({visibleCount}/{items.length})
+            </button>
+          )}
         </div>
       )}
     </div>

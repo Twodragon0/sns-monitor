@@ -10,6 +10,7 @@ import {
   sortPosts,
   DCInsideResultPosts,
   YouTubeComments,
+  ThreadsPostBlock,
   SENTIMENT_COLORS,
   PLATFORMS,
   POSTS_PER_PAGE,
@@ -914,6 +915,87 @@ describe('DCInsideResultPosts', () => {
       expect(axios.post).toHaveBeenCalled();
     });
   });
+
+  it('does not refetch after first successful attempt', async () => {
+    axios.post = vi.fn().mockResolvedValue({
+      data: {
+        comments: [{ text: 'c1', author: 'a1' }],
+        comment_count: 1,
+      },
+    });
+    const posts = [{
+      number: 8,
+      text: 'Post for dedup refetch',
+      url: 'https://gall.dcinside.com/8',
+      comment_count: 2,
+      comments: [],
+    }];
+    render(<DCInsideResultPosts posts={posts} />);
+    const postCards = () => screen.getAllByRole('button').filter(b => b.getAttribute('aria-expanded') !== null);
+
+    // First expand — triggers refetch
+    fireEvent.click(postCards()[0]);
+    await waitFor(() => {
+      expect(axios.post).toHaveBeenCalledTimes(1);
+    });
+
+    // Collapse
+    fireEvent.click(postCards()[0]);
+    // Re-expand — should NOT trigger another refetch
+    fireEvent.click(postCards()[0]);
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(axios.post).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not refetch after first failed attempt and shows error message', async () => {
+    axios.post = vi.fn().mockRejectedValue(new Error('Network Error'));
+    const posts = [{
+      number: 9,
+      text: 'Post for failed refetch',
+      url: 'https://gall.dcinside.com/9',
+      comment_count: 2,
+      comments: [],
+    }];
+    render(<DCInsideResultPosts posts={posts} />);
+    const postCards = () => screen.getAllByRole('button').filter(b => b.getAttribute('aria-expanded') !== null);
+
+    // First expand — triggers refetch which fails
+    fireEvent.click(postCards()[0]);
+    await waitFor(() => {
+      expect(axios.post).toHaveBeenCalledTimes(1);
+    });
+
+    // Collapse then re-expand — should NOT trigger another refetch
+    fireEvent.click(postCards()[0]);
+    fireEvent.click(postCards()[0]);
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(axios.post).toHaveBeenCalledTimes(1);
+
+    // Error message should be displayed inline
+    await waitFor(() => {
+      expect(screen.getByText(/재수집 실패/)).toBeInTheDocument();
+    });
+  });
+
+  it('does not trigger refetch when collectionFailed is false (comments already collected)', async () => {
+    axios.post = vi.fn();
+    const posts = [{
+      number: 10,
+      text: 'Post with existing comments',
+      url: 'https://gall.dcinside.com/10',
+      comment_count: 2,
+      comments: [{ text: 'existing', author: 'u' }],
+    }];
+    render(<DCInsideResultPosts posts={posts} />);
+    const postCards = screen.getAllByRole('button').filter(b => b.getAttribute('aria-expanded') !== null);
+
+    fireEvent.click(postCards[0]);
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(axios.post).not.toHaveBeenCalled();
+  });
 });
 
 // ─── YouTubeComments ──────────────────────────────────────────────────────────
@@ -997,5 +1079,59 @@ describe('YouTubeComments', () => {
   it('renders empty comment list gracefully', () => {
     const { container } = render(<YouTubeComments comments={[]} />);
     expect(container).toBeTruthy();
+  });
+});
+
+// ─── ThreadsPostBlock ─────────────────────────────────────────────────────────
+// Migrated from url-analyzer/ResultComponents.test.jsx (deleted as dead code).
+// ThreadsPostBlock is exported from ./AnalysisResult (canonical path).
+
+describe('ThreadsPostBlock', () => {
+  it('renders without crashing with no props', () => {
+    const { container } = render(<ThreadsPostBlock result={null} />);
+    expect(container).toBeTruthy();
+  });
+
+  it('shows fallback text when no embed and no content', () => {
+    render(<ThreadsPostBlock result={null} />);
+    expect(screen.getByText(/게시글 내용을 불러오지 못했습니다/i)).toBeInTheDocument();
+  });
+
+  it('shows post content when provided', () => {
+    render(<ThreadsPostBlock content="Hello Threads world" result={null} />);
+    expect(screen.getByText('Hello Threads world')).toBeInTheDocument();
+  });
+
+  it('shows description when content is not provided', () => {
+    render(<ThreadsPostBlock description="My description" result={null} />);
+    expect(screen.getByText('My description')).toBeInTheDocument();
+  });
+
+  it('shows origin link when url is provided', () => {
+    render(<ThreadsPostBlock url="https://www.threads.net/t/abc" result={null} />);
+    expect(screen.getByText(/Threads 원문 보기/i)).toBeInTheDocument();
+  });
+
+  it('shows replies list', () => {
+    const replies = [
+      { author: 'user1', date: '2026-01-01', text: 'Reply 1' },
+      { author: 'user2', date: '2026-01-02', text: 'Reply 2' },
+    ];
+    render(<ThreadsPostBlock replies={replies} result={{ source: 'threads_api' }} />);
+    expect(screen.getByText('Reply 1')).toBeInTheDocument();
+    expect(screen.getByText('Reply 2')).toBeInTheDocument();
+  });
+
+  it('shows "더 보기" button when replies > 20', () => {
+    const replies = Array.from({ length: 25 }, (_, i) => ({
+      author: `user${i}`, text: `Reply ${i}`,
+    }));
+    render(<ThreadsPostBlock replies={replies} result={{ source: 'threads_api' }} />);
+    expect(screen.getByText(/나머지 5개 댓글 더 보기/i)).toBeInTheDocument();
+  });
+
+  it('shows token hint when no token and no replies', () => {
+    render(<ThreadsPostBlock replies={[]} result={{ source: 'other' }} />);
+    expect(screen.getByText(/THREADS_ACCESS_TOKEN/i)).toBeInTheDocument();
   });
 });
