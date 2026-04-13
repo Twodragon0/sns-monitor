@@ -79,8 +79,8 @@ def dashboard_stats():
             cached = redis_client.get(cache_key)
             if cached:
                 return jsonify(json.loads(cached))
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Redis cache read failed for stats: %s", e)
 
     # Try in-memory cache
     now = time.time()
@@ -102,8 +102,8 @@ def dashboard_stats():
     if redis_client:
         try:
             redis_client.setex(cache_key, _STATS_TTL, json.dumps(stats))
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Redis cache write failed for stats: %s", e)
 
     return jsonify(stats)
 

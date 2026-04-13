@@ -160,8 +160,8 @@ class PlatformAnalyzer(
         try:
             from .redis_client import get_redis
             self._redis = get_redis()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Redis client unavailable in PlatformAnalyzer: %s", e)
 
         # Reddit OAuth2 (optional; avoids 403 when Reddit blocks unauthenticated requests)
         self._reddit_client_id = (os.environ.get("REDDIT_CLIENT_ID") or "").strip()
@@ -414,8 +414,8 @@ class PlatformAnalyzer(
             try:
                 val = self._redis.get(self._RATE_KEY_TPL.format(service=service, window=window))
                 return int(val) if val else 0
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Redis rate_get failed for %s: %s", service, e)
         # In-memory fallback
         key = f"_mem_{service}"
         mem = getattr(self, key, None) or {"window": "", "count": 0}
@@ -443,8 +443,8 @@ class PlatformAnalyzer(
                         rkey, results,
                     )
                 return
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Redis rate_incr failed for %s: %s", service, e)
         # In-memory fallback
         key = f"_mem_{service}"
         mem = getattr(self, key, None) or {"window": "", "count": 0}
@@ -574,8 +574,8 @@ class PlatformAnalyzer(
                 for word, tag in cls._CUSTOM_WORDS:
                     try:
                         kiwi.add_user_word(word, tag)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug("Kiwi add_user_word failed for %r: %s", word, e)
                 cls._kiwi = kiwi
                 logger.info("Kiwi morphological analyzer loaded with %d custom words", len(cls._CUSTOM_WORDS))
             except ImportError:
@@ -592,8 +592,8 @@ class PlatformAnalyzer(
                 return [t.form for t in tokens
                         if t.tag in self._KEYWORD_POS
                         and len(t.form) >= (3 if t.tag == "SL" else 2)]
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Kiwi tokenize failed in _extract_keywords: %s", e)
         # Regex fallback
         return re.findall(r"[가-힣]{2,}|[a-zA-Z]{3,}", text)
 
@@ -702,8 +702,8 @@ class PlatformAnalyzer(
                                 pos_score += 2
                             elif lemma in neg_lemmas:
                                 neg_score += 2
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Kiwi tokenize failed in _analyze_sentiment: %s", e)
 
             if pos_score > neg_score:
                 sentiment_counts["positive"] += 1

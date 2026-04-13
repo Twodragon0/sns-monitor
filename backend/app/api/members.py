@@ -295,8 +295,8 @@ def _find_channel_files_local(youtube_dir: str, handle: str) -> list:
             if ch == handle.lower() or ch == handle.lstrip('@').lower():
                 mtime = os.path.getmtime(fpath)
                 matches.append((fpath, mtime, data))
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Could not read channel file %s: %s", fpath, e)
     return matches
 
 

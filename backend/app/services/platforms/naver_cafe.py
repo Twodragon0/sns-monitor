@@ -360,8 +360,8 @@ class NaverCafeMixin:
                                 date_str = datetime.fromtimestamp(
                                     art["writeDateTimestamp"] / 1000, tz=KST
                                 ).strftime("%Y.%m.%d %H:%M")
-                            except Exception:
-                                pass
+                            except Exception as e:
+                                logger.debug("Naver Cafe timestamp parse failed: %s", e)
                         view_count = art.get("readCount") or art.get("viewCount")
                         if view_count is not None and not isinstance(view_count, int):
                             try:

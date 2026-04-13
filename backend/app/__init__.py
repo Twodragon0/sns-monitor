@@ -2,6 +2,7 @@
 SNS Monitor Backend - Flask Application Factory
 """
 
+import logging
 import os
 from flask import Flask, jsonify
 from flask_cors import CORS
@@ -10,6 +11,8 @@ from flask_limiter.util import get_remote_address
 
 from .config import Config
 from .utils.logger import setup_logger, get_logger
+
+_init_logger = logging.getLogger(__name__)
 
 # Module-level limiter so blueprints can import and decorate routes
 def _build_redis_uri():
@@ -61,8 +64,8 @@ def create_app(config_class=Config):
             r = get_redis()
             if r:
                 redis_ok = r.ping()
-        except Exception:
-            pass
+        except Exception as e:
+            _init_logger.debug("Redis health check failed: %s", e)
         return jsonify({
             'status': 'healthy',
             'redis': redis_ok,

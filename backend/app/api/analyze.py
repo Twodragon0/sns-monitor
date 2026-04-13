@@ -172,7 +172,11 @@ def summarize_analysis():
             verify=Config.MIROFISH_SSL_VERIFY,
         )
         if resp.ok:
-            report = resp.json()
+            try:
+                report = resp.json()
+            except (ValueError, Exception):
+                logger.warning("MiroFish returned non-JSON for summarize: %s", resp.text[:200])
+                report = {}
             return jsonify(
                 {
                     "summary": report.get(
