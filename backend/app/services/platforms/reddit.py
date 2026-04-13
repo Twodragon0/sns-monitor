@@ -152,8 +152,8 @@ class RedditMixin:
             if about_resp.ok:
                 raw = about_resp.json()
                 about = raw.get("data", {}) if isinstance(raw, dict) else {}
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Reddit subreddit about fetch failed for %s: %s", subreddit, e)
 
         return {
             "type": "subreddit",

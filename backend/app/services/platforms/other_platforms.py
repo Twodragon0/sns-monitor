@@ -132,7 +132,7 @@ class OtherPlatformsMixin:
                 }]
                 profile_info["total_posts"] = 1
         except ImportError:
-            pass
+            logger.debug("beautifulsoup4 not installed; Kakao profile metadata not parsed")
 
         return profile_info
 
@@ -166,7 +166,7 @@ class OtherPlatformsMixin:
                 }]
                 story_info["total_posts"] = 1
         except ImportError:
-            pass
+            logger.debug("beautifulsoup4 not installed; Kakao Story metadata not parsed")
 
         return story_info
 
@@ -209,7 +209,7 @@ class OtherPlatformsMixin:
                 }]
                 chat_info["total_posts"] = 1
         except ImportError:
-            pass
+            logger.debug("beautifulsoup4 not installed; Kakao OpenChat metadata not parsed")
 
         return chat_info
 
@@ -527,8 +527,8 @@ class OtherPlatformsMixin:
                                     "author": p.get("creatorName", "Vuddy"),
                                     "url": f"https://vuddy.io/product/{p.get('id', '')}",
                                 })
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Vuddy Next.js __NEXT_DATA__ parse failed: %s", e)
 
             # Fallback: extract from visible elements
             if not out["posts"]:

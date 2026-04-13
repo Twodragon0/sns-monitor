@@ -189,8 +189,8 @@ def _call_cli(tool_name: str, prompt: str, timeout: int = 120) -> Optional[str]:
         finally:
             try:
                 os.unlink(prompt_file)
-            except OSError:
-                pass
+            except OSError as e:
+                logger.debug("Failed to delete temp prompt file %s: %s", prompt_file, e)
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
         if result.stderr:

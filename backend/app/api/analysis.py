@@ -26,6 +26,15 @@ logger = logging.getLogger(__name__)
 MIROFISH_URL = os.environ.get('MIROFISH_ENDPOINT', 'http://mirofish:5001')
 
 
+def _proxy_json(resp):
+    """Safely extract JSON from a proxied response, returning a Flask tuple."""
+    try:
+        return jsonify(resp.json()), resp.status_code
+    except (ValueError, requests.exceptions.JSONDecodeError):
+        logger.warning("MiroFish returned non-JSON (status %d): %s", resp.status_code, resp.text[:200])
+        return jsonify({'error': 'Invalid response from AI analysis service'}), 502
+
+
 def _mirofish_headers():
     """Forward OpenAI OAuth access token to AI analysis service so it can call OpenAI API without LLM_API_KEY."""
     headers = {}
@@ -254,7 +263,7 @@ def build_analysis_graph():
             timeout=30,
             headers=_mirofish_headers(),
         )
-        return jsonify(resp.json()), resp.status_code
+        return _proxy_json(resp)
     except requests.ConnectionError:
         return jsonify({'error': 'AI analysis service not available'}), 503
 
@@ -271,7 +280,7 @@ def get_analysis_task(task_id):
             timeout=10,
             headers=_mirofish_headers(),
         )
-        return jsonify(resp.json()), resp.status_code
+        return _proxy_json(resp)
     except requests.ConnectionError:
         return jsonify({'error': 'AI analysis service not available'}), 503
 
@@ -288,7 +297,7 @@ def get_analysis_graph_data(graph_id):
             timeout=30,
             headers=_mirofish_headers(),
         )
-        return jsonify(resp.json()), resp.status_code
+        return _proxy_json(resp)
     except requests.ConnectionError:
         return jsonify({'error': 'AI analysis service not available'}), 503
 
@@ -305,7 +314,7 @@ def generate_analysis_report():
             timeout=30,
             headers=_mirofish_headers(),
         )
-        return jsonify(resp.json()), resp.status_code
+        return _proxy_json(resp)
     except requests.ConnectionError:
         return jsonify({'error': 'AI analysis service not available'}), 503
 
@@ -322,7 +331,7 @@ def get_analysis_report(report_id):
             timeout=30,
             headers=_mirofish_headers(),
         )
-        return jsonify(resp.json()), resp.status_code
+        return _proxy_json(resp)
     except requests.ConnectionError:
         return jsonify({'error': 'AI analysis service not available'}), 503
 
@@ -340,7 +349,7 @@ def chat_with_analysis():
             timeout=60,
             headers=_mirofish_headers(),
         )
-        return jsonify(resp.json()), resp.status_code
+        return _proxy_json(resp)
     except requests.ConnectionError:
         return jsonify({'error': 'AI analysis service not available'}), 503
 
@@ -355,7 +364,7 @@ def list_analysis_projects():
             timeout=10,
             headers=_mirofish_headers(),
         )
-        return jsonify(resp.json()), resp.status_code
+        return _proxy_json(resp)
     except requests.ConnectionError:
         return jsonify({'error': 'AI analysis service not available'}), 503
 
@@ -402,8 +411,8 @@ def list_available_sources():
                         with open(latest, 'r', encoding='utf-8') as fp:
                             data = json.load(fp)
                         name = data.get('gallery_name') or name
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug("Could not read gallery name for %s: %s", gallery_dir.name, e)
                     sources.append({
                         'type': 'dcinside',
                         'id': gallery_dir.name,
@@ -434,8 +443,8 @@ def _read_source_items(src_type, src_id):
                     stats['video_count'] += 1
                     for c in video.get('comments', [])[:30]:
                         items.append({'text': c.get('text', ''), 'author': c.get('author', '')})
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to load YouTube data for %s: %s", src_id, e)
 
     elif src_type == 'dcinside':
         dc_dir = data_dir / 'dcinside' / src_id
@@ -454,8 +463,8 @@ def _read_source_items(src_type, src_id):
                             items.append({'text': full_text, 'author': p.get('author', '')})
                         for c in post.get('comments', [])[:10]:
                             items.append({'text': c.get('text', c.get('content', '')), 'author': c.get('author', '')})
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Failed to load DCInside data from %s: %s", json_file, e)
 
     return items, stats
 
@@ -687,8 +696,8 @@ def generate_daily_report():
                         ct = c.get('text', c.get('content', ''))
                         if ct:
                             all_items.append({'text': ct})
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to load posts from %s: %s", json_file, e)
 
         if not all_items:
             continue
@@ -697,8 +706,8 @@ def generate_daily_report():
         try:
             with open(json_files[-1], 'r', encoding='utf-8') as f:
                 name = json.load(f).get('gallery_name', name)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Could not read gallery name from %s: %s", json_files[-1], e)
 
         sentiment = analyzer._analyze_sentiment(all_items)
         s = sentiment['sentiment']
@@ -766,8 +775,8 @@ def list_reports():
                 'date': data.get('date', f.stem),
                 'summary': data.get('summary', {}),
             })
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Could not read report file %s: %s", f, e)
 
     return jsonify({'reports': reports})
 

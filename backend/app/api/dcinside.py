@@ -45,8 +45,8 @@ def _gallery_display_name(gallery_id):
             with open(files[0], 'r', encoding='utf-8') as f:
                 data = json.load(f)
             return data.get('gallery_name', gallery_id)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Could not read gallery name from file for %s: %s", gallery_id, e)
     return gallery_id
 
 

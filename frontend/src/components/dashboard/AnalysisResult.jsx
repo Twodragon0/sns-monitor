@@ -956,14 +956,12 @@ export function ThreadsPostBlock({ embedHtml, url, replies, description, content
     });
     container.innerHTML = sanitized;
     const existing = document.querySelector('script[src="https://www.threads.com/embed.js"]');
-    if (existing) return;
-    const script = document.createElement('script');
-    script.src = 'https://www.threads.com/embed.js';
-    script.async = true;
-    document.body.appendChild(script);
-    return () => {
-      if (script.parentNode) script.parentNode.removeChild(script);
-    };
+    if (!existing) {
+      const script = document.createElement('script');
+      script.src = 'https://www.threads.com/embed.js';
+      script.async = true;
+      document.body.appendChild(script);
+    }
   }, [embedHtml]);
 
   const replyList = Array.isArray(replies) ? replies : [];

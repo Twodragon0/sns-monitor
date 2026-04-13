@@ -44,8 +44,10 @@ def setup_logger(name='sns-monitor', level=logging.INFO):
         file_handler.setLevel(logging.DEBUG)
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
-    except OSError:
-        pass
+    except OSError as e:
+        # Log to stderr directly since file handler setup failed
+        import sys as _sys
+        print(f"[sns-monitor] WARNING: Could not set up file log handler: {e}", file=_sys.stderr)
 
     return logger
 
