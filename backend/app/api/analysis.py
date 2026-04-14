@@ -30,6 +30,28 @@ logger = logging.getLogger(__name__)
 MIROFISH_URL = os.environ.get('MIROFISH_ENDPOINT', 'http://mirofish:5001')
 
 
+def _validate_chat_history(data):
+    """Validate and sanitize chat_history from request data.
+
+    Returns a validated list of message dicts, or a Flask error response tuple
+    (jsonify(...), status_code) if the raw value is not a list.
+    Callers must check: if isinstance(result, tuple): return result
+    """
+    raw_history = data.get('chat_history', [])
+    if not isinstance(raw_history, list):
+        return jsonify({'error': 'Invalid chat_history format'}), 400
+    chat_history = []
+    for msg in raw_history[:MAX_CHAT_HISTORY]:
+        if not isinstance(msg, dict):
+            continue
+        role = msg.get('role', '')
+        content = msg.get('content', '')
+        if role not in ALLOWED_CHAT_ROLES or not isinstance(content, str):
+            continue
+        chat_history.append({'role': role, 'content': content[:5000]})
+    return chat_history
+
+
 def _proxy_json(resp):
     """Safely extract JSON from a proxied response, returning a Flask tuple."""
     try:
@@ -905,18 +927,9 @@ def ai_chat():
     sources_list = data.get('sources', [])
     message = (data.get('message') or '').strip()
 
-    raw_history = data.get('chat_history', [])
-    if not isinstance(raw_history, list):
-        return jsonify({'error': 'Invalid chat_history format'}), 400
-    chat_history = []
-    for msg in raw_history[:MAX_CHAT_HISTORY]:
-        if not isinstance(msg, dict):
-            continue
-        role = msg.get('role', '')
-        content = msg.get('content', '')
-        if role not in ALLOWED_CHAT_ROLES or not isinstance(content, str):
-            continue
-        chat_history.append({'role': role, 'content': content[:5000]})
+    chat_history = _validate_chat_history(data)
+    if isinstance(chat_history, tuple):
+        return chat_history
 
     if not message:
         return jsonify({'error': 'Message is required'}), 400
@@ -1058,18 +1071,9 @@ def ai_url_chat():
     url_result = data.get('result')
     message = (data.get('message') or '').strip()
 
-    raw_history = data.get('chat_history', [])
-    if not isinstance(raw_history, list):
-        return jsonify({'error': 'Invalid chat_history format'}), 400
-    chat_history = []
-    for msg in raw_history[:MAX_CHAT_HISTORY]:
-        if not isinstance(msg, dict):
-            continue
-        role = msg.get('role', '')
-        content = msg.get('content', '')
-        if role not in ALLOWED_CHAT_ROLES or not isinstance(content, str):
-            continue
-        chat_history.append({'role': role, 'content': content[:5000]})
+    chat_history = _validate_chat_history(data)
+    if isinstance(chat_history, tuple):
+        return chat_history
 
     if not message:
         return jsonify({'error': 'Message is required'}), 400
