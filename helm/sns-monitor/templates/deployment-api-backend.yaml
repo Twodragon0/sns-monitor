@@ -45,6 +45,36 @@ spec:
               value: "{{ include "sns-monitor.fullname" . }}-redis-master"
             - name: REDIS_PORT
               value: "6379"
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "sns-monitor.fullname" . }}-secrets
+                  key: redis-password
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "sns-monitor.fullname" . }}-secrets
+                  key: jwt-secret
+            - name: SESSION_COOKIE_SECURE
+              value: "true"
+            - name: YOUTUBE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "sns-monitor.fullname" . }}-secrets
+                  key: youtube-api-key
+                  optional: true
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "sns-monitor.fullname" . }}-secrets
+                  key: openai-api-key
+                  optional: true
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "sns-monitor.fullname" . }}-secrets
+                  key: claude-api-key
+                  optional: true
           livenessProbe:
             httpGet:
               path: /api/health

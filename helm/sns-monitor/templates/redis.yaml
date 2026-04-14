@@ -9,6 +9,7 @@ metadata:
 data:
   redis.conf: |
     protected-mode no
+    requirepass {{ .Values.secrets.redisPassword | default "changeme" }}
     appendonly yes
     maxmemory 100mb
     maxmemory-policy volatile-lru
@@ -76,6 +77,12 @@ spec:
             capabilities:
               drop:
                 - ALL
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "sns-monitor.fullname" . }}-secrets
+                  key: redis-password
           ports:
             - containerPort: 6379
               name: redis
@@ -95,15 +102,17 @@ spec:
           readinessProbe:
             exec:
               command:
-                - redis-cli
-                - PING
+                - sh
+                - -c
+                - redis-cli -a "$REDIS_PASSWORD" PING
             initialDelaySeconds: 5
             periodSeconds: 5
           livenessProbe:
             exec:
               command:
-                - redis-cli
-                - PING
+                - sh
+                - -c
+                - redis-cli -a "$REDIS_PASSWORD" PING
             initialDelaySeconds: 10
             periodSeconds: 10
           resources:

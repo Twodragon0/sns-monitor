@@ -312,3 +312,6 @@ s3Sync:
 secrets:
   youtubeApiKey: ""
   redisPassword: ""
+  jwtSecret: ""
+  openaiApiKey: ""
+  claudeApiKey: ""

@@ -20,7 +20,11 @@ frontend:
       memory: 512Mi
 
 apiBackend:
-  replicaCount: 3
+  replicaCount: 2
+  env:
+    LOCAL_MODE: "true"
+    LOCAL_DATA_DIR: "/app/local-data"
+    SESSION_COOKIE_SECURE: "true"
   resources:
     requests:
       cpu: 200m
@@ -61,6 +65,8 @@ ingress:
     nginx.ingress.kubernetes.io/enable-cors: "true"
     nginx.ingress.kubernetes.io/auth-url: "http://sns-monitor-oauth2-proxy.sns-monitoring.svc.cluster.local:4180/oauth2/auth"
     nginx.ingress.kubernetes.io/auth-signin: "https://$host/oauth2/start?rd=$escaped_request_uri"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "Strict-Transport-Security: max-age=31536000; includeSubDomains";
   hosts:
     - host: sns-monitor.your-domain.com
       paths:
