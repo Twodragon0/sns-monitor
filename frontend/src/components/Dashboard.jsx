@@ -260,6 +260,7 @@ function Dashboard({ onShowError }) {
               type="url"
               value={url}
               onChange={e => { setUrl(e.target.value); setAnalysisError(null); }}
+              onKeyDown={e => { if (e.key === 'Enter' && url.trim() && !analysisLoading) handleAnalyze(e); }}
               placeholder={rotatePlaceholder}
               disabled={analysisLoading}
               aria-label="분석할 URL"
@@ -281,6 +282,11 @@ function Dashboard({ onShowError }) {
             {analysisLoading ? '분석 중…' : '분석'}
           </button>
         </form>
+        {analysisLoading && (
+          <div className="dash__search-progress">
+            <div className="dash__search-progress-bar" />
+          </div>
+        )}
 
         <div className="dash__platforms">
           {Object.entries(PLATFORMS).map(([k, v]) => (
@@ -309,27 +315,68 @@ function Dashboard({ onShowError }) {
               <button className="dash__history-clear" onClick={() => { setHistory([]); localStorage.removeItem(RESULTS_CACHE_KEY); }}>삭제</button>
             </div>
             <ul className="dash__history-list">
-              {history.slice(0, 6).map((h, i) => (
-                <li
-                  key={h.url || i}
-                  className="dash__history-item"
-                  onClick={() => {
-                    setUrl(h.url);
-                    const cache = loadResultsCache();
-                    const cached = cache.data[h.url];
-                    setAnalysisResult(cached ?? null);
-                    setAnalysisSummary(null);
-                  }}
-                >
-                  <span className="dash__history-icon" style={{ color: PLATFORMS[h.platform]?.color }}>
-                    {PLATFORMS[h.platform]?.icon || '🔗'}
-                  </span>
-                  <span className="dash__history-title">{h.title}</span>
-                  <span className="dash__history-time">
-                    {h.analyzed_at ? new Date(h.analyzed_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : ''}
-                  </span>
-                </li>
-              ))}
+              {history.slice(0, 6).map((h, i) => {
+                const pInfo = PLATFORMS[h.platform];
+                const now = new Date();
+                const analyzedAt = h.analyzed_at ? new Date(h.analyzed_at) : null;
+                let timeLabel = '';
+                if (analyzedAt) {
+                  const diffMs = now - analyzedAt;
+                  const diffMin = Math.floor(diffMs / 60000);
+                  const diffHr = Math.floor(diffMin / 60);
+                  const diffDay = Math.floor(diffHr / 24);
+                  if (diffMin < 1) timeLabel = '방금 전';
+                  else if (diffMin < 60) timeLabel = `${diffMin}분 전`;
+                  else if (diffHr < 24) timeLabel = `${diffHr}시간 전`;
+                  else if (diffDay < 7) timeLabel = `${diffDay}일 전`;
+                  else timeLabel = analyzedAt.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
+                }
+                return (
+                  <li
+                    key={h.url || i}
+                    className="dash__history-item"
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }}
+                    onClick={() => {
+                      setUrl(h.url);
+                      const cache = loadResultsCache();
+                      const cached = cache.data[h.url];
+                      setAnalysisResult(cached ?? null);
+                      setAnalysisSummary(null);
+                    }}
+                  >
+                    <span
+                      className="dash__history-icon"
+                      style={{
+                        color: pInfo?.color || 'var(--c-text-secondary)',
+                        fontSize: 15,
+                      }}
+                      title={pInfo?.label || h.platform || ''}
+                    >
+                      {pInfo?.icon || '🔗'}
+                    </span>
+                    <span className="dash__history-title">{h.title}</span>
+                    {pInfo && (
+                      <span style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        padding: '2px 6px',
+                        borderRadius: 8,
+                        background: pInfo.color + '22',
+                        color: pInfo.color,
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0,
+                      }}>
+                        {pInfo.label}
+                      </span>
+                    )}
+                    <span className="dash__history-time" title={analyzedAt?.toLocaleString('ko-KR') || ''}>
+                      {timeLabel}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         )}

@@ -1,5 +1,26 @@
 /* ===== Dashboard — Design Tokens (inherit from App.css :root) ===== */
 
+/* ===== Entrance animation ===== */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dash > * {
+  animation: fade-in-up 0.35s ease both;
+}
+
+.dash > *:nth-child(1) { animation-delay: 0.04s; }
+.dash > *:nth-child(2) { animation-delay: 0.10s; }
+.dash > *:nth-child(3) { animation-delay: 0.16s; }
+.dash > *:nth-child(4) { animation-delay: 0.22s; }
+
 /* ===== Layout ===== */
 .dash {
   display: flex;
@@ -377,9 +398,10 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
   position: relative;
   overflow: hidden;
+  cursor: default;
 }
 
 .dash__stat-box::before {
@@ -391,12 +413,17 @@
   height: 100%;
   background: linear-gradient(180deg, var(--c-primary) 0%, #6366f1 100%);
   border-radius: 12px 0 0 12px;
+  transition: width 0.2s ease;
 }
 
 .dash__stat-box:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
   border-color: rgba(26, 86, 240, 0.2);
+}
+
+.dash__stat-box:hover::before {
+  width: 5px;
 }
 
 .dash__stat-icon {
@@ -461,7 +488,8 @@
   background: var(--c-primary);
   border-radius: 2px 2px 0 0;
   transform: scaleX(0);
-  transition: transform 0.2s ease;
+  transform-origin: center;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .dash__tab:hover {
@@ -521,6 +549,46 @@
 }
 
 @keyframes dash-spin { to { transform: rotate(360deg); } }
+
+/* ===== URL Analysis Progress Bar ===== */
+.dash__search-progress {
+  height: 3px;
+  border-radius: 0 0 4px 4px;
+  margin-top: -2px;
+  overflow: hidden;
+  background: rgba(26, 86, 240, 0.08);
+}
+
+.dash__search-progress-bar {
+  height: 100%;
+  width: 40%;
+  background: linear-gradient(90deg, var(--c-primary), #6366f1);
+  border-radius: 2px;
+  animation: progress-sweep 1.4s ease-in-out infinite;
+}
+
+@keyframes progress-sweep {
+  0%   { transform: translateX(-150%); }
+  100% { transform: translateX(350%); }
+}
+
+/* ===== Skeleton loading pulse ===== */
+.dash__skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--c-border) 25%,
+    rgba(26, 86, 240, 0.06) 50%,
+    var(--c-border) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.6s ease-in-out infinite;
+  border-radius: 6px;
+}
+
+@keyframes skeleton-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
 
 /* ===== Panel Cards (shared) ===== */
 .panel-card {
@@ -1619,8 +1687,12 @@
 @media (max-width: 768px) {
   .dash__hero { padding: 20px 16px; }
   .dash__hero-bridge { margin-top: 16px; padding-top: 12px; font-size: 0.78rem; }
-  .dash__search { flex-direction: column; }
-  .dash__search-btn { width: 100%; }
+  .dash__search {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .dash__search-wrap { width: 100%; }
+  .dash__search-btn { width: 100%; text-align: center; }
   .dash__search-input { padding-right: 16px; }
   .dash__search-badge { display: none; }
   .dash__monitoring { padding: 16px 16px 0; }

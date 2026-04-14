@@ -24,6 +24,7 @@ def get_kst_now():
 from googleapiclient.errors import HttpError
 
 # Import optimized YouTube API functions
+import optimized_youtube_api as _yt_api
 from optimized_youtube_api import (
     search_videos_optimized,
     get_video_comments_optimized,
@@ -59,40 +60,34 @@ if not LOCAL_MODE:
     save_metadata_to_local = None
 else:
     # 로컬 모드: 공통 유틸리티 임포트
+    def _import_local_storage():
+        """Try multiple paths to import local_storage and return (save_to_local_file, save_metadata_to_local)."""
+        candidate_paths = [
+            None,  # current sys.path first (covers copied local_storage.py)
+            os.path.join(os.path.dirname(__file__), '..', 'common'),
+            '/app/common',
+            os.path.join(os.path.dirname(__file__), 'common'),
+        ]
+        for path in candidate_paths:
+            if path is not None:
+                if not os.path.exists(path):
+                    continue
+                sys.path.insert(0, path)
+            try:
+                from local_storage import (  # noqa: PLC0415
+                    save_to_local_file as _save,
+                    save_metadata_to_local as _save_meta,
+                    is_local_mode,  # noqa: F401
+                )
+                label = path if path is not None else "current directory"
+                logger.info("Successfully imported local_storage from %s", label)
+                return _save, _save_meta
+            except ImportError:
+                continue
+        raise ImportError("Could not find local_storage module in any path")
+
     try:
-        # 현재 디렉토리에서 먼저 시도 (복사된 파일)
-        try:
-            from local_storage import (
-                save_to_local_file, 
-                save_metadata_to_local, 
-                is_local_mode
-            )
-            logger.info("Successfully imported local_storage from current directory")
-        except ImportError:
-            # 여러 경로 시도
-            common_paths = [
-                os.path.join(os.path.dirname(__file__), '..', 'common'),
-                '/app/common',
-                os.path.join(os.path.dirname(__file__), 'common')
-            ]
-            imported = False
-            for common_path in common_paths:
-                if os.path.exists(common_path):
-                    sys.path.insert(0, common_path)
-                    try:
-                        from local_storage import (
-                            save_to_local_file, 
-                            save_metadata_to_local, 
-                            is_local_mode
-                        )
-                        imported = True
-                        logger.info("Successfully imported local_storage from %s", common_path)
-                        break
-                    except ImportError:
-                        continue
-            
-            if not imported:
-                raise ImportError("Could not find local_storage module in any path")
+        save_to_local_file, save_metadata_to_local = _import_local_storage()
     except ImportError as e:
         logger.warning("Could not import local_storage: %s", e)
         save_to_local_file = None
@@ -1279,6 +1274,8 @@ def lambda_handler(event, context):
     """
     logger.info("Event: %s", json.dumps(event))
 
+    crawl_start_time = get_kst_now()
+
     # Reset API statistics at the start of each lambda invocation
     reset_api_stats()
 
@@ -1316,6 +1313,39 @@ def lambda_handler(event, context):
     logger.info("=== YouTube API Usage Statistics ===")
     print_api_stats()
     logger.info("====================================\n")
+
+    # --- Structured crawl summary ---
+    crawl_end_time = get_kst_now()
+    crawl_duration_sec = (crawl_end_time - crawl_start_time).total_seconds()
+
+    total_channels_processed = sum(1 for r in results if 'channel' in r)
+    total_videos_found = sum(
+        r.get('videos_analyzed', 0) or r.get('videos_found', 0)
+        for r in results
+    )
+    total_comments_collected = sum(
+        r.get('total_comments', 0) or r.get('comments_collected', 0)
+        for r in results
+    )
+    total_quota_used = sum(
+        stats['quota'] for stats in _yt_api.api_stats.values()
+    )
+    error_count = sum(1 for r in results if 'error' in r)
+
+    logger.info(
+        "=== Crawl Summary | duration=%.1fs channels=%d videos=%d comments=%d quota=%d errors=%d ===",
+        crawl_duration_sec,
+        total_channels_processed,
+        total_videos_found,
+        total_comments_collected,
+        total_quota_used,
+        error_count,
+    )
+    if error_count:
+        error_details = [r for r in results if 'error' in r]
+        for err in error_details:
+            logger.warning("Crawl error entry: %s", err)
+    # --------------------------------
 
     return {
         'statusCode': 200,

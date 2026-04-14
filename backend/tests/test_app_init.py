@@ -40,15 +40,17 @@ class TestHealthRoutes:
         resp = client.get('/health')
         assert resp.status_code == 200
         data = resp.get_json()
-        assert data['status'] == 'healthy'
-        assert 'redis' in data
+        assert data['status'] in ('ok', 'degraded')
+        assert data['redis'] in ('connected', 'disconnected')
+        assert data['data_dir'] in ('accessible', 'missing')
+        assert isinstance(data['uptime_seconds'], int)
         assert 'local_mode' in data
 
     def test_api_health_endpoint_ok(self, client):
         resp = client.get('/api/health')
         assert resp.status_code == 200
         data = resp.get_json()
-        assert data['status'] == 'healthy'
+        assert data['status'] in ('ok', 'degraded')
 
     def test_health_with_redis_ping_true(self, client):
         mock_redis = MagicMock()
@@ -57,15 +59,30 @@ class TestHealthRoutes:
             resp = client.get('/api/health')
         assert resp.status_code == 200
         data = resp.get_json()
-        assert data['redis'] is True
+        assert data['redis'] == 'connected'
 
-    def test_health_redis_exception_still_ok(self, client):
+    def test_health_redis_exception_still_returns_200(self, client):
         with patch('app.services.redis_client.get_redis', side_effect=RuntimeError('no redis')):
             resp = client.get('/api/health')
         assert resp.status_code == 200
         data = resp.get_json()
-        assert data['status'] == 'healthy'
-        assert data['redis'] is False
+        assert data['status'] in ('ok', 'degraded')
+        assert data['redis'] == 'disconnected'
+
+    def test_health_contains_uptime(self, client):
+        resp = client.get('/api/health')
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data['uptime_seconds'] >= 0
+
+    def test_health_data_dir_accessible_when_exists(self, client):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch('app.Config') as mock_cfg:
+                mock_cfg.LOCAL_DATA_DIR = tmpdir
+                mock_cfg.LOCAL_MODE = True
+                resp = client.get('/api/health')
+        assert resp.status_code == 200
 
 
 class TestCreateAppCors:

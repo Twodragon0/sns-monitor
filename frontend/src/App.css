@@ -179,13 +179,19 @@
 .status-dot.online  {
   background: var(--c-success);
   box-shadow: 0 0 0 2px rgba(16,185,129,.3);
-  animation: pulse-dot 2s ease-in-out infinite;
+  animation: pulse-dot 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 .status-dot.offline { background: var(--c-danger); }
 
 @keyframes pulse-dot {
-  0%, 100% { box-shadow: 0 0 0 2px rgba(16,185,129,.3); }
-  50%       { box-shadow: 0 0 0 4px rgba(16,185,129,.15); }
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(16,185,129,.55);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(16,185,129,.0);
+    transform: scale(1.1);
+  }
 }
 
 .status-label { opacity: 0.9; }
@@ -204,7 +210,24 @@
   padding: 24px 20px;
   color: var(--c-text-secondary);
   font-size: 12px;
-  border-top: 1px solid var(--c-border);
+  position: relative;
+}
+
+.App-footer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--c-border) 20%,
+    rgba(26, 86, 240, 0.25) 50%,
+    var(--c-border) 80%,
+    transparent 100%
+  );
 }
 
 /* ===== Analysis auth gate (OpenAI OAuth) ===== */
@@ -261,6 +284,54 @@ html,
 .dash__tab,
 .result {
   transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+/* ===== Scrollbar styling (dark mode) ===== */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--c-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--c-border);
+  border-radius: 4px;
+  border: 2px solid var(--c-bg);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--c-text-secondary);
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: #3a3f52;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: #4d5268;
+}
+
+/* ===== Accessibility: focus-visible outlines ===== */
+:focus-visible {
+  outline: 2px solid var(--c-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--c-primary);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none; /* inputs use box-shadow focus ring via their own rules */
 }
 
 /* ===== Responsive ===== */

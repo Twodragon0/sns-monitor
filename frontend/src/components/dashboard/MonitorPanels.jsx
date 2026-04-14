@@ -41,6 +41,29 @@ export function SentimentMiniBar({ sentiment }) {
   );
 }
 
+/** Custom tooltip that respects CSS variable colours */
+function ChartTooltip({ active, payload, label }) {
+  if (!active || !payload || payload.length === 0) return null;
+  return (
+    <div style={{
+      background: 'var(--c-surface)',
+      border: '1px solid var(--c-border)',
+      borderRadius: 8,
+      padding: '6px 10px',
+      fontSize: 11,
+      color: 'var(--c-text)',
+      boxShadow: 'var(--shadow-md)',
+    }}>
+      <p style={{ margin: '0 0 4px', color: 'var(--c-text-secondary)', fontSize: 10 }}>{label}</p>
+      {payload.map((entry) => (
+        <p key={entry.dataKey} style={{ margin: '2px 0', color: entry.color, fontWeight: 600 }}>
+          {entry.name}: {entry.value}
+        </p>
+      ))}
+    </div>
+  );
+}
+
 /** Trend mini chart for a single gallery */
 export function GalleryTrendChart({ galleryId }) {
   const [trend, setTrend] = useState(null);
@@ -50,7 +73,11 @@ export function GalleryTrendChart({ galleryId }) {
       .catch(() => setTrend([]));
   }, [galleryId]);
 
-  if (!trend || trend.length < 2) return <p className="panel-card__hint" style={{ margin: '4px 0' }}>트렌드 데이터 부족 (2회 이상 수집 필요)</p>;
+  if (!trend || trend.length < 2) return (
+    <p className="panel-card__hint" style={{ margin: '4px 0', fontStyle: 'italic' }}>
+      트렌드 데이터 부족 — 크롤러가 2회 이상 수집한 후 표시됩니다
+    </p>
+  );
 
   const chartData = trend.map(t => ({
     time: t.timestamp?.slice(5, 16).replace('T', ' ') || '',
@@ -63,11 +90,11 @@ export function GalleryTrendChart({ galleryId }) {
     <div style={{ marginTop: 6 }}>
       <ResponsiveContainer width="100%" height={80}>
         <LineChart data={chartData} margin={{ top: 2, right: 4, bottom: 0, left: -20 }}>
-          <XAxis dataKey="time" tick={{ fontSize: 9 }} interval="preserveStartEnd" />
-          <YAxis tick={{ fontSize: 9 }} />
-          <Tooltip contentStyle={{ fontSize: 11 }} />
-          <Line type="monotone" dataKey="pos" stroke="#10b981" strokeWidth={2} dot={false} name="긍정" />
-          <Line type="monotone" dataKey="neg" stroke="#ef4444" strokeWidth={2} dot={false} name="부정" />
+          <XAxis dataKey="time" tick={{ fontSize: 9, fill: 'var(--c-text-secondary)' }} interval="preserveStartEnd" />
+          <YAxis tick={{ fontSize: 9, fill: 'var(--c-text-secondary)' }} />
+          <Tooltip content={<ChartTooltip />} />
+          <Line type="monotone" dataKey="pos" stroke="#10b981" strokeWidth={2} dot={false} name="긍정" animationDuration={800} />
+          <Line type="monotone" dataKey="neg" stroke="#ef4444" strokeWidth={2} dot={false} name="부정" animationDuration={800} />
         </LineChart>
       </ResponsiveContainer>
     </div>
@@ -115,7 +142,25 @@ export function GalleryMonitorPanel() {
   }
 
   if (loading) return null;
-  if (dcSources.length === 0) return null;
+  if (dcSources.length === 0) return (
+    <div className="gallery-monitor" style={{ marginTop: 20 }}>
+      <h4 className="dash__section-title" style={{ marginBottom: 10 }}>DCInside 갤러리 모니터링</h4>
+      <div style={{
+        padding: '20px 18px',
+        background: 'var(--c-bg)',
+        border: '1.5px dashed var(--c-border)',
+        borderRadius: 10,
+        textAlign: 'center',
+        color: 'var(--c-text-secondary)',
+        fontSize: '0.85rem',
+        lineHeight: 1.6,
+      }}>
+        <span style={{ fontSize: 28, display: 'block', marginBottom: 8 }} aria-hidden="true">📋</span>
+        <strong style={{ color: 'var(--c-text)', display: 'block', marginBottom: 4 }}>수집된 갤러리 없음</strong>
+        DCInside 크롤러를 실행하거나 상단 URL 검색에서 갤러리 URL을 입력하면 여기에 모니터링 카드가 표시됩니다.
+      </div>
+    </div>
+  );
 
   // Detect negative sentiment alerts (neg > 5% of total)
   const alerts = Object.entries(sentiments)
@@ -136,7 +181,22 @@ export function GalleryMonitorPanel() {
           <strong className="gallery-monitor__alert-title">부정 감성 경고</strong>
           {alerts.map(a => (
             <span key={a.id} className="gallery-monitor__alert-item">
-              {a.name}: <strong>{a.negPct}%</strong> ({a.negative}건)
+              {a.name}:{' '}
+              <span style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                background: 'rgba(239,68,68,0.12)',
+                border: '1px solid rgba(239,68,68,0.3)',
+                borderRadius: 12,
+                padding: '1px 7px',
+                fontSize: 11,
+                fontWeight: 700,
+                color: 'var(--c-danger)',
+                marginLeft: 4,
+              }}>
+                {a.negPct}% · {a.negative}건
+              </span>
             </span>
           ))}
         </div>

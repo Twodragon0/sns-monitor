@@ -9,7 +9,7 @@ import os
 import time
 from datetime import datetime, timezone
 
-from flask import jsonify, request
+from flask import jsonify, make_response, request
 
 from . import dashboard_bp
 from .. import limiter
@@ -78,14 +78,18 @@ def dashboard_stats():
         try:
             cached = redis_client.get(cache_key)
             if cached:
-                return jsonify(json.loads(cached))
+                resp = make_response(jsonify(json.loads(cached)))
+                resp.headers['Cache-Control'] = 'private, max-age=60'
+                return resp
         except Exception as e:
             logger.debug("Redis cache read failed for stats: %s", e)
 
     # Try in-memory cache
     now = time.time()
     if _stats_cache['data'] and now < _stats_cache['expires']:
-        return jsonify(_stats_cache['data'])
+        resp = make_response(jsonify(_stats_cache['data']))
+        resp.headers['Cache-Control'] = 'private, max-age=60'
+        return resp
 
     # Compute fresh stats
     stats = {
@@ -97,6 +101,9 @@ def dashboard_stats():
     except Exception as e:
         logger.error("Error getting stats: %s", e, exc_info=True)
 
+    # Stamp freshness so the frontend knows when the data was computed
+    stats['last_computed'] = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+
     # Store in caches
     _stats_cache = {'data': stats, 'expires': now + _STATS_TTL}
     if redis_client:
@@ -105,7 +112,9 @@ def dashboard_stats():
         except Exception as e:
             logger.debug("Redis cache write failed for stats: %s", e)
 
-    return jsonify(stats)
+    resp = make_response(jsonify(stats))
+    resp.headers['Cache-Control'] = 'private, max-age=60'
+    return resp
 
 
 @dashboard_bp.route('/api/channels', methods=['GET'])

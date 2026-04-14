@@ -4,7 +4,8 @@ SNS Monitor Backend - Flask Application Factory
 
 import logging
 import os
-from flask import Flask, jsonify
+import time
+from flask import Flask, jsonify, request, g
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -13,6 +14,10 @@ from .config import Config
 from .utils.logger import setup_logger, get_logger
 
 _init_logger = logging.getLogger(__name__)
+_request_logger = logging.getLogger(__name__ + ".requests")
+
+# Record the time the module was first imported (proxy for process start time)
+_APP_START_TIME = time.time()
 
 # Module-level limiter so blueprints can import and decorate routes
 def _build_redis_uri():
@@ -56,20 +61,55 @@ def create_app(config_class=Config):
             logger.warning("CORS_ORIGINS not set — falling back to localhost origins")
         CORS(app, resources={r"/api/*": {"origins": _fallback}})
 
+    # Request logging middleware (only for /api/* routes)
+    @app.before_request
+    def _before_request():
+        if request.path.startswith('/api/'):
+            g._req_start = time.time()
+
+    @app.after_request
+    def _after_request(response):
+        if request.path.startswith('/api/'):
+            elapsed_ms = int((time.time() - getattr(g, '_req_start', time.time())) * 1000)
+            _request_logger.info(
+                "%s %s %s %dms",
+                request.method,
+                request.path,
+                response.status_code,
+                elapsed_ms,
+            )
+        return response
+
     # Health check (frontend calls /api/health via nginx proxy)
     def _health():
         from .services.redis_client import get_redis
-        redis_ok = False
+
+        # Redis connectivity
+        redis_status = "disconnected"
         try:
             r = get_redis()
-            if r:
-                redis_ok = r.ping()
+            if r and r.ping():
+                redis_status = "connected"
         except Exception as e:
             _init_logger.debug("Redis health check failed: %s", e)
+
+        # local-data directory accessibility
+        data_dir_status = "missing"
+        try:
+            if os.path.isdir(Config.LOCAL_DATA_DIR) and os.access(Config.LOCAL_DATA_DIR, os.R_OK):
+                data_dir_status = "accessible"
+        except Exception as e:
+            _init_logger.debug("Data dir health check failed: %s", e)
+
+        uptime = int(time.time() - _APP_START_TIME)
+        overall = "ok" if redis_status == "connected" and data_dir_status == "accessible" else "degraded"
+
         return jsonify({
-            'status': 'healthy',
-            'redis': redis_ok,
-            'local_mode': Config.LOCAL_MODE
+            'status': overall,
+            'redis': redis_status,
+            'data_dir': data_dir_status,
+            'uptime_seconds': uptime,
+            'local_mode': Config.LOCAL_MODE,
         })
 
     @app.route('/health', methods=['GET'])

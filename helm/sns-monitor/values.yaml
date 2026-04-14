@@ -73,7 +73,7 @@ security:
 
   containerSecurityContext:
     allowPrivilegeEscalation: false
-    readOnlyRootFilesystem: false
+    readOnlyRootFilesystem: true  # 보안 강화: 기본값 true (P1 fix)
     capabilities:
       drop:
         - ALL

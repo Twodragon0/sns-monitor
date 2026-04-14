@@ -152,6 +152,19 @@ def execute_with_retry_and_cache(api_call, api_name, params, max_retries=3, back
             api_stats[api_name]['calls'] += 1
             api_stats[api_name]['quota'] += QUOTA_COSTS.get(api_name, 1)
 
+            # Warn when approaching the daily quota limit (10,000 units)
+            DAILY_QUOTA_LIMIT = int(os.environ.get('YOUTUBE_DAILY_QUOTA_LIMIT', '10000'))
+            QUOTA_WARN_THRESHOLD = int(os.environ.get('YOUTUBE_QUOTA_WARN_THRESHOLD', '8000'))
+            total_quota_so_far = sum(s['quota'] for s in api_stats.values())
+            if total_quota_so_far >= QUOTA_WARN_THRESHOLD:
+                logger.warning(
+                    "Approaching daily quota limit: %d / %d units used (%.1f%%). "
+                    "Last call: api=%s cost=%d",
+                    total_quota_so_far, DAILY_QUOTA_LIMIT,
+                    total_quota_so_far / DAILY_QUOTA_LIMIT * 100,
+                    api_name, QUOTA_COSTS.get(api_name, 1),
+                )
+
             # 캐시에 저장
             save_to_cache(api_name, params, result)
 
@@ -163,17 +176,22 @@ def execute_with_retry_and_cache(api_call, api_name, params, max_retries=3, back
 
             error_code = e.resp.status if hasattr(e, 'resp') else None
             error_reason = None
+            quota_cost = QUOTA_COSTS.get(api_name, 1)
 
             try:
                 error_data = json.loads(e.content.decode('utf-8'))
                 error_reason = error_data.get('error', {}).get('errors', [{}])[0].get('reason', '')
-            except:
+            except Exception:
                 pass
 
-            # 403 Forbidden
+            # 403 Forbidden — distinguish quota exhaustion from access denial
             if error_code == 403:
                 if error_reason in ['quotaExceeded', 'dailyLimitExceeded']:
-                    logger.warning("YouTube API quota exceeded. Reason: %s", error_reason)
+                    logger.warning(
+                        "YouTube API daily quota exceeded (reason=%s, api=%s, quota_cost=%d). "
+                        "Further calls will fail until quota resets at midnight PT.",
+                        error_reason, api_name, quota_cost,
+                    )
                     if attempt < max_retries:
                         # 할당량 초과 시 더 긴 대기 + jitter
                         wait_time = (backoff_base ** (attempt + 2)) * 10 + random.uniform(0, 5)
@@ -183,10 +201,21 @@ def execute_with_retry_and_cache(api_call, api_name, params, max_retries=3, back
                     else:
                         raise Exception(f"YouTube API quota exceeded after {max_retries + 1} attempts")
                 elif error_reason == 'commentsDisabled':
-                    logger.info("Comments disabled for this video/channel")
+                    logger.info("Comments disabled for this video/channel (api=%s)", api_name)
                     return None
+                elif error_reason in ['forbidden', 'accessNotConfigured', 'keyInvalid']:
+                    # Permanent access denial — no point retrying
+                    logger.error(
+                        "403 Access denied (reason=%s, api=%s). "
+                        "Check API key permissions and enabled APIs.",
+                        error_reason, api_name,
+                    )
+                    raise
                 else:
-                    logger.error("403 Forbidden error: %s", error_reason or 'Unknown reason')
+                    logger.error(
+                        "403 Forbidden (reason=%s, api=%s, quota_cost=%d)",
+                        error_reason or 'unknown', api_name, quota_cost,
+                    )
                     if attempt < max_retries:
                         continue
                     else:
@@ -194,7 +223,10 @@ def execute_with_retry_and_cache(api_call, api_name, params, max_retries=3, back
 
             # 429 Too Many Requests
             elif error_code == 429:
-                logger.warning("Rate limit exceeded (429). Attempt %d/%d", attempt + 1, max_retries + 1)
+                logger.warning(
+                    "Rate limit exceeded (429, api=%s, quota_cost=%d). Attempt %d/%d",
+                    api_name, quota_cost, attempt + 1, max_retries + 1,
+                )
                 if attempt < max_retries:
                     # Rate limit 초과 시 더 긴 대기 + jitter
                     wait_time = (backoff_base ** (attempt + 1)) * 5 + random.uniform(0, 3)
@@ -206,17 +238,23 @@ def execute_with_retry_and_cache(api_call, api_name, params, max_retries=3, back
 
             # 400 Bad Request (재시도 불필요)
             elif error_code == 400:
-                logger.error("400 Bad Request: %s", error_reason or 'Invalid request')
+                logger.error(
+                    "400 Bad Request (reason=%s, api=%s, quota_cost=%d)",
+                    error_reason or 'invalid_request', api_name, quota_cost,
+                )
                 raise
 
             # 404 Not Found (재시도 불필요)
             elif error_code == 404:
-                logger.warning("404 Not Found: Resource not found")
+                logger.warning("404 Not Found (api=%s): resource does not exist", api_name)
                 return None
 
             # 기타 오류: 재시도
             else:
-                logger.error("YouTube API error %s: %s", error_code, e)
+                logger.error(
+                    "YouTube API error %s (api=%s, quota_cost=%d): %s",
+                    error_code, api_name, quota_cost, e,
+                )
                 if attempt < max_retries:
                     continue
                 else:

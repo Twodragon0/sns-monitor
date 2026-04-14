@@ -17,6 +17,10 @@ from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeo
 
 logger = logging.getLogger(__name__)
 
+# Playwright timeout constant (milliseconds)
+PAGE_TIMEOUT_MS = 30000
+SELECTOR_TIMEOUT_MS = 10000
+
 # KST 시간대 설정
 KST = timezone(timedelta(hours=9))
 
@@ -28,17 +32,21 @@ def isoformat_kst():
     """KST ISO 8601 형식"""
     return now_kst().isoformat()
 
-# AWS 클라이언트 (LocalStack 지원)
-s3_endpoint = os.environ.get('S3_ENDPOINT')
-s3_client = boto3.client('s3', endpoint_url=s3_endpoint) if s3_endpoint else boto3.client('s3')
-
 # 환경 변수
 S3_BUCKET = os.environ.get('S3_BUCKET')
 LLM_ANALYZER_ENDPOINT = os.environ.get('LLM_ANALYZER_ENDPOINT', 'http://llm-analyzer:5000')
 
 # 로컬 모드 설정
-LOCAL_MODE = os.environ.get('LOCAL_MODE', '').lower() == 'true'
+LOCAL_MODE = os.environ.get('LOCAL_MODE', 'false').lower() == 'true'
 LOCAL_DATA_DIR = os.environ.get('LOCAL_DATA_DIR', './local-data')
+
+logger.info("LOCAL_MODE=%s LOCAL_DATA_DIR=%s", LOCAL_MODE, LOCAL_DATA_DIR)
+
+# AWS 클라이언트 — only initialised when not in LOCAL_MODE
+s3_client = None
+if not LOCAL_MODE:
+    s3_endpoint = os.environ.get('S3_ENDPOINT')
+    s3_client = boto3.client('s3', endpoint_url=s3_endpoint) if s3_endpoint else boto3.client('s3')
 
 # Playwright는 드라이버 생성 함수가 필요 없음 - 컨텍스트 매니저 사용
 
@@ -570,24 +578,30 @@ def get_comments_with_playwright(gallery_id, post_id, gallery_type='mini'):
         with sync_playwright() as p:
             # Chromium 브라우저 실행 (headless)
             browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
-
-            # 페이지 이동
-            url = f"https://gall.dcinside.com/{gallery_type}/board/view/?id={gallery_id}&no={post_id}"
-            page.goto(url, wait_until='networkidle', timeout=30000)
-
-            # 댓글이 로드될 때까지 대기
+            html = ''
             try:
-                page.wait_for_selector('.comment_box, .cmt_list, ul.cmt_list', timeout=10000)
-            except PlaywrightTimeoutError as e:
-                logger.warning("Comment elements not found, trying anyway... (Error: %s)", e)
+                page = browser.new_page()
 
-            # 추가 대기 (동적 로딩 완료)
-            time.sleep(3)
+                # 페이지 이동
+                url = f"https://gall.dcinside.com/{gallery_type}/board/view/?id={gallery_id}&no={post_id}"
+                page.goto(url, wait_until='networkidle', timeout=PAGE_TIMEOUT_MS)
 
-            # 페이지 HTML 가져오기
-            html = page.content()
-            browser.close()
+                # 댓글이 로드될 때까지 대기
+                try:
+                    page.wait_for_selector('.comment_box, .cmt_list, ul.cmt_list', timeout=SELECTOR_TIMEOUT_MS)
+                except PlaywrightTimeoutError as e:
+                    logger.warning(
+                        "Selector timeout gallery=%s post=%s: %s — continuing with available HTML",
+                        gallery_id, post_id, e,
+                    )
+
+                # 추가 대기 (동적 로딩 완료)
+                time.sleep(3)
+
+                # 페이지 HTML 가져오기
+                html = page.content()
+            finally:
+                browser.close()
 
             # BeautifulSoup으로 파싱
             soup = BeautifulSoup(html, 'html.parser')
@@ -783,8 +797,10 @@ def lambda_handler(event, context):
 
     logger.info("Event: %s", json.dumps(event))
 
+    crawl_start = time.monotonic()
     galleries_to_crawl = event.get('galleries', list(GALLERIES.keys()))
     results = []
+    failed_count = 0
 
     for gallery_id in galleries_to_crawl:
         if gallery_id not in GALLERIES:
@@ -921,6 +937,12 @@ def lambda_handler(event, context):
             # LLM 분석 트리거
             trigger_llm_analysis(s3_key, gallery_id, total_comments)
 
+            logger.info(
+                "Gallery summary | gallery=%s posts=%d comments=%d positive=%d negative=%d s3_key=%s",
+                gallery_id, len(filtered_posts), total_comments,
+                positive_count, negative_count, s3_key,
+            )
+
             results.append({
                 'gallery_id': gallery_id,
                 'status': 'success',
@@ -935,11 +957,22 @@ def lambda_handler(event, context):
             logger.error("Error crawling gallery '%s': %s", gallery_id, e)
             import traceback
             traceback.print_exc()
+            failed_count += 1
             results.append({
                 'gallery_id': gallery_id,
                 'status': 'error',
                 'error': str(e)
             })
+
+    crawl_duration_s = time.monotonic() - crawl_start
+    total_posts_all = sum(r.get('posts_found', 0) for r in results)
+    total_comments_all = sum(r.get('total_comments', 0) for r in results)
+    logger.info(
+        "Crawl complete | galleries_processed=%d galleries_failed=%d "
+        "total_posts=%d total_comments=%d duration_s=%.1f",
+        len(galleries_to_crawl), failed_count,
+        total_posts_all, total_comments_all, crawl_duration_s,
+    )
 
     return {
         'statusCode': 200,
