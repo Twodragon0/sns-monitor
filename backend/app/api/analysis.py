@@ -161,6 +161,7 @@ def _transform_dcinside_to_document(gallery_id):
 
 
 @analysis_bp.route('/api/analysis/status', methods=['GET'])
+@limiter.limit("30 per minute")
 def analysis_status():
     """Check AI analysis service availability."""
     try:

@@ -56,7 +56,8 @@ def _load_latest_metadata_local(platform, keyword=None):
                 metadata = json.load(f)
             if not keyword or metadata.get('keyword') == keyword:
                 files.append((filepath, metadata))
-        except Exception:
+        except Exception as e:
+            logger.debug("Skipping vuddy file %s: %s", filepath, e)
             continue
 
     if not files:
