@@ -256,6 +256,7 @@ def transform_sns_data():
 
 
 @analysis_bp.route('/api/analysis/graph/build', methods=['POST'])
+@limiter.limit("5 per minute")
 @csrf_protect
 @require_analysis_auth
 def build_analysis_graph():
@@ -273,6 +274,7 @@ def build_analysis_graph():
 
 
 @analysis_bp.route('/api/analysis/graph/task/<task_id>', methods=['GET'])
+@limiter.limit("30 per minute")
 @require_analysis_auth
 def get_analysis_task(task_id):
     """Proxy task status query to AI analysis service."""
@@ -290,6 +292,7 @@ def get_analysis_task(task_id):
 
 
 @analysis_bp.route('/api/analysis/graph/data/<graph_id>', methods=['GET'])
+@limiter.limit("30 per minute")
 @require_analysis_auth
 def get_analysis_graph_data(graph_id):
     """Proxy graph data query to AI analysis service."""
@@ -307,6 +310,7 @@ def get_analysis_graph_data(graph_id):
 
 
 @analysis_bp.route('/api/analysis/report/generate', methods=['POST'])
+@limiter.limit("5 per minute")
 @csrf_protect
 @require_analysis_auth
 def generate_analysis_report():
@@ -324,6 +328,7 @@ def generate_analysis_report():
 
 
 @analysis_bp.route('/api/analysis/report/<report_id>', methods=['GET'])
+@limiter.limit("30 per minute")
 @require_analysis_auth
 def get_analysis_report(report_id):
     """Proxy report retrieval from AI analysis service."""
@@ -359,6 +364,7 @@ def chat_with_analysis():
 
 
 @analysis_bp.route('/api/analysis/projects', methods=['GET'])
+@limiter.limit("30 per minute")
 @require_analysis_auth
 def list_analysis_projects():
     """Proxy project list from AI analysis service."""
@@ -658,6 +664,7 @@ def gallery_compare():
 
 
 @analysis_bp.route('/api/analysis/report/generate-daily', methods=['POST'])
+@limiter.limit("2 per minute")
 @csrf_protect
 def generate_daily_report():
     """Generate a daily sentiment report for all galleries.
