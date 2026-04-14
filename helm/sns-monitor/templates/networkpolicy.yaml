@@ -75,7 +75,8 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: redis
+      {{- include "sns-monitor.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: redis
   policyTypes:
     - Ingress
   ingress:
@@ -83,6 +84,7 @@ spec:
         - podSelector:
             matchLabels:
               {{- include "sns-monitor.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: api-backend
       ports:
         - protocol: TCP
           port: 6379
