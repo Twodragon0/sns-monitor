@@ -746,7 +746,7 @@ class TestGetCommentsWithPlaywright:
     @patch("time.sleep")
     def test_returns_parsed_comments_from_html(self, _sleep, crawler_module):
         ctx, _ = _build_pw_context(_PW_COMMENT_HTML)
-        with patch.object(crawler_module, "sync_playwright", return_value=ctx):
+        with patch("crawler.sync_playwright", return_value=ctx):
             result = crawler_module.get_comments_with_playwright("ivnit", "99")
         assert len(result["comments"]) == 1
         assert result["comments"][0]["text"] == "Playwright comment"
@@ -754,21 +754,21 @@ class TestGetCommentsWithPlaywright:
     @patch("time.sleep")
     def test_browser_is_always_closed(self, _sleep, crawler_module):
         ctx, mock_browser = _build_pw_context(_PW_EMPTY_HTML)
-        with patch.object(crawler_module, "sync_playwright", return_value=ctx):
+        with patch("crawler.sync_playwright", return_value=ctx):
             crawler_module.get_comments_with_playwright("ivnit", "99")
         mock_browser.close.assert_called_once()
 
     @patch("time.sleep")
     def test_browser_closed_even_when_selector_times_out(self, _sleep, crawler_module):
         ctx, mock_browser = _build_pw_context(_PW_EMPTY_HTML, selector_raises=True)
-        with patch.object(crawler_module, "sync_playwright", return_value=ctx):
+        with patch("crawler.sync_playwright", return_value=ctx):
             crawler_module.get_comments_with_playwright("ivnit", "99")
         mock_browser.close.assert_called_once()
 
     @patch("time.sleep")
     def test_returns_empty_when_no_comment_html(self, _sleep, crawler_module):
         ctx, _ = _build_pw_context(_PW_EMPTY_HTML)
-        with patch.object(crawler_module, "sync_playwright", return_value=ctx):
+        with patch("crawler.sync_playwright", return_value=ctx):
             result = crawler_module.get_comments_with_playwright("ivnit", "99")
         assert result == {"comments": [], "comment_count": 0}
 
@@ -777,14 +777,14 @@ class TestGetCommentsWithPlaywright:
         bad_ctx = MagicMock()
         bad_ctx.__enter__ = MagicMock(side_effect=Exception("pw crashed"))
         bad_ctx.__exit__ = MagicMock(return_value=False)
-        with patch.object(crawler_module, "sync_playwright", return_value=bad_ctx):
+        with patch("crawler.sync_playwright", return_value=bad_ctx):
             result = crawler_module.get_comments_with_playwright("ivnit", "99")
         assert result == {"comments": [], "comment_count": 0}
 
     @patch("time.sleep")
     def test_comment_count_from_total_span(self, _sleep, crawler_module):
         ctx, _ = _build_pw_context(_PW_TOTAL_SPAN_HTML)
-        with patch.object(crawler_module, "sync_playwright", return_value=ctx):
+        with patch("crawler.sync_playwright", return_value=ctx):
             result = crawler_module.get_comments_with_playwright("ivnit", "99")
         assert result["comment_count"] == 42
 
