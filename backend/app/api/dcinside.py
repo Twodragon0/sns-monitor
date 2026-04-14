@@ -300,5 +300,5 @@ def gallery_posts(gallery_id):
 
     except Exception as e:
         logger.error("Error in gallery_posts %s: %s", gallery_id, e, exc_info=True)
-        body = json.dumps({'error': str(e)}, ensure_ascii=False)
+        body = json.dumps({'error': 'Internal server error'}, ensure_ascii=False)
         return Response(body, status=500, content_type='application/json')

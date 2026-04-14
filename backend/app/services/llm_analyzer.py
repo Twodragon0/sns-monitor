@@ -395,7 +395,7 @@ def analyze_with_llm(
             return {"error": f"Unknown LLM provider: {provider}"}
     except Exception as e:
         logger.error("LLM analysis failed (%s): %s", provider, e, exc_info=True)
-        return {"error": f"LLM analysis failed: {str(e)}"}
+        return {"error": "LLM analysis failed. Please try again later."}
 
 
 def summarize_with_llm(
@@ -471,7 +471,7 @@ def chat_with_llm(
             return {"error": f"Unknown provider: {provider}"}
     except Exception as e:
         logger.error("LLM chat failed (%s): %s", provider, e, exc_info=True)
-        return {"error": f"LLM chat failed: {str(e)}"}
+        return {"error": "LLM chat failed. Please try again later."}
 
 
 def _call_anthropic(

@@ -159,7 +159,7 @@ def crawler_results():
         }), 200
     except Exception as e:
         logger.error("Error saving crawler results: %s", e, exc_info=True)
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Internal server error'}), 500
 
 
 @data_bp.route('/api/twitter/search', methods=['POST'])
@@ -195,7 +195,7 @@ def twitter_search():
                     }
                 except Exception as e:
                     logger.error("Error searching keyword '%s': %s", keyword, e, exc_info=True)
-                    bulk_results[keyword] = {'tweets': [], 'replies': [], 'error': str(e)}
+                    bulk_results[keyword] = {'tweets': [], 'replies': [], 'error': 'Internal server error'}
             return (
                 json.dumps({'results': bulk_results}, default=decimal_default, ensure_ascii=False),
                 200,
@@ -229,4 +229,4 @@ def twitter_search():
         )
     except Exception as e:
         logger.error("Error in Twitter search: %s", e, exc_info=True)
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Internal server error'}), 500

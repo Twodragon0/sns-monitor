@@ -21,6 +21,10 @@ from ..config import Config
 # Alphanumeric + hyphens + underscores only for path IDs
 _SAFE_ID_RE = re.compile(r'^[a-zA-Z0-9_-]{1,128}$')
 
+# Chat history validation constants
+MAX_CHAT_HISTORY = 20
+ALLOWED_CHAT_ROLES = {"user", "assistant"}
+
 logger = logging.getLogger(__name__)
 
 MIROFISH_URL = os.environ.get('MIROFISH_ENDPOINT', 'http://mirofish:5001')
@@ -893,7 +897,19 @@ def ai_chat():
     data = request.get_json() or {}
     sources_list = data.get('sources', [])
     message = (data.get('message') or '').strip()
-    chat_history = data.get('chat_history', [])
+
+    raw_history = data.get('chat_history', [])
+    if not isinstance(raw_history, list):
+        return jsonify({'error': 'Invalid chat_history format'}), 400
+    chat_history = []
+    for msg in raw_history[:MAX_CHAT_HISTORY]:
+        if not isinstance(msg, dict):
+            continue
+        role = msg.get('role', '')
+        content = msg.get('content', '')
+        if role not in ALLOWED_CHAT_ROLES or not isinstance(content, str):
+            continue
+        chat_history.append({'role': role, 'content': content[:5000]})
 
     if not message:
         return jsonify({'error': 'Message is required'}), 400
@@ -1034,7 +1050,19 @@ def ai_url_chat():
     data = request.get_json() or {}
     url_result = data.get('result')
     message = (data.get('message') or '').strip()
-    chat_history = data.get('chat_history', [])
+
+    raw_history = data.get('chat_history', [])
+    if not isinstance(raw_history, list):
+        return jsonify({'error': 'Invalid chat_history format'}), 400
+    chat_history = []
+    for msg in raw_history[:MAX_CHAT_HISTORY]:
+        if not isinstance(msg, dict):
+            continue
+        role = msg.get('role', '')
+        content = msg.get('content', '')
+        if role not in ALLOWED_CHAT_ROLES or not isinstance(content, str):
+            continue
+        chat_history.append({'role': role, 'content': content[:5000]})
 
     if not message:
         return jsonify({'error': 'Message is required'}), 400
