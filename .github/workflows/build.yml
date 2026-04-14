@@ -36,7 +36,7 @@ jobs:
 
       - name: Install test dependencies
         run: |
-          pip install pytest boto3 requests beautifulsoup4 google-api-python-client playwright
+          pip install pytest boto3 requests beautifulsoup4 lxml google-api-python-client playwright
 
       - name: Run YouTube crawler tests
         run: |
