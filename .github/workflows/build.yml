@@ -19,6 +19,33 @@ env:
   IMAGE_PREFIX: ${{ github.repository_owner }}/sns-monitor
 
 jobs:
+  test-crawlers:
+    name: Test Crawlers
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.11'
+
+      - name: Install test dependencies
+        run: |
+          pip install pytest boto3 requests beautifulsoup4 google-api-python-client playwright
+
+      - name: Run YouTube crawler tests
+        run: |
+          cd crawlers/youtube && python -m pytest tests/ -v --tb=short
+
+      - name: Run DCInside crawler tests
+        run: |
+          cd crawlers/dcinside && python -m pytest tests/ -v --tb=short
+
   build-frontend:
     name: Build Frontend
     runs-on: ubuntu-latest
@@ -202,7 +229,7 @@ jobs:
   summary:
     name: Build Summary
     runs-on: ubuntu-latest
-    needs: [build-frontend, build-api-backend, build-youtube-crawler, build-dcinside-crawler]
+    needs: [test-crawlers, build-frontend, build-api-backend, build-youtube-crawler, build-dcinside-crawler]
     if: always()
     permissions:
       contents: read
@@ -213,8 +240,9 @@ jobs:
           {
             echo "## Docker Build Results"
             echo ""
-            echo "| Image | Status | Platforms |"
-            echo "|-------|--------|-----------|"
+            echo "| Step | Status | Details |"
+            echo "|------|--------|---------|"
+            echo "| Crawler Tests | ${{ needs.test-crawlers.result == 'success' && 'pass' || 'fail' }} | YouTube + DCInside |"
             echo "| Frontend | ${{ needs.build-frontend.result == 'success' && 'pass' || 'fail' }} | amd64, arm64 |"
             echo "| API Backend | ${{ needs.build-api-backend.result == 'success' && 'pass' || 'fail' }} | amd64, arm64 |"
             echo "| YouTube Crawler | ${{ needs.build-youtube-crawler.result == 'success' && 'pass' || 'fail' }} | amd64, arm64 |"
