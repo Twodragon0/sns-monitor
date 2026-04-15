@@ -129,7 +129,9 @@ def crawler_results():
     """크롤러 결과 저장 엔드포인트 (DCInside + YouTube)."""
     token = request.headers.get('X-Crawler-Token', '')
     expected = os.environ.get('CRAWLER_INTERNAL_TOKEN', '')
-    if expected and not secrets.compare_digest(token, expected):
+    if not expected:
+        return jsonify({'error': 'CRAWLER_INTERNAL_TOKEN not configured'}), 503
+    if not secrets.compare_digest(token, expected):
         return jsonify({'error': 'Unauthorized'}), 401
 
     if not Config.LOCAL_MODE:
@@ -178,9 +180,16 @@ def twitter_search():
         twitter_crawler_endpoint = os.environ.get(
             'TWITTER_CRAWLER_ENDPOINT', 'http://twitter-crawler:5000'
         )
+        MAX_KEYWORD_LENGTH = 100
 
         if action == 'bulk_search':
+            MAX_BULK_KEYWORDS = 20
             keywords = body.get('keywords', [])
+            if not isinstance(keywords, list) or len(keywords) > MAX_BULK_KEYWORDS:
+                return jsonify({'error': f'keywords must be a list of max {MAX_BULK_KEYWORDS} items'}), 400
+            keywords = [k for k in keywords if isinstance(k, str) and k.strip() and len(k) <= MAX_KEYWORD_LENGTH]
+            if not keywords:
+                return jsonify({'error': 'At least one valid keyword is required'}), 400
             bulk_results = {}
             for keyword in keywords:
                 try:
@@ -202,7 +211,6 @@ def twitter_search():
                 {'Content-Type': 'application/json'},
             )
 
-        MAX_KEYWORD_LENGTH = 100
         keyword = (body.get('keyword', '') or '').strip()
         if not keyword or len(keyword) > MAX_KEYWORD_LENGTH:
             return jsonify({'error': 'Keyword must be 1-100 characters'}), 400

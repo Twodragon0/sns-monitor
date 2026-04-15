@@ -131,14 +131,16 @@ class TestDataBlueprint:
 
     def test_crawler_results_local_mode(self, client):
         """crawler_results saves in LOCAL_MODE."""
-        resp = client.post('/api/crawler/results', json={'results': []})
+        resp = client.post('/api/crawler/results', json={'results': []},
+                           headers={'X-Crawler-Token': 'test-crawler-token'})
         assert resp.status_code == 200
         assert 'saved_count' in resp.get_json()
 
     @patch('app.api.data.Config')
     def test_crawler_results_s3_mode_returns_501(self, mock_cfg, client):
         mock_cfg.LOCAL_MODE = False
-        resp = client.post('/api/crawler/results', json={'results': []})
+        resp = client.post('/api/crawler/results', json={'results': []},
+                           headers={'X-Crawler-Token': 'test-crawler-token'})
         assert resp.status_code == 501
         assert 'error' in resp.get_json()
 
@@ -395,7 +397,7 @@ class TestCrawlerResultsDCInside:
         """When youtube save returns False, dcinside save path is tried (line 143-144)."""
         resp = client.post('/api/crawler/results', json={
             'results': [{'gallery_id': 'test_gallery', 'data': []}]
-        })
+        }, headers={'X-Crawler-Token': 'test-crawler-token'})
         assert resp.status_code == 200
         data = resp.get_json()
         assert data['saved_count'] == 1
@@ -407,7 +409,7 @@ class TestCrawlerResultsDCInside:
         """When both saves fail, saved_count stays 0."""
         resp = client.post('/api/crawler/results', json={
             'results': [{'gallery_id': 'unknown', 'data': []}]
-        })
+        }, headers={'X-Crawler-Token': 'test-crawler-token'})
         assert resp.status_code == 200
         assert resp.get_json()['saved_count'] == 0
 

@@ -19,7 +19,7 @@ from .. import limiter
 from ..config import Config
 
 # Alphanumeric + hyphens + underscores only for path IDs
-_SAFE_ID_RE = re.compile(r'^[a-zA-Z0-9_-]{1,128}$')
+_SAFE_ID_RE = re.compile(r'^[a-zA-Z0-9_@-]{1,128}$')
 
 # Chat history validation constants
 MAX_CHAT_HISTORY = 20
@@ -232,11 +232,10 @@ def transform_sns_data():
         return jsonify({'error': 'No data found for specified sources'}), 404
 
     # Send to AI analysis service as file upload
+    import tempfile
+    files = []
+    temp_files = []
     try:
-        import tempfile
-        files = []
-        temp_files = []
-
         for doc in documents:
             tmp = tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False, encoding='utf-8')
             tmp.write(doc['content'])
@@ -255,12 +254,6 @@ def transform_sns_data():
             headers=_mirofish_headers(),
         )
 
-        # Clean up temp files
-        for f_tuple in files:
-            f_tuple[1][1].close()
-        for tmp_path in temp_files:
-            os.unlink(tmp_path)
-
         if resp.status_code != 200:
             logger.warning("MiroFish returned %d: %s", resp.status_code, resp.text[:200])
         try:
@@ -276,6 +269,17 @@ def transform_sns_data():
     except Exception as e:
         logger.error("AI analysis transform failed: %s", e, exc_info=True)
         return jsonify({'error': 'Internal server error'}), 500
+    finally:
+        for f_tuple in files:
+            try:
+                f_tuple[1][1].close()
+            except Exception:
+                pass
+        for tmp_path in temp_files:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
 
 
 @analysis_bp.route('/api/analysis/graph/build', methods=['POST'])
@@ -413,6 +417,7 @@ def _source_display_name_youtube(json_path):
 
 
 @analysis_bp.route('/api/analysis/sources', methods=['GET'])
+@limiter.limit("30 per minute")
 def list_available_sources():
     """List available SNS data sources that can be analyzed (for AI analysis/summary)."""
     data_dir = Path(Config.LOCAL_DATA_DIR)
@@ -557,6 +562,7 @@ def local_summary():
 
 
 @analysis_bp.route('/api/analysis/trend', methods=['GET'])
+@limiter.limit("30 per minute")
 def sentiment_trend():
     """Return sentiment over time for a gallery (one data point per crawl file).
 
@@ -626,6 +632,7 @@ def sentiment_trend():
 
 
 @analysis_bp.route('/api/analysis/compare', methods=['GET'])
+@limiter.limit("10 per minute")
 def gallery_compare():
     """Compare sentiment across all DCInside galleries.
 
@@ -689,6 +696,7 @@ def gallery_compare():
 @analysis_bp.route('/api/analysis/report/generate-daily', methods=['POST'])
 @limiter.limit("2 per minute")
 @csrf_protect
+@require_analysis_auth
 def generate_daily_report():
     """Generate a daily sentiment report for all galleries.
 
@@ -794,6 +802,7 @@ def generate_daily_report():
 
 
 @analysis_bp.route('/api/analysis/reports', methods=['GET'])
+@limiter.limit("30 per minute")
 def list_reports():
     """List available daily reports."""
     report_dir = _get_local_data_dir() / 'analysis' / 'reports'
@@ -816,6 +825,7 @@ def list_reports():
 
 
 @analysis_bp.route('/api/analysis/reports/<date>', methods=['GET'])
+@limiter.limit("30 per minute")
 def get_report(date):
     """Get a specific daily report."""
     if not _SAFE_ID_RE.match(date):

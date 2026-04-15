@@ -134,8 +134,10 @@ class TestGetDataRoute:
 
 
 class TestCrawlerResultsRoute:
+    _TOKEN_HEADER = {'X-Crawler-Token': 'test-crawler-token'}
+
     def test_local_mode_empty_results_saved(self, client):
-        resp = client.post('/api/crawler/results', json={'results': []})
+        resp = client.post('/api/crawler/results', json={'results': []}, headers=self._TOKEN_HEADER)
         assert resp.status_code == 200
         data = resp.get_json()
         assert data['saved_count'] == 0
@@ -147,7 +149,7 @@ class TestCrawlerResultsRoute:
                 mock_cfg.LOCAL_DATA_DIR = tmpdir
                 resp = client.post('/api/crawler/results', json={
                     'results': [{'channel': '@testch', 'videos': []}]
-                })
+                }, headers=self._TOKEN_HEADER)
                 assert resp.status_code == 200
                 data = resp.get_json()
                 assert data['saved_count'] == 1
@@ -155,11 +157,11 @@ class TestCrawlerResultsRoute:
     @patch('app.api.data.Config')
     def test_s3_mode_returns_501(self, mock_cfg, client):
         mock_cfg.LOCAL_MODE = False
-        resp = client.post('/api/crawler/results', json={'results': []})
+        resp = client.post('/api/crawler/results', json={'results': []}, headers=self._TOKEN_HEADER)
         assert resp.status_code == 501
 
     def test_no_json_body_returns_200_with_zero(self, client):
-        resp = client.post('/api/crawler/results', data='not json', content_type='text/plain')
+        resp = client.post('/api/crawler/results', data='not json', content_type='text/plain', headers=self._TOKEN_HEADER)
         assert resp.status_code == 200
         assert resp.get_json()['saved_count'] == 0
 
@@ -170,10 +172,19 @@ class TestCrawlerResultsRoute:
                 mock_cfg.LOCAL_DATA_DIR = tmpdir
                 resp = client.post('/api/crawler/results', json={
                     'results': [{'channel': '@chan1'}, {'channel': '@chan2'}]
-                })
+                }, headers=self._TOKEN_HEADER)
                 data = resp.get_json()
                 assert 'youtube_channels' in data
                 assert len(data['youtube_channels']) == 2
+
+    def test_missing_token_returns_401(self, client):
+        resp = client.post('/api/crawler/results', json={'results': []})
+        assert resp.status_code == 401
+
+    def test_unconfigured_token_returns_503(self, client):
+        with patch.dict(os.environ, {'CRAWLER_INTERNAL_TOKEN': ''}):
+            resp = client.post('/api/crawler/results', json={'results': []})
+            assert resp.status_code == 503
 
 
 class TestTwitterSearchRoute:
@@ -228,9 +239,9 @@ class TestTwitterSearchRoute:
             'action': 'bulk_search',
             'keywords': [],
         })
-        assert resp.status_code == 200
-        data = json.loads(resp.data)
-        assert data['results'] == {}
+        assert resp.status_code == 400
+        data = resp.get_json()
+        assert 'error' in data
 
 
 class TestFetchTweetsFromCrawler:
@@ -299,11 +310,13 @@ class TestSaveDcinsideResultException:
 
 
 class TestCrawlerResultsException:
+    _TOKEN_HEADER = {'X-Crawler-Token': 'test-crawler-token'}
+
     def test_unexpected_exception_returns_500(self, client):
         with patch('app.api.data._save_youtube_result', side_effect=RuntimeError('boom')):
             resp = client.post('/api/crawler/results', json={
                 'results': [{'channel': '@chan'}]
-            })
+            }, headers=self._TOKEN_HEADER)
             assert resp.status_code == 500
             assert 'error' in resp.get_json()
 

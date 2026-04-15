@@ -96,23 +96,15 @@ def get_overall_sentiment(sentiment_dist):
 
 def extract_comment_sentiment(comment, comment_text):
     """댓글에서 감성 분석 추출 (중첩 if 제거)"""
-    sentiment = comment.get('sentiment') or comment.get('is_vtuber')
+    sentiment = comment.get('sentiment')
     if sentiment:
         return sentiment
     return detect_comment_sentiment(comment_text)
 
 
 def _detect_reply_sentiment(reply_text):
-    """댓글 텍스트에서 감성 분석 (중첩 if 제거)"""
-    text_lower = reply_text.lower()
-    positive_words = ['좋', '최고', '사랑', '감사', '고마', '훌륭', '멋', '대박', '완벽', '👍', '❤', '💕', '😊', '😍']
-    negative_words = ['안좋', '최악', '싫', '별로', '실망', '나쁘', '문제', '불만', '😢', '😡', '👎']
-
-    if any(word in text_lower for word in positive_words):
-        return 'positive'
-    if any(word in text_lower for word in negative_words):
-        return 'negative'
-    return 'neutral'
+    """댓글 텍스트에서 감성 분석. detect_comment_sentiment에 위임."""
+    return detect_comment_sentiment(reply_text)
 
 
 def _calculate_sentiment_from_samples(comment_samples):

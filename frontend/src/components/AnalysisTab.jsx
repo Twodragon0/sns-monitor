@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 
 import { API_BASE } from '../config';
+import './AnalysisTab.css';
 import { WordCloudAndCompare, DailyReportsPanel } from './analysis-tab/AnalysisWidgets';
 import { AuthPanel, providerLabel } from './analysis-tab/AuthPanel';
 import { LocalResultPanel, AiResultPanel } from './analysis-tab/ResultPanels';
@@ -393,15 +394,7 @@ function AnalysisTab() {
         <button
           type="button"
           onClick={goDashboard}
-          style={{
-            padding: '6px 12px',
-            fontSize: '13px',
-            color: '#666',
-            background: '#f1f5f9',
-            border: '1px solid #e2e8f0',
-            borderRadius: '6px',
-            cursor: 'pointer',
-          }}
+          className="analysis-tab__back-btn"
         >
           ← 대시보드로 돌아가기
         </button>
@@ -409,11 +402,11 @@ function AnalysisTab() {
       <h2 style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
         수집 데이터 분석 · 요약
         {llmStatus.available ? (
-          <span style={{ fontSize: '12px', padding: '2px 8px', borderRadius: '12px', backgroundColor: '#d4edda', color: '#155724' }}>
+          <span className="analysis-tab__status-badge analysis-tab__status-badge--ok">
             {providerLabel(llmStatus.provider)} 연결됨
           </span>
         ) : (
-          <span style={{ fontSize: '12px', padding: '2px 8px', borderRadius: '12px', backgroundColor: '#fef3c7', color: '#92400e' }}>
+          <span className="analysis-tab__status-badge analysis-tab__status-badge--warn">
             AI 미연결 — 아래에서 API Key를 입력하세요
           </span>
         )}
@@ -421,51 +414,34 @@ function AnalysisTab() {
 
       {/* URL Analysis Result context */}
       {urlAnalysisData && (
-        <div style={{
-          padding: '14px 16px',
-          backgroundColor: '#f0f4ff',
-          border: '1px solid #c7d2fe',
-          borderRadius: '8px',
-          marginBottom: '16px',
-          fontSize: '14px',
-        }}>
+        <div className="analysis-tab__url-banner">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <strong style={{ color: '#4338ca' }}>
+              <strong className="analysis-tab__url-banner-title">
                 URL 분석 결과 → AI 심화 분석
               </strong>
-              <span style={{ marginLeft: '8px', color: '#6366f1' }}>
+              <span className="analysis-tab__url-banner-sub">
                 {urlAnalysisData.platform?.toUpperCase()} : {urlAnalysisData.title || urlAnalysisData.username || ''}
               </span>
             </div>
             <button
               type="button"
               onClick={() => { setUrlAnalysisData(null); setAiResult(null); setAnalysisState('idle'); setChatMessages([]); }}
-              style={{
-                padding: '4px 10px', fontSize: '12px', color: '#666',
-                background: '#e2e8f0', border: 'none', borderRadius: '4px', cursor: 'pointer',
-              }}
+              className="analysis-tab__url-banner-close"
             >
               닫기
             </button>
           </div>
-          {loading && <p style={{ margin: '8px 0 0', color: '#4338ca' }}>AI 분석 진행 중...</p>}
+          {loading && <p className="analysis-tab__url-banner-loading" style={{ margin: '8px 0 0' }}>AI 분석 진행 중...</p>}
         </div>
       )}
 
       {/* AI connection status / auth panel */}
-      <div style={{
-        padding: '14px 16px',
-        backgroundColor: llmStatus.available ? '#e8f5e9' : '#fff8e6',
-        border: `1px solid ${llmStatus.available ? '#a5d6a7' : '#f0c14b'}`,
-        borderRadius: '8px',
-        marginBottom: '20px',
-        fontSize: '14px',
-      }}>
+      <div className={`analysis-tab__llm-panel ${llmStatus.available ? 'analysis-tab__llm-panel--ok' : 'analysis-tab__llm-panel--warn'}`}>
         {llmStatus.available ? (
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <strong style={{ color: '#2e7d32' }}>
+              <strong className="analysis-tab__llm-title--ok">
                 {providerLabel(llmStatus.provider)} ({llmStatus.model}) 연결됨
               </strong>
               {authInfo.logged_in && (
@@ -476,13 +452,13 @@ function AnalysisTab() {
                     setAuthInfo({ logged_in: false, auth_required: false });
                     window.location.reload();
                   }}
-                  style={{ padding: '4px 10px', fontSize: '12px', color: '#666', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '4px', cursor: 'pointer' }}
+                  className="analysis-tab__logout-btn"
                 >
                   로그아웃
                 </button>
               )}
             </div>
-            <p style={{ margin: '4px 0 0', color: '#5a5a5a', fontSize: '13px' }}>
+            <p className="analysis-tab__llm-desc">
               {llmStatus.auth_mode === 'cli' ? 'Docker 내부 SDK' : llmStatus.auth_mode === 'oauth' ? 'OAuth 인증' : llmStatus.auth_mode === 'api_key_session' ? '브라우저 API Key' : 'API Key'}로 AI 분석을 수행합니다.
             </p>
           </>
@@ -492,19 +468,14 @@ function AnalysisTab() {
       </div>
 
       {/* Data Source Selection */}
-      <div style={{
-        backgroundColor: '#f8f9fa',
-        padding: '16px',
-        borderRadius: '8px',
-        marginBottom: '20px',
-      }}>
+      <div className="analysis-tab__sources">
         <h3 style={{ marginTop: 0, marginBottom: '8px' }}>데이터 소스 선택</h3>
         {sources.length === 0 ? (
-          <p style={{ color: '#666', marginBottom: 0 }}>수집된 소스가 없습니다. 크롤러를 먼저 실행하세요.</p>
+          <p className="analysis-tab__source-empty">수집된 소스가 없습니다. 크롤러를 먼저 실행하세요.</p>
         ) : (
           <>
             {selectedSources.length === 0 && (
-              <p style={{ color: '#555', fontSize: '13px', marginBottom: '10px' }}>
+              <p className="analysis-tab__source-hint">
                 아래 소스 중 <strong>하나 이상 클릭</strong>하여 선택한 뒤 [분석] 버튼을 누르세요.
               </p>
             )}
@@ -517,16 +488,7 @@ function AnalysisTab() {
                     key={key}
                     onClick={() => toggleSource(src)}
                     type="button"
-                    style={{
-                      padding: '8px 16px',
-                      border: `2px solid ${isSelected ? '#007bff' : '#dee2e6'}`,
-                      borderRadius: '20px',
-                      backgroundColor: isSelected ? '#007bff' : 'white',
-                      color: isSelected ? 'white' : '#333',
-                      cursor: 'pointer',
-                      fontSize: '13px',
-                      transition: 'all 0.2s',
-                    }}
+                    className={`analysis-tab__source-btn ${isSelected ? 'analysis-tab__source-btn--selected' : 'analysis-tab__source-btn--unselected'}`}
                   >
                     {src.type === 'youtube' ? 'YT' : 'DC'} {src.name}
                     {src.files != null && ` (${src.files}개)`}
@@ -542,21 +504,18 @@ function AnalysisTab() {
             type="button"
             onClick={startAnalysis}
             disabled={selectedSources.length === 0 || loading}
-            style={{
-              padding: '10px 24px',
-              backgroundColor: (selectedSources.length === 0 || loading) ? '#ccc' : mirofishAvailable ? '#28a745' : '#007bff',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: (selectedSources.length === 0 || loading) ? 'not-allowed' : 'pointer',
-              fontSize: '14px',
-              fontWeight: 'bold',
-            }}
+            className={`analysis-tab__run-btn ${
+              (selectedSources.length === 0 || loading)
+                ? 'analysis-tab__run-btn--disabled'
+                : mirofishAvailable
+                  ? 'analysis-tab__run-btn--mirofish'
+                  : 'analysis-tab__run-btn--ai'
+            }`}
           >
             {loading ? '분석 중…' : selectedSources.length === 0 ? '소스 선택 후 분석' : llmStatus.available ? `${selectedSources.length}개 소스 AI 분석` : `${selectedSources.length}개 소스 기본 분석`}
           </button>
           {selectedSources.length > 0 && (
-            <span style={{ marginLeft: '10px', fontSize: '12px', color: '#666' }}>
+            <span className="analysis-tab__run-hint">
               {llmStatus.available
                 ? `${providerLabel(llmStatus.provider)}로 AI 분석`
                 : 'AI 미연결 — 키워드 기반 로컬 분석'}
@@ -567,28 +526,15 @@ function AnalysisTab() {
 
       {/* Progress */}
       {analysisState !== 'idle' && analysisState !== 'error' && analysisState !== 'completed' && (
-        <div style={{
-          backgroundColor: '#e3f2fd',
-          padding: '16px',
-          borderRadius: '8px',
-          marginBottom: '20px',
-        }}>
+        <div className="analysis-tab__progress">
           <h4 style={{ margin: '0 0 8px 0' }}>분석 진행 상황</h4>
-          <div style={{
-            width: '100%',
-            backgroundColor: '#bbdefb',
-            borderRadius: '4px',
-            overflow: 'hidden',
-            marginBottom: '8px',
-          }}>
-            <div style={{
-              width: `${getProgressPercent()}%`,
-              height: '8px',
-              backgroundColor: '#1976d2',
-              transition: 'width 0.5s ease',
-            }} />
+          <div className="analysis-tab__progress-track">
+            <div
+              className="analysis-tab__progress-fill"
+              style={{ width: `${getProgressPercent()}%` }}
+            />
           </div>
-          <p style={{ margin: 0, fontSize: '13px', color: '#1565c0' }}>
+          <p className="analysis-tab__progress-text">
             {analysisState === 'transforming' && 'SNS 데이터를 문서로 변환 중...'}
             {analysisState === 'building' && (taskProgress?.message || '지식 그래프 구축 중...')}
             {analysisState === 'generating' && '분석 보고서 생성 중...'}
@@ -598,14 +544,7 @@ function AnalysisTab() {
 
       {/* Error */}
       {error && (
-        <div style={{
-          padding: '16px',
-          backgroundColor: '#f8d7da',
-          border: '1px solid #f5c6cb',
-          borderRadius: '8px',
-          marginBottom: '20px',
-          color: '#721c24',
-        }}>
+        <div className="analysis-tab__error">
           <strong>오류:</strong> {error}
         </div>
       )}
@@ -621,18 +560,13 @@ function AnalysisTab() {
 
       {/* Completed - Graph Data */}
       {analysisState === 'completed' && currentProject && (
-        <div style={{
-          backgroundColor: '#d4edda',
-          padding: '16px',
-          borderRadius: '8px',
-          marginBottom: '20px',
-        }}>
-          <h4 style={{ margin: '0 0 8px 0', color: '#155724' }}>분석 완료</h4>
-          <p style={{ margin: '0 0 8px 0', fontSize: '13px' }}>
+        <div className="analysis-tab__completed">
+          <h4 className="analysis-tab__completed-title">분석 완료</h4>
+          <p className="analysis-tab__completed-desc">
             프로젝트: <strong>{currentProject.project_name || currentProject.project_id}</strong>
           </p>
           {currentProject.ontology && (
-            <p style={{ margin: '0 0 8px 0', fontSize: '13px' }}>
+            <p className="analysis-tab__completed-desc">
               개체: {currentProject.ontology.entity_types?.length || 0}종 /
               관계: {currentProject.ontology.edge_types?.length || 0}종
             </p>
@@ -640,15 +574,7 @@ function AnalysisTab() {
           {taskProgress?.result?.graph_id && (
             <button
               onClick={() => viewGraphData(taskProgress.result.graph_id)}
-              style={{
-                padding: '6px 16px',
-                backgroundColor: '#28a745',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '13px',
-              }}
+              className="analysis-tab__view-graph-btn"
             >
               그래프 보기 ({taskProgress.result.node_count}개 노드, {taskProgress.result.edge_count}개 엣지)
             </button>
@@ -658,28 +584,16 @@ function AnalysisTab() {
 
       {/* Graph Visualization */}
       {report?.type === 'graph' && report.data && (
-        <div style={{
-          backgroundColor: 'white',
-          padding: '16px',
-          borderRadius: '8px',
-          border: '1px solid #dee2e6',
-          marginBottom: '20px',
-        }}>
+        <div className="analysis-tab__graph">
           <h3 style={{ marginTop: 0 }}>지식 그래프</h3>
           <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: '300px' }}>
               <h4>개체 ({report.data.nodes?.length || 0})</h4>
               <div style={{ maxHeight: '400px', overflow: 'auto' }}>
                 {(report.data.nodes || []).map((node, i) => (
-                  <div key={node.id || node.name || i} style={{
-                    padding: '8px',
-                    marginBottom: '4px',
-                    backgroundColor: '#f8f9fa',
-                    borderRadius: '4px',
-                    fontSize: '13px',
-                  }}>
+                  <div key={node.id || node.name || i} className="analysis-tab__graph-node">
                     <strong>{node.name || node.label || node.id}</strong>
-                    {node.type && <span style={{ color: '#666', marginLeft: '8px' }}>({node.type})</span>}
+                    {node.type && <span className="analysis-tab__graph-node-type">({node.type})</span>}
                   </div>
                 ))}
               </div>
@@ -688,15 +602,9 @@ function AnalysisTab() {
               <h4>관계 ({report.data.edges?.length || 0})</h4>
               <div style={{ maxHeight: '400px', overflow: 'auto' }}>
                 {(report.data.edges || []).map((edge, i) => (
-                  <div key={edge.source && edge.target ? `${edge.source}-${edge.target}-${i}` : i} style={{
-                    padding: '8px',
-                    marginBottom: '4px',
-                    backgroundColor: '#f0f7ff',
-                    borderRadius: '4px',
-                    fontSize: '13px',
-                  }}>
+                  <div key={edge.source && edge.target ? `${edge.source}-${edge.target}-${i}` : i} className="analysis-tab__graph-edge">
                     {edge.source_name || edge.source}
-                    <span style={{ color: '#007bff', margin: '0 6px' }}>{edge.relation || edge.type}</span>
+                    <span className="analysis-tab__graph-edge-relation">{edge.relation || edge.type}</span>
                     {edge.target_name || edge.target}
                   </div>
                 ))}
@@ -708,51 +616,31 @@ function AnalysisTab() {
 
       {/* Chat Interface - works with SNS AI, AI LLM, URL result, or all */}
       {analysisState === 'completed' && (currentProject || aiResult || urlAnalysisData || llmStatus.available) && (
-        <div style={{
-          backgroundColor: 'white',
-          padding: '16px',
-          borderRadius: '8px',
-          border: '1px solid #dee2e6',
-          marginBottom: '20px',
-        }}>
+        <div className="analysis-tab__chat">
           <h3 style={{ marginTop: 0 }}>
             AI 대화
             {aiResult && (
-              <span style={{ fontSize: '12px', fontWeight: 'normal', color: '#888', marginLeft: '8px' }}>
+              <span className="analysis-tab__chat-provider">
                 {providerLabel(aiResult.provider)}
               </span>
             )}
           </h3>
-          <div style={{
-            maxHeight: '400px',
-            overflow: 'auto',
-            marginBottom: '12px',
-            padding: '8px',
-            backgroundColor: '#f8f9fa',
-            borderRadius: '4px',
-          }}>
+          <div className="analysis-tab__chat-messages">
             {chatMessages.length === 0 && (
-              <p style={{ color: '#999', textAlign: 'center', margin: '20px 0' }}>
+              <p className="analysis-tab__chat-empty">
                 분석 결과에 대해 질문하세요...
               </p>
             )}
             {chatMessages.map((msg, i) => (
-              <div key={`${msg.role}-${i}`} style={{
-                padding: '8px 12px',
-                marginBottom: '8px',
-                borderRadius: '8px',
-                backgroundColor: msg.role === 'user' ? '#007bff' : '#e9ecef',
-                color: msg.role === 'user' ? 'white' : '#333',
-                marginLeft: msg.role === 'user' ? '40px' : '0',
-                marginRight: msg.role === 'assistant' ? '40px' : '0',
-                whiteSpace: 'pre-wrap',
-                fontSize: '14px',
-              }}>
+              <div
+                key={`${msg.role}-${i}`}
+                className={`analysis-tab__chat-bubble ${msg.role === 'user' ? 'analysis-tab__chat-bubble--user' : 'analysis-tab__chat-bubble--assistant'}`}
+              >
                 {msg.content}
               </div>
             ))}
             {chatLoading && (
-              <div style={{ textAlign: 'center', color: '#999', padding: '8px' }}>
+              <div className="analysis-tab__chat-loading">
                 생각 중...
               </div>
             )}
@@ -770,13 +658,7 @@ function AnalysisTab() {
                 }
               }}
               placeholder="분석 결과에 대해 질문하세요..."
-              style={{
-                flex: 1,
-                padding: '10px 12px',
-                border: '1px solid #dee2e6',
-                borderRadius: '6px',
-                fontSize: '14px',
-              }}
+              className="analysis-tab__chat-input"
             />
             <button
               onClick={() => {
@@ -785,14 +667,7 @@ function AnalysisTab() {
                 else if (llmStatus.available) sendAiChat();
               }}
               disabled={chatLoading || !chatInput.trim()}
-              style={{
-                padding: '10px 20px',
-                backgroundColor: chatLoading ? '#ccc' : '#007bff',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: chatLoading ? 'not-allowed' : 'pointer',
-              }}
+              className={`analysis-tab__chat-send-btn ${(chatLoading || !chatInput.trim()) ? 'analysis-tab__chat-send-btn--disabled' : 'analysis-tab__chat-send-btn--active'}`}
             >
               전송
             </button>
@@ -802,36 +677,27 @@ function AnalysisTab() {
 
       {/* Existing Projects */}
       {projects.length > 0 && (
-        <div style={{
-          backgroundColor: 'white',
-          padding: '16px',
-          borderRadius: '8px',
-          border: '1px solid #dee2e6',
-        }}>
+        <div className="analysis-tab__projects">
           <h3 style={{ marginTop: 0 }}>이전 분석</h3>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+          <table className="analysis-tab__projects-table">
             <thead>
-              <tr style={{ borderBottom: '2px solid #dee2e6' }}>
-                <th style={{ textAlign: 'left', padding: '8px' }}>프로젝트</th>
-                <th style={{ textAlign: 'left', padding: '8px' }}>상태</th>
-                <th style={{ textAlign: 'left', padding: '8px' }}>개체</th>
-                <th style={{ textAlign: 'left', padding: '8px' }}>생성일</th>
+              <tr className="analysis-tab__projects-thead-row">
+                <th>프로젝트</th>
+                <th>상태</th>
+                <th>개체</th>
+                <th>생성일</th>
               </tr>
             </thead>
             <tbody>
               {projects.map(proj => (
-                <tr key={proj.project_id} style={{ borderBottom: '1px solid #eee' }}>
+                <tr key={proj.project_id} className="analysis-tab__projects-row">
                   <td style={{ padding: '8px' }}>{proj.name || proj.project_id}</td>
                   <td style={{ padding: '8px' }}>
-                    <span style={{
-                      padding: '2px 8px',
-                      borderRadius: '12px',
-                      fontSize: '11px',
-                      backgroundColor: proj.status === 'graph_completed' ? '#d4edda' :
-                                      proj.status === 'graph_building' ? '#fff3cd' : '#e2e3e5',
-                      color: proj.status === 'graph_completed' ? '#155724' :
-                             proj.status === 'graph_building' ? '#856404' : '#383d41',
-                    }}>
+                    <span className={`analysis-tab__project-status ${
+                      proj.status === 'graph_completed' ? 'analysis-tab__project-status--completed' :
+                      proj.status === 'graph_building' ? 'analysis-tab__project-status--building' :
+                      'analysis-tab__project-status--default'
+                    }`}>
                       {proj.status}
                     </span>
                   </td>

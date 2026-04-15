@@ -160,9 +160,10 @@ class TestExtractCommentSentiment:
         comment = {'sentiment': 'positive', 'text': ''}
         assert extract_comment_sentiment(comment, '') == 'positive'
 
-    def test_uses_is_vtuber_as_fallback(self):
+    def test_ignores_is_vtuber_field(self):
+        """is_vtuber is not a sentiment value; should fall back to text detection."""
         comment = {'is_vtuber': 'negative', 'text': ''}
-        assert extract_comment_sentiment(comment, '') == 'negative'
+        assert extract_comment_sentiment(comment, '') == 'neutral'
 
     def test_falls_back_to_text_detection(self):
         comment = {}

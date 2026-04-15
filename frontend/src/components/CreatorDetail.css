@@ -1,0 +1,325 @@
+/* ===== CreatorDetail — Design Tokens from App.css :root ===== */
+
+/* ===== Header ===== */
+.creator-detail__back-btn {
+  padding: 8px 16px;
+  background: var(--c-primary);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  font-family: inherit;
+}
+
+.creator-detail__back-btn:hover {
+  background: var(--c-primary-dark);
+}
+
+.creator-detail__last-updated {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--c-text-secondary);
+}
+
+/* ===== Keyword Section ===== */
+.creator-detail__keywords {
+  margin-bottom: 32px;
+  padding: 20px;
+  background: var(--c-surface);
+  border: 2px solid var(--c-primary);
+  border-radius: 12px;
+}
+
+.creator-detail__keywords-title {
+  margin-top: 0;
+  color: var(--c-primary);
+  font-size: 18px;
+}
+
+.creator-detail__keyword-category {
+  font-size: 12px;
+  color: var(--c-text-secondary);
+  font-weight: bold;
+  margin-right: 6px;
+}
+
+.creator-detail__keyword-tag {
+  display: inline-block;
+  padding: 3px 8px;
+  background: var(--c-primary);
+  color: #fff;
+  border-radius: 12px;
+  font-size: 11px;
+  margin-right: 4px;
+}
+
+.creator-detail__keyword-meta {
+  margin: 0;
+  font-size: 12px;
+  color: var(--c-text-secondary);
+}
+
+/* ===== Chart Cards ===== */
+.creator-detail__chart-card {
+  padding: 20px;
+  background: var(--c-surface);
+  border: 2px solid var(--c-border);
+  border-radius: 12px;
+}
+
+.creator-detail__chart-title {
+  margin-top: 0;
+  font-size: 16px;
+  color: var(--c-text);
+}
+
+.creator-detail__chart-empty {
+  color: var(--c-text-secondary);
+  text-align: center;
+}
+
+/* ===== Channel Card ===== */
+.creator-detail__channel {
+  margin-bottom: 24px;
+  background: var(--c-surface);
+  border: 2px solid var(--c-primary);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.creator-detail__channel-header {
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.creator-detail__channel-name {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.creator-detail__channel-handle {
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.creator-detail__channel-badge {
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 4px 10px;
+  border-radius: 12px;
+}
+
+/* ===== Channel Summary ===== */
+.creator-detail__channel-summary {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--c-border);
+}
+
+/* Sentiment stat boxes */
+.creator-detail__sentiment-box {
+  text-align: center;
+  padding: 10px;
+  border-radius: 8px;
+}
+
+.creator-detail__sentiment-box--positive {
+  background: rgba(76, 175, 80, 0.12);
+}
+
+.creator-detail__sentiment-value--positive {
+  font-size: 22px;
+  font-weight: bold;
+  color: var(--c-success);
+}
+
+.creator-detail__sentiment-label--positive {
+  font-size: 11px;
+  color: var(--c-success);
+}
+
+.creator-detail__sentiment-box--neutral {
+  background: rgba(255, 152, 0, 0.1);
+}
+
+.creator-detail__sentiment-value--neutral {
+  font-size: 22px;
+  font-weight: bold;
+  color: var(--c-warn);
+}
+
+.creator-detail__sentiment-label--neutral {
+  font-size: 11px;
+  color: var(--c-warn);
+}
+
+.creator-detail__sentiment-box--negative {
+  background: rgba(244, 67, 54, 0.1);
+}
+
+.creator-detail__sentiment-value--negative {
+  font-size: 22px;
+  font-weight: bold;
+  color: var(--c-danger);
+}
+
+.creator-detail__sentiment-label--negative {
+  font-size: 11px;
+  color: var(--c-danger);
+}
+
+.creator-detail__sentiment-box--score {
+  background: rgba(156, 39, 176, 0.1);
+}
+
+.creator-detail__sentiment-value--score {
+  font-size: 22px;
+  font-weight: bold;
+  color: #9c27b0;
+}
+
+[data-theme="dark"] .creator-detail__sentiment-value--score {
+  color: #ce93d8;
+}
+
+.creator-detail__sentiment-label--score {
+  font-size: 11px;
+  color: #9c27b0;
+}
+
+[data-theme="dark"] .creator-detail__sentiment-label--score {
+  color: #ce93d8;
+}
+
+/* External link buttons */
+.creator-detail__yt-link {
+  padding: 6px 12px;
+  background: #ff0000;
+  color: #fff;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: bold;
+  text-decoration: none;
+}
+
+.creator-detail__yt-link:hover {
+  opacity: 0.88;
+}
+
+/* ===== Expanded Section ===== */
+.creator-detail__expanded {
+  padding: 16px 20px;
+}
+
+.creator-detail__section-title {
+  color: var(--c-primary);
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+/* Video item */
+.creator-detail__video {
+  padding: 10px;
+  background: var(--c-bg);
+  border-radius: 8px;
+  border: 1px solid var(--c-border);
+}
+
+.creator-detail__video-title {
+  font-size: 13px;
+  font-weight: bold;
+  color: var(--c-text);
+  margin-bottom: 4px;
+}
+
+.creator-detail__video-meta {
+  font-size: 11px;
+  color: var(--c-text-secondary);
+  display: flex;
+  gap: 12px;
+}
+
+/* Comment item */
+.creator-detail__comment {
+  padding: 10px 12px;
+  background: var(--c-bg);
+  border-radius: 8px;
+}
+
+.creator-detail__comment-keyword {
+  background: var(--c-primary);
+  color: #fff;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  margin-right: 4px;
+}
+
+.creator-detail__comment-text {
+  font-size: 13px;
+  color: var(--c-text);
+  margin-bottom: 6px;
+}
+
+.creator-detail__comment-meta {
+  font-size: 11px;
+  color: var(--c-text-secondary);
+  display: flex;
+  gap: 12px;
+}
+
+.creator-detail__load-more-btn {
+  margin-top: 12px;
+  padding: 8px 20px;
+  background: var(--c-primary);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+/* ===== DCInside Section ===== */
+.creator-detail__dc-title {
+  color: var(--c-primary);
+  margin-bottom: 16px;
+  font-weight: 900;
+}
+
+.creator-detail__dc-gallery {
+  margin-bottom: 16px;
+  padding: 16px;
+  background: var(--c-surface);
+  border: 2px solid var(--c-primary);
+  border-radius: 12px;
+}
+
+.creator-detail__dc-gallery-name {
+  margin: 0;
+  color: var(--c-primary);
+}
+
+.creator-detail__dc-gallery-meta {
+  font-size: 13px;
+  color: var(--c-text-secondary);
+}
+
+/* ===== Empty State ===== */
+.creator-detail__empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--c-text-secondary);
+}
+
+.creator-detail__empty-keyword-hint {
+  font-size: 13px;
+  color: var(--c-text-secondary);
+}
