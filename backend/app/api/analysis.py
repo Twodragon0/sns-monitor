@@ -515,14 +515,14 @@ def local_summary():
     Local analysis: reads crawled data and runs keyword-based sentiment analysis.
     Works offline — no external AI service required.
     """
-    from ..services.platform_analyzer import PlatformAnalyzer
+    from ..services.sentiment_analyzer import SentimentAnalyzer
 
     data = request.get_json() or {}
     sources_list = data.get('sources', [])
     if not sources_list:
         return jsonify({'error': 'No data sources specified'}), 400
 
-    analyzer = PlatformAnalyzer(data_dir=str(_get_local_data_dir()))
+    analyzer = SentimentAnalyzer()
     all_items = []
     source_summaries = []
 
@@ -536,7 +536,7 @@ def local_summary():
         if not items:
             continue
 
-        sentiment = analyzer._analyze_sentiment(items)
+        sentiment = analyzer.analyze(items)
         all_items.extend(items)
         source_summaries.append({
             'type': src_type,
@@ -550,7 +550,7 @@ def local_summary():
         return jsonify({'error': 'No data found for specified sources'}), 404
 
     # Overall combined sentiment
-    overall_sentiment = analyzer._analyze_sentiment(all_items)
+    overall_sentiment = analyzer.analyze(all_items)
 
     return jsonify({
         'success': True,
@@ -568,7 +568,7 @@ def sentiment_trend():
 
     Query params: type=dcinside&id=skoshism
     """
-    from ..services.platform_analyzer import PlatformAnalyzer
+    from ..services.sentiment_analyzer import SentimentAnalyzer
 
     src_type = request.args.get('type', 'dcinside')
     src_id = request.args.get('id', '')
@@ -576,7 +576,7 @@ def sentiment_trend():
         return jsonify({'error': 'Invalid source id'}), 400
 
     data_dir = _get_local_data_dir()
-    analyzer = PlatformAnalyzer(data_dir=str(data_dir))
+    analyzer = SentimentAnalyzer()
     trend = []
 
     if src_type == 'dcinside':
@@ -611,7 +611,7 @@ def sentiment_trend():
                             items.append({'text': ctext})
 
                 if items:
-                    sentiment = analyzer._analyze_sentiment(items)
+                    sentiment = analyzer.analyze(items)
                     s = sentiment.get('sentiment', {})
                     trend.append({
                         'timestamp': ts,
@@ -638,14 +638,14 @@ def gallery_compare():
 
     Returns sorted list of galleries with their latest sentiment stats.
     """
-    from ..services.platform_analyzer import PlatformAnalyzer
+    from ..services.sentiment_analyzer import SentimentAnalyzer
 
     data_dir = _get_local_data_dir()
     dc_dir = data_dir / 'dcinside'
     if not dc_dir.exists():
         return jsonify({'galleries': []})
 
-    analyzer = PlatformAnalyzer(data_dir=str(data_dir))
+    analyzer = SentimentAnalyzer()
     galleries = []
 
     for gallery_dir in sorted(dc_dir.iterdir()):
@@ -673,7 +673,7 @@ def gallery_compare():
                     if ctext:
                         items.append({'text': ctext})
 
-            sentiment = analyzer._analyze_sentiment(items)
+            sentiment = analyzer.analyze(items)
             s = sentiment['sentiment']
             total = s['positive'] + s['neutral'] + s['negative']
             galleries.append({
@@ -703,10 +703,10 @@ def generate_daily_report():
     Saves to local-data/analysis/reports/YYYY-MM-DD.json
     Can be triggered by cron or manually.
     """
-    from ..services.platform_analyzer import PlatformAnalyzer
+    from ..services.sentiment_analyzer import SentimentAnalyzer
 
     data_dir = _get_local_data_dir()
-    analyzer = PlatformAnalyzer(data_dir=str(data_dir))
+    analyzer = SentimentAnalyzer()
     dc_dir = data_dir / 'dcinside'
 
     today = datetime.now().strftime('%Y-%m-%d')
@@ -751,7 +751,7 @@ def generate_daily_report():
         except Exception as e:
             logger.debug("Could not read gallery name from %s: %s", json_files[-1], e)
 
-        sentiment = analyzer._analyze_sentiment(all_items)
+        sentiment = analyzer.analyze(all_items)
         s = sentiment['sentiment']
         total = s['positive'] + s['neutral'] + s['negative']
 

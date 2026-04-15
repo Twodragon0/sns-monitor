@@ -216,10 +216,16 @@ class DCInsideMixin:
 
         comment_fetch_stats = {"attempted": 0, "collected": 0, "timed_out": False}
         if fetch_comments and posts:
-            # Reset session cookies before comment collection — stale cookies from
-            # gallery list scraping (especially 'csid') cause DCInside to block the
-            # comment API with "정상적인 접근이 아닙니다".
-            self._session.cookies.clear()
+            # Reset DCInside-specific cookies before comment collection — stale cookies
+            # from gallery list scraping (especially 'csid') cause DCInside to block
+            # the comment API with "정상적인 접근이 아닙니다".
+            # Only clear cookies scoped to DCInside domains to avoid destroying
+            # cookies set by other platforms (e.g. Naver Cafe authentication).
+            for dc_domain in ("gall.dcinside.com", ".dcinside.com", "dcinside.com"):
+                try:
+                    self._session.cookies.clear(domain=dc_domain)
+                except KeyError:
+                    pass
             try:
                 self._session.get(list_url_base, headers=headers, timeout=15)
             except Exception as e:
