@@ -46,6 +46,10 @@ jobs:
         run: |
           cd crawlers/dcinside && python -m pytest tests/ -v --tb=short
 
+      - name: Run Naver Cafe crawler tests
+        run: |
+          cd crawlers/naver_cafe && python -m pytest tests/ -v --tb=short
+
   build-frontend:
     name: Build Frontend
     runs-on: ubuntu-latest
