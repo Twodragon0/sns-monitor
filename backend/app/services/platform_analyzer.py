@@ -25,6 +25,7 @@ from .platforms import (
     RedditMixin, TwitterMixin, ThreadsMixin, OtherPlatformsMixin,
 )
 from .sentiment_analyzer import SentimentAnalyzer
+from .rate_limiter import RateLimiterService
 
 logger = logging.getLogger(__name__)
 
@@ -163,6 +164,7 @@ class PlatformAnalyzer(
             self._redis = get_redis()
         except Exception as e:
             logger.debug("Redis client unavailable in PlatformAnalyzer: %s", e)
+        self._rate_limiter = RateLimiterService(self._redis)
 
         # Reddit OAuth2 (optional; avoids 403 when Reddit blocks unauthenticated requests)
         self._reddit_client_id = (os.environ.get("REDDIT_CLIENT_ID") or "").strip()
@@ -389,76 +391,31 @@ class PlatformAnalyzer(
             },
         ]
 
-    # --- Unified rate limit helpers (Redis-backed with in-memory fallback) ---
+    # --- Unified rate limit helpers (thin wrappers around RateLimiterService) ---
     # API limits: YouTube 10,000 quota/day, Reddit 600 req/10min, Naver 25,000/day
 
-    _RATE_KEY_TPL = "sns:{service}:count:{window}"
-
-    _API_LIMITS = {
-        "naver_search": {"limit": 25000, "window": "daily", "ttl": 90000},
-        "youtube": {"limit": 10000, "window": "daily", "ttl": 90000},
-        "reddit": {"limit": 600, "window": "10min", "ttl": 660},
-    }
+    def _sync_rate_limiter_redis(self):
+        """Keep RateLimiterService in sync with self._redis (supports test injection)."""
+        self._rate_limiter._redis = self._redis
 
     def _rate_window(self, service):
         """Return the current window key for the given service."""
-        cfg = self._API_LIMITS.get(service, {})
-        if cfg.get("window") == "10min":
-            now = datetime.now(KST)
-            slot = now.minute // 10
-            return f"{now.strftime('%Y-%m-%d')}T{now.hour:02d}:{slot}"
-        return datetime.now(KST).strftime("%Y-%m-%d")
+        self._sync_rate_limiter_redis()
+        return self._rate_limiter.window(service)
 
     def _rate_get(self, service):
         """Get current call count for a service."""
-        window = self._rate_window(service)
-        if self._redis:
-            try:
-                val = self._redis.get(self._RATE_KEY_TPL.format(service=service, window=window))
-                return int(val) if val else 0
-            except Exception as e:
-                logger.debug("Redis rate_get failed for %s: %s", service, e)
-        # In-memory fallback
-        key = f"_mem_{service}"
-        mem = getattr(self, key, None) or {"window": "", "count": 0}
-        if mem["window"] != window:
-            return 0
-        return mem["count"]
+        self._sync_rate_limiter_redis()
+        return self._rate_limiter.get(service)
 
     def _rate_incr(self, service):
         """Increment call count for a service."""
-        window = self._rate_window(service)
-        ttl = self._API_LIMITS.get(service, {}).get("ttl", 90000)
-        if self._redis:
-            try:
-                rkey = self._RATE_KEY_TPL.format(service=service, window=window)
-                pipe = self._redis.pipeline()
-                pipe.incr(rkey)
-                pipe.expire(rkey, ttl)
-                results = pipe.execute()
-                # Validate that both commands succeeded (neither returned None/False).
-                # pipeline() without raise_on_error=True swallows per-command errors;
-                # a None result indicates the command did not complete successfully.
-                if results is None or len(results) < 2 or results[0] is None:
-                    logger.warning(
-                        "Redis pipeline partial failure for rate key %s: %s",
-                        rkey, results,
-                    )
-                return
-            except Exception as e:
-                logger.debug("Redis rate_incr failed for %s: %s", service, e)
-        # In-memory fallback
-        key = f"_mem_{service}"
-        mem = getattr(self, key, None) or {"window": "", "count": 0}
-        if mem["window"] != window:
-            mem = {"window": window, "count": 0}
-        mem["count"] += 1
-        setattr(self, key, mem)
+        self._sync_rate_limiter_redis()
+        self._rate_limiter.increment(service)
 
     def _rate_check(self, service):
         """Check if service is within rate limit. Returns (allowed, count, limit)."""
-        cfg = self._API_LIMITS.get(service, {})
-        limit = cfg.get("limit", 999999)
+        limit = self._rate_limiter._API_LIMITS.get(service, {}).get("limit", 999999)
         count = self._rate_get(service)
         return count < limit, count, limit
 
@@ -471,30 +428,13 @@ class PlatformAnalyzer(
 
     def get_api_usage(self):
         """Return API usage stats for all rate-limited services."""
-        today = datetime.now(KST).strftime("%Y-%m-%d")
-        storage = "redis" if self._redis else "memory"
-
-        def _build(service, configured):
-            cfg = self._API_LIMITS[service]
-            count = self._rate_get(service)
-            limit = cfg["limit"]
-            window_label = "일일" if cfg["window"] == "daily" else "10분"
-            return {
-                "configured": configured,
-                "daily_limit": limit,
-                "used_today": count,
-                "remaining": max(0, limit - count),
-                "window": window_label,
-                "date": today,
-                "storage": storage,
-            }
-
+        self._sync_rate_limiter_redis()
         yt_key = (os.environ.get("YOUTUBE_API_KEY") or "").strip()
-        return {
-            "naver_search": _build("naver_search", bool(self._naver_search_client_id)),
-            "youtube": _build("youtube", bool(yt_key) and yt_key.lower() not in ("your_youtube_api_key_here",)),
-            "reddit": _build("reddit", bool(self._reddit_client_id)),
-        }
+        return self._rate_limiter.get_usage(
+            naver_configured=bool(self._naver_search_client_id),
+            youtube_configured=bool(yt_key) and yt_key.lower() not in ("your_youtube_api_key_here",),
+            reddit_configured=bool(self._reddit_client_id),
+        )
 
     # Platform-specific methods are provided by mixins:
     # YouTubeMixin, DCInsideMixin, NaverCafeMixin, RedditMixin,

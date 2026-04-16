@@ -1,0 +1,242 @@
+/* ===== AnalysisWidgets — Design Tokens from App.css :root ===== */
+
+/* ===== Negative Sentiment Alert ===== */
+.aw-alert {
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  background-color: var(--c-error-bg);
+  border: 1px solid var(--c-error-border);
+  border-radius: 8px;
+}
+
+.aw-alert__title {
+  color: var(--c-danger);
+  font-size: 13px;
+}
+
+.aw-alert__item {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #7f1d1d;
+}
+
+[data-theme="dark"] .aw-alert__item {
+  color: #fca5a5;
+}
+
+.aw-alert__keywords {
+  color: var(--c-text-secondary);
+}
+
+/* ===== Widget Row ===== */
+.aw-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+/* ===== Card (shared by WordCloud + Gallery Comparison + Trend) ===== */
+.aw-card {
+  flex: 1 1 340px;
+  background-color: var(--c-surface);
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid var(--c-border);
+}
+
+.aw-card--trend {
+  background-color: var(--c-surface);
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid var(--c-primary-light);
+  margin-bottom: 20px;
+}
+
+/* ===== Card Headings ===== */
+.aw-card__title {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: var(--c-text-secondary);
+}
+
+.aw-card__title--trend {
+  margin: 0;
+  font-size: 14px;
+  color: var(--c-primary);
+}
+
+.aw-card__hint {
+  margin: 0 0 8px;
+  font-size: 11px;
+  color: var(--c-text-secondary);
+}
+
+/* ===== Word Cloud ===== */
+.aw-wordcloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  padding: 10px;
+  min-height: 100px;
+}
+
+/* ===== Trend Chart Header ===== */
+.aw-trend__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.aw-trend__close-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--c-text-secondary);
+  font-size: 12px;
+}
+
+.aw-trend__empty {
+  font-size: 12px;
+  color: var(--c-text-secondary);
+  margin-bottom: 16px;
+}
+
+/* ===== Daily Reports Panel ===== */
+.aw-reports {
+  background-color: var(--c-surface);
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid var(--c-border);
+  margin-top: 20px;
+}
+
+.aw-reports__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+/* ===== Generate Button ===== */
+.aw-reports__gen-btn {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.aw-reports__gen-btn--idle {
+  background: #6366f1;
+}
+
+.aw-reports__gen-btn--loading {
+  background: var(--c-text-secondary);
+  cursor: not-allowed;
+}
+
+/* ===== Report Date Buttons ===== */
+.aw-reports__dates {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.aw-reports__date-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.aw-reports__date-btn--selected {
+  background: #6366f1;
+  color: #fff;
+  border: none;
+}
+
+.aw-reports__date-btn--unselected {
+  background: var(--c-bg);
+  color: var(--c-text-secondary);
+  border: 1px solid var(--c-border);
+}
+
+/* ===== Reports Empty Message ===== */
+.aw-reports__empty {
+  color: var(--c-text-secondary);
+  font-size: 13px;
+}
+
+/* ===== Report Detail: Stat Cards Row ===== */
+.aw-stat-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+/* ===== Gallery Breakdown Table ===== */
+.aw-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.aw-table__head-row {
+  border-bottom: 2px solid var(--c-border);
+}
+
+.aw-table__head-row th {
+  text-align: left;
+  padding: 6px;
+  color: var(--c-text);
+}
+
+.aw-table__row {
+  border-bottom: 1px solid var(--c-border);
+}
+
+.aw-table__row td {
+  padding: 6px;
+}
+
+.aw-table__cell--name {
+  font-weight: 500;
+}
+
+.aw-table__cell--right {
+  text-align: right;
+}
+
+.aw-table__cell--positive {
+  text-align: right;
+  color: var(--c-success);
+}
+
+.aw-table__cell--negative-alert {
+  text-align: right;
+  color: var(--c-danger);
+}
+
+.aw-table__cell--negative-ok {
+  text-align: right;
+  color: var(--c-text-secondary);
+}
+
+.aw-table__cell--keywords {
+  color: var(--c-text-secondary);
+  font-size: 11px;
+}
+
+/* ===== Report Footer ===== */
+.aw-reports__footer {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--c-text-secondary);
+}
