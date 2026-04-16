@@ -1,0 +1,433 @@
+/* ===== AnalysisTab — Design Tokens from App.css :root ===== */
+
+/* ===== Back Button ===== */
+.analysis-tab__back-btn {
+  padding: 6px 12px;
+  font-size: 13px;
+  color: var(--c-text-secondary);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.analysis-tab__back-btn:hover {
+  color: var(--c-text);
+  border-color: var(--c-text-secondary);
+}
+
+/* ===== Status Badges ===== */
+.analysis-tab__status-badge {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.analysis-tab__status-badge--ok {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: var(--c-success);
+}
+
+.analysis-tab__status-badge--warn {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: var(--c-warn);
+}
+
+/* ===== URL Analysis Context Banner ===== */
+.analysis-tab__url-banner {
+  padding: 14px 16px;
+  background-color: var(--c-primary-light);
+  border: 1px solid rgba(26, 86, 240, 0.25);
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.analysis-tab__url-banner-title {
+  color: var(--c-primary);
+}
+
+.analysis-tab__url-banner-sub {
+  margin-left: 8px;
+  color: var(--c-primary);
+}
+
+.analysis-tab__url-banner-close {
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--c-text-secondary);
+  background: var(--c-border);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.analysis-tab__url-banner-loading {
+  margin: 8px 0 0;
+  color: var(--c-primary);
+}
+
+/* ===== LLM Status Panel ===== */
+.analysis-tab__llm-panel {
+  padding: 14px 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  border: 1px solid;
+}
+
+.analysis-tab__llm-panel--ok {
+  background-color: rgba(16, 185, 129, 0.08);
+  border-color: var(--c-success);
+}
+
+.analysis-tab__llm-panel--warn {
+  background-color: rgba(245, 158, 11, 0.08);
+  border-color: var(--c-warn);
+}
+
+.analysis-tab__llm-title--ok {
+  color: var(--c-success);
+}
+
+.analysis-tab__logout-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--c-text-secondary);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.analysis-tab__llm-desc {
+  margin: 4px 0 0;
+  color: var(--c-text-secondary);
+  font-size: 13px;
+}
+
+/* ===== Source Selection Panel ===== */
+.analysis-tab__sources {
+  background-color: var(--c-surface);
+  border: 1px solid var(--c-border);
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.analysis-tab__source-empty {
+  color: var(--c-text-secondary);
+  margin-bottom: 0;
+}
+
+.analysis-tab__source-hint {
+  color: var(--c-text-secondary);
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.analysis-tab__source-btn {
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.analysis-tab__source-btn--selected {
+  border: 2px solid var(--c-primary);
+  background-color: var(--c-primary);
+  color: #fff;
+}
+
+.analysis-tab__source-btn--unselected {
+  border: 2px solid var(--c-border);
+  background-color: var(--c-surface);
+  color: var(--c-text);
+}
+
+.analysis-tab__run-btn {
+  padding: 10px 24px;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  font-family: inherit;
+}
+
+.analysis-tab__run-btn--disabled {
+  background-color: var(--c-border);
+  cursor: not-allowed;
+}
+
+.analysis-tab__run-btn--mirofish {
+  background-color: var(--c-success);
+}
+
+.analysis-tab__run-btn--ai {
+  background-color: var(--c-primary);
+}
+
+.analysis-tab__run-hint {
+  margin-left: 10px;
+  font-size: 12px;
+  color: var(--c-text-secondary);
+}
+
+/* ===== Progress Panel ===== */
+.analysis-tab__progress {
+  background-color: var(--c-primary-light);
+  border: 1px solid rgba(26, 86, 240, 0.2);
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.analysis-tab__progress-track {
+  width: 100%;
+  background-color: var(--c-border);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.analysis-tab__progress-fill {
+  height: 8px;
+  background-color: var(--c-primary);
+  transition: width 0.5s ease;
+}
+
+.analysis-tab__progress-text {
+  margin: 0;
+  font-size: 13px;
+  color: var(--c-primary);
+}
+
+/* ===== Error Panel ===== */
+.analysis-tab__error {
+  padding: 16px;
+  background-color: var(--c-error-bg);
+  border: 1px solid var(--c-error-border);
+  border-radius: 8px;
+  margin-bottom: 20px;
+  color: var(--c-danger);
+}
+
+/* ===== Completed Panel ===== */
+.analysis-tab__completed {
+  background-color: rgba(16, 185, 129, 0.1);
+  border: 1px solid var(--c-success);
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.analysis-tab__completed-title {
+  margin: 0 0 8px;
+  color: var(--c-success);
+}
+
+.analysis-tab__completed-desc {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--c-text);
+}
+
+.analysis-tab__view-graph-btn {
+  padding: 6px 16px;
+  background-color: var(--c-success);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+/* ===== Graph Visualization Panel ===== */
+.analysis-tab__graph {
+  background-color: var(--c-surface);
+  border: 1px solid var(--c-border);
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.analysis-tab__graph-node {
+  padding: 8px;
+  margin-bottom: 4px;
+  background-color: var(--c-bg);
+  border-radius: 4px;
+  font-size: 13px;
+  color: var(--c-text);
+}
+
+.analysis-tab__graph-node-type {
+  color: var(--c-text-secondary);
+  margin-left: 8px;
+}
+
+.analysis-tab__graph-edge {
+  padding: 8px;
+  margin-bottom: 4px;
+  background-color: var(--c-primary-light);
+  border-radius: 4px;
+  font-size: 13px;
+  color: var(--c-text);
+}
+
+.analysis-tab__graph-edge-relation {
+  color: var(--c-primary);
+  margin: 0 6px;
+}
+
+/* ===== Chat Panel ===== */
+.analysis-tab__chat {
+  background-color: var(--c-surface);
+  border: 1px solid var(--c-border);
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.analysis-tab__chat-provider {
+  font-size: 12px;
+  font-weight: normal;
+  color: var(--c-text-secondary);
+  margin-left: 8px;
+}
+
+.analysis-tab__chat-messages {
+  max-height: 400px;
+  overflow: auto;
+  margin-bottom: 12px;
+  padding: 8px;
+  background-color: var(--c-bg);
+  border-radius: 4px;
+}
+
+.analysis-tab__chat-empty {
+  color: var(--c-text-secondary);
+  text-align: center;
+  margin: 20px 0;
+}
+
+.analysis-tab__chat-bubble {
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  white-space: pre-wrap;
+  font-size: 14px;
+}
+
+.analysis-tab__chat-bubble--user {
+  background-color: var(--c-primary);
+  color: #fff;
+  margin-left: 40px;
+}
+
+.analysis-tab__chat-bubble--assistant {
+  background-color: var(--c-surface);
+  color: var(--c-text);
+  border: 1px solid var(--c-border);
+  margin-right: 40px;
+}
+
+.analysis-tab__chat-loading {
+  text-align: center;
+  color: var(--c-text-secondary);
+  padding: 8px;
+}
+
+.analysis-tab__chat-input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  background: var(--c-surface-input);
+  color: var(--c-text);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.analysis-tab__chat-input:focus {
+  border-color: var(--c-primary);
+}
+
+.analysis-tab__chat-send-btn {
+  padding: 10px 20px;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.analysis-tab__chat-send-btn--active {
+  background-color: var(--c-primary);
+}
+
+.analysis-tab__chat-send-btn--disabled {
+  background-color: var(--c-border);
+  cursor: not-allowed;
+}
+
+/* ===== Projects Table Panel ===== */
+.analysis-tab__projects {
+  background-color: var(--c-surface);
+  border: 1px solid var(--c-border);
+  padding: 16px;
+  border-radius: 8px;
+}
+
+.analysis-tab__projects-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  color: var(--c-text);
+}
+
+.analysis-tab__projects-thead-row {
+  border-bottom: 2px solid var(--c-border);
+}
+
+.analysis-tab__projects-thead-row th {
+  text-align: left;
+  padding: 8px;
+  color: var(--c-text-secondary);
+}
+
+.analysis-tab__projects-row {
+  border-bottom: 1px solid var(--c-border);
+}
+
+.analysis-tab__projects-row td {
+  padding: 8px;
+}
+
+.analysis-tab__project-status {
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  display: inline-block;
+}
+
+.analysis-tab__project-status--completed {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: var(--c-success);
+}
+
+.analysis-tab__project-status--building {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: var(--c-warn);
+}
+
+.analysis-tab__project-status--default {
+  background-color: var(--c-border);
+  color: var(--c-text-secondary);
+}

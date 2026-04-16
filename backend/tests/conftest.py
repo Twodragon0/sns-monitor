@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 # Override Redis host BEFORE importing the app so limiter uses memory://
 os.environ['REDIS_HOST'] = ''
 os.environ['REDIS_PASSWORD'] = ''
+os.environ.setdefault('CRAWLER_INTERNAL_TOKEN', 'test-crawler-token')
 
 # Set an allowed origin for CSRF protection so test POST requests pass the check.
 _TEST_ORIGIN = 'http://localhost:3080'

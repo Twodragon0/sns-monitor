@@ -362,7 +362,7 @@ def _handle_channel_all_local(group_id: str, members_data) -> dict:
         logger.info("Loaded %d %s channels from JSON", len(channels_data), group_id)
     return {
         'statusCode': 200,
-        'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+        'headers': {'Content-Type': 'application/json'},
         'body': json.dumps(
             {'channels': channels_data, 'last_crawled': last_crawled},
             default=decimal_default,

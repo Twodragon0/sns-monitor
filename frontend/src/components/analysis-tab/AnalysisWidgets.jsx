@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { API_BASE } from '../../config';
+import './AnalysisWidgets.css';
 
 /** Word Cloud + Gallery Comparison + Negative Alert */
 export function WordCloudAndCompare({ keywords }) {
@@ -32,32 +33,23 @@ export function WordCloudAndCompare({ keywords }) {
     <>
       {/* Negative sentiment alert */}
       {alerts.length > 0 && (
-        <div style={{
-          padding: '12px 16px', marginBottom: '16px',
-          backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px',
-        }}>
-          <strong style={{ color: '#dc2626', fontSize: '13px' }}>부정 감성 경고</strong>
+        <div className="aw-alert">
+          <strong className="aw-alert__title">부정 감성 경고</strong>
           {alerts.map(g => (
-            <p key={g.id} style={{ margin: '4px 0 0', fontSize: '12px', color: '#7f1d1d' }}>
+            <p key={g.id} className="aw-alert__item">
               <strong>{g.name}</strong>: 부정 {g.neg_pct}% ({g.negative}건)
-              {g.keywords?.length > 0 && <span style={{ color: '#9ca3af' }}> — {g.keywords.slice(0, 3).join(', ')}</span>}
+              {g.keywords?.length > 0 && <span className="aw-alert__keywords"> — {g.keywords.slice(0, 3).join(', ')}</span>}
             </p>
           ))}
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '20px' }}>
+      <div className="aw-row">
         {/* Word Cloud */}
         {keywords.length > 0 && (
-          <div style={{
-            flex: '1 1 340px', backgroundColor: 'white', padding: '16px',
-            borderRadius: '8px', border: '1px solid #dee2e6',
-          }}>
-            <h4 style={{ margin: '0 0 12px', fontSize: '14px', color: '#555' }}>키워드 클라우드</h4>
-            <div style={{
-              display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'center',
-              padding: '10px', minHeight: '100px',
-            }}>
+          <div className="aw-card">
+            <h4 className="aw-card__title">키워드 클라우드</h4>
+            <div className="aw-wordcloud">
               {keywords.slice(0, 25).map((kw, i) => {
                 const ratio = kw.count / maxCount;
                 const size = Math.max(12, Math.round(ratio * 32 + 10));
@@ -80,12 +72,9 @@ export function WordCloudAndCompare({ keywords }) {
 
         {/* Gallery Comparison (clickable bars) */}
         {compareData.length > 1 && (
-          <div style={{
-            flex: '1 1 340px', backgroundColor: 'white', padding: '16px',
-            borderRadius: '8px', border: '1px solid #dee2e6',
-          }}>
-            <h4 style={{ margin: '0 0 4px', fontSize: '14px', color: '#555' }}>갤러리간 감성 비교</h4>
-            <p style={{ margin: '0 0 8px', fontSize: '11px', color: '#9ca3af' }}>클릭하면 트렌드를 표시합니다</p>
+          <div className="aw-card">
+            <h4 className="aw-card__title" style={{ marginBottom: '4px' }}>갤러리간 감성 비교</h4>
+            <p className="aw-card__hint">클릭하면 트렌드를 표시합니다</p>
             <ResponsiveContainer width="100%" height={compareData.length * 40 + 30}>
               <BarChart data={compareData} layout="vertical" margin={{ left: 10, right: 10, top: 5, bottom: 5 }}
                 onClick={(e) => { if (e?.activePayload?.[0]?.payload?.id) setSelectedGallery(prev => prev === e.activePayload[0].payload.id ? null : e.activePayload[0].payload.id); }}
@@ -104,16 +93,12 @@ export function WordCloudAndCompare({ keywords }) {
 
       {/* Inline trend chart for clicked gallery */}
       {selectedGallery && trendData.length >= 2 && (
-        <div style={{
-          backgroundColor: 'white', padding: '16px', borderRadius: '8px',
-          border: '1px solid #c7d2fe', marginBottom: '20px',
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <h4 style={{ margin: 0, fontSize: '14px', color: '#4338ca' }}>
+        <div className="aw-card--trend">
+          <div className="aw-trend__header">
+            <h4 className="aw-card__title--trend">
               {compareData.find(g => g.id === selectedGallery)?.name || selectedGallery} 감성 트렌드
             </h4>
-            <button type="button" onClick={() => setSelectedGallery(null)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: '12px' }}>닫기</button>
+            <button type="button" onClick={() => setSelectedGallery(null)} className="aw-trend__close-btn">닫기</button>
           </div>
           <ResponsiveContainer width="100%" height={140}>
             <BarChart data={trendData.map(t => ({
@@ -131,7 +116,7 @@ export function WordCloudAndCompare({ keywords }) {
         </div>
       )}
       {selectedGallery && trendData.length < 2 && (
-        <p style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '16px' }}>
+        <p className="aw-trend__empty">
           {compareData.find(g => g.id === selectedGallery)?.name}: 트렌드 데이터 부족 (2회 이상 수집 필요)
         </p>
       )}
@@ -176,19 +161,12 @@ export function DailyReportsPanel() {
   };
 
   return (
-    <div style={{
-      backgroundColor: 'white', padding: '16px', borderRadius: '8px',
-      border: '1px solid #dee2e6', marginTop: '20px',
-    }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+    <div className="aw-reports">
+      <div className="aw-reports__header">
         <h3 style={{ margin: 0 }}>일일 감성 보고서</h3>
         <button
           type="button" onClick={generate} disabled={generating}
-          style={{
-            padding: '6px 14px', fontSize: '12px', fontWeight: 600,
-            background: generating ? '#94a3b8' : '#6366f1', color: 'white',
-            border: 'none', borderRadius: '6px', cursor: generating ? 'not-allowed' : 'pointer',
-          }}
+          className={`aw-reports__gen-btn ${generating ? 'aw-reports__gen-btn--loading' : 'aw-reports__gen-btn--idle'}`}
         >
           {generating ? '생성 중...' : '오늘 보고서 생성'}
         </button>
@@ -196,15 +174,10 @@ export function DailyReportsPanel() {
 
       {/* Report list */}
       {reports.length > 0 && (
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
+        <div className="aw-reports__dates">
           {reports.slice(0, 14).map(r => (
             <button key={r.date} type="button" onClick={() => viewReport(r.date)}
-              style={{
-                padding: '4px 10px', fontSize: '12px', borderRadius: '6px', cursor: 'pointer',
-                background: selected === r.date ? '#6366f1' : '#f1f5f9',
-                color: selected === r.date ? 'white' : '#475569',
-                border: selected === r.date ? 'none' : '1px solid #e2e8f0',
-              }}
+              className={`aw-reports__date-btn ${selected === r.date ? 'aw-reports__date-btn--selected' : 'aw-reports__date-btn--unselected'}`}
             >
               {r.date?.slice(5)} ({r.summary?.total_items || 0}건)
             </button>
@@ -213,13 +186,13 @@ export function DailyReportsPanel() {
       )}
 
       {reports.length === 0 && !detail && (
-        <p style={{ color: '#9ca3af', fontSize: '13px' }}>보고서가 없습니다. "오늘 보고서 생성"을 클릭하세요.</p>
+        <p className="aw-reports__empty">보고서가 없습니다. "오늘 보고서 생성"을 클릭하세요.</p>
       )}
 
       {/* Report detail */}
       {detail && (
         <div>
-          <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
+          <div className="aw-stat-row">
             {[
               { label: '총 분석', value: detail.summary?.total_items || 0, color: '#3b82f6' },
               { label: '긍정', value: `${detail.summary?.pos_pct || 0}%`, color: '#10b981' },
@@ -231,38 +204,38 @@ export function DailyReportsPanel() {
                 backgroundColor: `${s.color}10`, borderRadius: '8px', border: `1px solid ${s.color}30`,
               }}>
                 <div style={{ fontSize: '20px', fontWeight: 'bold', color: s.color }}>{s.value}</div>
-                <div style={{ fontSize: '11px', color: '#6b7280' }}>{s.label}</div>
+                <div style={{ fontSize: '11px', color: 'var(--c-text-secondary)' }}>{s.label}</div>
               </div>
             ))}
           </div>
 
           {/* Gallery breakdown */}
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+          <table className="aw-table">
             <thead>
-              <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
-                <th style={{ textAlign: 'left', padding: '6px' }}>갤러리</th>
-                <th style={{ textAlign: 'right', padding: '6px' }}>분석</th>
-                <th style={{ textAlign: 'right', padding: '6px' }}>긍정</th>
-                <th style={{ textAlign: 'right', padding: '6px' }}>부정</th>
-                <th style={{ textAlign: 'left', padding: '6px' }}>키워드</th>
+              <tr className="aw-table__head-row">
+                <th>갤러리</th>
+                <th style={{ textAlign: 'right' }}>분석</th>
+                <th style={{ textAlign: 'right' }}>긍정</th>
+                <th style={{ textAlign: 'right' }}>부정</th>
+                <th>키워드</th>
               </tr>
             </thead>
             <tbody>
               {(detail.galleries || []).map(g => (
-                <tr key={g.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                  <td style={{ padding: '6px', fontWeight: 500 }}>{g.name}</td>
-                  <td style={{ padding: '6px', textAlign: 'right' }}>{g.total}</td>
-                  <td style={{ padding: '6px', textAlign: 'right', color: '#10b981' }}>{g.pos_pct}%</td>
-                  <td style={{ padding: '6px', textAlign: 'right', color: g.neg_pct >= 5 ? '#dc2626' : '#6b7280' }}>
+                <tr key={g.id} className="aw-table__row">
+                  <td className="aw-table__cell--name">{g.name}</td>
+                  <td className="aw-table__cell--right">{g.total}</td>
+                  <td className="aw-table__cell--positive">{g.pos_pct}%</td>
+                  <td className={g.neg_pct >= 5 ? 'aw-table__cell--negative-alert' : 'aw-table__cell--negative-ok'}>
                     {g.neg_pct}%
                   </td>
-                  <td style={{ padding: '6px', color: '#9ca3af', fontSize: '11px' }}>{g.keywords?.slice(0, 3).join(', ')}</td>
+                  <td className="aw-table__cell--keywords">{g.keywords?.slice(0, 3).join(', ')}</td>
                 </tr>
               ))}
             </tbody>
           </table>
 
-          <p style={{ margin: '8px 0 0', fontSize: '11px', color: '#9ca3af' }}>
+          <p className="aw-reports__footer">
             생성: {detail.generated_at?.slice(0, 19).replace('T', ' ')} | 파일: {detail.galleries?.reduce((s, g) => s + (g.files_analyzed || 0), 0)}개
           </p>
         </div>

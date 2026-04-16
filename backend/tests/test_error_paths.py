@@ -274,7 +274,7 @@ class TestSentimentTrendMissingKeys:
         return gallery_dir
 
     @patch('app.api.analysis.Config')
-    @patch('app.services.platform_analyzer.PlatformAnalyzer._analyze_sentiment')
+    @patch('app.services.sentiment_analyzer.SentimentAnalyzer.analyze')
     def test_sentiment_missing_positive_key(self, mock_analyze, mock_cfg, client):
         """If sentiment dict lacks 'positive', .get() returns 0 without KeyError."""
         # Return a sentiment dict with 'sentiment' sub-dict missing 'positive'
@@ -303,7 +303,7 @@ class TestSentimentTrendMissingKeys:
                 assert point['neutral'] == 3
 
     @patch('app.api.analysis.Config')
-    @patch('app.services.platform_analyzer.PlatformAnalyzer._analyze_sentiment')
+    @patch('app.services.sentiment_analyzer.SentimentAnalyzer.analyze')
     def test_sentiment_missing_all_sub_keys(self, mock_analyze, mock_cfg, client):
         """If sentiment sub-dict is entirely empty, all counts fall back to 0."""
         mock_analyze.return_value = {
@@ -330,7 +330,7 @@ class TestSentimentTrendMissingKeys:
                 assert point['negative'] == 0
 
     @patch('app.api.analysis.Config')
-    @patch('app.services.platform_analyzer.PlatformAnalyzer._analyze_sentiment')
+    @patch('app.services.sentiment_analyzer.SentimentAnalyzer.analyze')
     def test_sentiment_top_keywords_missing(self, mock_analyze, mock_cfg, client):
         """If top_keywords is absent, the .get() fallback returns [] without error."""
         mock_analyze.return_value = {

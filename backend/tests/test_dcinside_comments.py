@@ -133,9 +133,12 @@ class TestCookieResetBeforeComments:
 
         real_clear = analyzer._session.cookies.clear
 
-        def recording_clear():
+        def recording_clear(domain=None, path=None, name=None):
             call_log.append("clear")
-            real_clear()
+            try:
+                real_clear(domain=domain, path=path, name=name)
+            except KeyError:
+                pass
 
         analyzer._session.cookies.clear = recording_clear
 
@@ -178,7 +181,7 @@ class TestCookieResetBeforeComments:
 
         clear_called = []
 
-        def spy_clear():
+        def spy_clear(domain=None, path=None, name=None):
             clear_called.append(True)
 
         analyzer._session.cookies.clear = spy_clear
