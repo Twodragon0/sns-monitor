@@ -129,9 +129,9 @@ def load_latest_metadata(platform: str, keyword: Optional[str] = None) -> Option
                 metadata = load_from_local_file(filepath)
                 if not keyword or metadata.get('keyword') == keyword:
                     files.append((filepath, metadata))
-            except:
+            except Exception:
                 continue
-    
+
     if not files:
         return None
     

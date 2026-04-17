@@ -5,6 +5,7 @@ GET  /api/platforms   - List supported platforms
 """
 
 import logging
+import threading
 from flask import request, jsonify, session
 
 from . import analyze_bp, csrf_protect
@@ -13,16 +14,19 @@ from ..config import Config
 
 logger = logging.getLogger(__name__)
 
-# Lazy-loaded platform analyzer
+# Lazy-loaded platform analyzer (thread-safe initialization)
 _platform_analyzer = None
+_analyzer_lock = threading.Lock()
 
 
 def _get_analyzer():
     global _platform_analyzer
     if _platform_analyzer is None:
-        from ..services.platform_analyzer import PlatformAnalyzer
+        with _analyzer_lock:
+            if _platform_analyzer is None:
+                from ..services.platform_analyzer import PlatformAnalyzer
 
-        _platform_analyzer = PlatformAnalyzer(data_dir=Config.LOCAL_DATA_DIR)
+                _platform_analyzer = PlatformAnalyzer(data_dir=Config.LOCAL_DATA_DIR)
     return _platform_analyzer
 
 

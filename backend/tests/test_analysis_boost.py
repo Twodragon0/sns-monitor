@@ -869,7 +869,7 @@ class TestAiUrlChatComplete:
         assert resp.status_code == 200
         doc_arg = mock_chat.call_args[0][0]
         assert 'YOUTUBE' in doc_arg
-        assert 'items collected' in doc_arg
+        assert '2 items' in doc_arg
 
     @patch('app.services.llm_analyzer.get_available_provider', return_value='openai')
     @patch('app.services.llm_analyzer.chat_with_llm')

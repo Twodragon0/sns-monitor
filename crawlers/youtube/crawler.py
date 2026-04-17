@@ -245,9 +245,9 @@ def execute_with_retry(api_call, max_retries=MAX_RETRIES, backoff_base=RETRY_BAC
             try:
                 error_data = json.loads(e.content.decode('utf-8'))
                 error_reason = error_data.get('error', {}).get('errors', [{}])[0].get('reason', '')
-            except:
+            except Exception:
                 pass
-            
+
             # 403 Forbidden: 할당량 초과 또는 권한 없음
             if error_code == 403:
                 if error_reason in ['quotaExceeded', 'dailyLimitExceeded']:

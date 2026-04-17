@@ -234,7 +234,7 @@ class TestBearerBypass:
             "/test/csrf-target",
             json={},
             headers={
-                "Authorization": "Bearer token-xyz",
+                "Authorization": "Bearer token-xyz-valid-length",
                 "Origin": "http://evil.example.com",
             },
         )

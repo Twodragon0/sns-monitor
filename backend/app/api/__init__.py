@@ -49,7 +49,9 @@ def csrf_protect(f):
         # Bearer-authenticated requests are stateless – skip cookie-CSRF concern.
         auth_header = request.headers.get("Authorization", "")
         if auth_header.startswith("Bearer "):
-            return f(*args, **kwargs)
+            token = auth_header[7:].strip()
+            if len(token) >= 10:
+                return f(*args, **kwargs)
 
         origin = request.headers.get("Origin", "").rstrip("/")
         if not origin:

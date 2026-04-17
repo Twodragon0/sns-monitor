@@ -17,7 +17,7 @@ from datetime import datetime
 import requests
 from flask import jsonify, request
 
-from . import data_bp
+from . import data_bp, csrf_protect
 from .. import limiter
 from ..config import Config
 from ..services.local_data import decimal_default
@@ -166,6 +166,7 @@ def crawler_results():
 
 @data_bp.route('/api/twitter/search', methods=['POST'])
 @limiter.limit("60 per minute")
+@csrf_protect
 def twitter_search():
     """Twitter 키워드 검색 엔드포인트."""
     if not Config.LOCAL_MODE:

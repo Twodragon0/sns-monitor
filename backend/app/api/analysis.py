@@ -78,6 +78,116 @@ def _get_local_data_dir():
     return Path(Config.LOCAL_DATA_DIR)
 
 
+def _extract_sentiment_items(data, include_content=True, max_posts=200, max_comments_per_post=5):
+    """Extract text items from crawled JSON data for sentiment analysis.
+
+    Args:
+        data: parsed JSON from a crawl file
+        include_content: if True, append post content snippet to text
+        max_posts: max number of posts to process
+        max_comments_per_post: max comments per post
+    Returns:
+        list of {'text': str} dicts
+    """
+    items = []
+    for post in data.get('posts', data.get('data', []))[:max_posts]:
+        p = post.get('post', post)
+        text = p.get('text', '') or p.get('title', '')
+        if text:
+            if include_content:
+                content = post.get('content', p.get('content', ''))
+                text = f"{text} {(content or '')[:200]}".strip()
+            items.append({'text': text})
+        for c in post.get('comments', [])[:max_comments_per_post]:
+            ctext = c.get('text', c.get('content', ''))
+            if ctext:
+                items.append({'text': ctext})
+    return items
+
+
+def _build_document_from_url_result(url_result, compact=False):
+    """Build a Markdown document from a URL analyzer result dict.
+
+    Args:
+        url_result: dict from URL analyzer
+        compact: if True, produce a shorter version (for chat context)
+    """
+    platform = url_result.get('platform', 'unknown')
+    title = url_result.get('title', url_result.get('username', 'Unknown'))
+    lines = [f"# {platform.upper()} Analysis: {title}"]
+
+    if url_result.get('description'):
+        limit = 1000 if compact else len(url_result['description'])
+        lines.append(f"\n## Description\n{url_result['description'][:limit]}")
+
+    if not compact and url_result.get('content'):
+        lines.append(f"\n## Content\n{str(url_result['content'])[:3000]}")
+
+    # Stats (full mode only)
+    if not compact:
+        stat_keys = ['view_count', 'like_count', 'comment_count', 'subscriber_count',
+                     'follower_count', 'tweet_count', 'total_posts', 'score']
+        stats = {k: url_result[k] for k in stat_keys if url_result.get(k) is not None}
+        if stats:
+            lines.append("\n## Stats")
+            for k, v in stats.items():
+                lines.append(f"- {k}: {v}")
+
+    # Posts/Comments
+    items = (url_result.get('comments') or url_result.get('replies')
+             or url_result.get('posts') or url_result.get('recent_videos') or [])
+    max_items = 30 if compact else 50
+    if items:
+        label = 'Comments' if url_result.get('comments') else 'Posts'
+        lines.append(f"\n## {label} ({len(items)} items)")
+        text_limit = 150 if compact else 200
+        for i, item in enumerate(items[:max_items]):
+            text = item.get('text', item.get('title', ''))
+            author = item.get('author', '')
+            if text:
+                if compact:
+                    lines.append(f"- {str(text)[:text_limit]}")
+                else:
+                    lines.append(f"{i+1}. [{author}] {str(text)[:text_limit]}")
+
+    # Existing sentiment (full mode only)
+    if not compact:
+        analysis = url_result.get('analysis')
+        if analysis:
+            lines.append("\n## Existing Sentiment Analysis")
+            lines.append(f"- Overall: {analysis.get('overall', 'N/A')}")
+            s = analysis.get('sentiment', {})
+            lines.append(f"- Positive: {s.get('positive', 0)}, Neutral: {s.get('neutral', 0)}, Negative: {s.get('negative', 0)}")
+
+    return '\n'.join(lines)
+
+
+def _build_documents_from_sources(sources_list):
+    """Build Markdown documents from a list of source dicts.
+
+    Returns (documents: list[str], error_response: tuple|None).
+    If error_response is not None, caller should return it directly.
+    """
+    documents = []
+    for src in sources_list:
+        src_type = src.get('type', '')
+        src_id = src.get('id', '')
+        if not _SAFE_ID_RE.match(src_id):
+            return [], (jsonify({'error': 'Invalid source id'}), 400)
+
+        if src_type == 'youtube':
+            doc = _transform_youtube_to_document(src_id)
+        elif src_type == 'dcinside':
+            doc = _transform_dcinside_to_document(src_id)
+        else:
+            continue
+
+        if doc:
+            documents.append(doc)
+
+    return documents, None
+
+
 def _transform_youtube_to_document(channel_handle):
     """Transform YouTube crawler data into a Markdown document for AI analysis."""
     data_dir = _get_local_data_dir() / 'youtube' / 'channels'
@@ -597,18 +707,7 @@ def sentiment_trend():
                 else:
                     ts = data.get('collected_at', fname)
 
-                # Quick sentiment on posts (supports both URL analyzer and crawler formats)
-                items = []
-                for post in data.get('posts', data.get('data', []))[:200]:
-                    p = post.get('post', post)
-                    text = p.get('text', '') or p.get('title', '')
-                    content = post.get('content', p.get('content', ''))
-                    if text:
-                        items.append({'text': f"{text} {(content or '')[:200]}".strip()})
-                    for c in post.get('comments', [])[:5]:
-                        ctext = c.get('text', c.get('content', ''))
-                        if ctext:
-                            items.append({'text': ctext})
+                items = _extract_sentiment_items(data)
 
                 if items:
                     sentiment = analyzer.analyze(items)
@@ -662,16 +761,7 @@ def gallery_compare():
                 data = json.load(f)
 
             name = data.get('gallery_name', gallery_dir.name)
-            items = []
-            for post in data.get('posts', data.get('data', []))[:200]:
-                p = post.get('post', post)
-                text = p.get('text', '') or p.get('title', '')
-                if text:
-                    items.append({'text': text})
-                for c in post.get('comments', [])[:5]:
-                    ctext = c.get('text', c.get('content', ''))
-                    if ctext:
-                        items.append({'text': ctext})
+            items = _extract_sentiment_items(data, include_content=False)
 
             sentiment = analyzer.analyze(items)
             s = sentiment['sentiment']
@@ -728,16 +818,7 @@ def generate_daily_report():
             try:
                 with open(jf, 'r', encoding='utf-8') as f:
                     fdata = json.load(f)
-                for post in fdata.get('posts', fdata.get('data', []))[:200]:
-                    p = post.get('post', post)
-                    text = p.get('text', '') or p.get('title', '')
-                    content = post.get('content', p.get('content', ''))
-                    if text:
-                        all_items.append({'text': f"{text} {(content or '')[:200]}".strip()})
-                    for c in post.get('comments', [])[:5]:
-                        ct = c.get('text', c.get('content', ''))
-                        if ct:
-                            all_items.append({'text': ct})
+                all_items.extend(_extract_sentiment_items(fdata))
             except Exception as e:
                 logger.debug("Failed to load posts from %s: %s", jf, e)
 
@@ -884,24 +965,9 @@ def ai_summary():
     if not sources_list:
         return jsonify({'error': 'No data sources specified'}), 400
 
-    # Build document from sources
-    documents = []
-    for src in sources_list:
-        src_type = src.get('type', '')
-        src_id = src.get('id', '')
-        if not _SAFE_ID_RE.match(src_id):
-            return jsonify({'error': 'Invalid source id'}), 400
-
-        if src_type == 'youtube':
-            doc = _transform_youtube_to_document(src_id)
-        elif src_type == 'dcinside':
-            doc = _transform_dcinside_to_document(src_id)
-        else:
-            continue
-
-        if doc:
-            documents.append(doc)
-
+    documents, err = _build_documents_from_sources(sources_list)
+    if err:
+        return err
     if not documents:
         return jsonify({'error': 'No data found for specified sources'}), 404
 
@@ -949,24 +1015,9 @@ def ai_chat():
     if not sources_list:
         return jsonify({'error': 'No data sources specified'}), 400
 
-    # Build document from sources
-    documents = []
-    for src in sources_list:
-        src_type = src.get('type', '')
-        src_id = src.get('id', '')
-        if not _SAFE_ID_RE.match(src_id):
-            return jsonify({'error': 'Invalid source id'}), 400
-
-        if src_type == 'youtube':
-            doc = _transform_youtube_to_document(src_id)
-        elif src_type == 'dcinside':
-            doc = _transform_dcinside_to_document(src_id)
-        else:
-            continue
-
-        if doc:
-            documents.append(doc)
-
+    documents, err = _build_documents_from_sources(sources_list)
+    if err:
+        return err
     if not documents:
         return jsonify({'error': 'No data found for specified sources'}), 404
 
@@ -995,8 +1046,7 @@ def ai_url_analyze():
     """
     from ..services.llm_analyzer import analyze_with_llm, get_available_provider
 
-    oauth_token = session.get('access_token')
-    provider = get_available_provider(oauth_token=oauth_token)
+    provider = get_available_provider(**_session_llm_kwargs())
     if not provider:
         return jsonify({
             'error': 'No LLM available. Set OPENAI_API_KEY or ANTHROPIC_API_KEY, or login with OAuth.'
@@ -1009,46 +1059,7 @@ def ai_url_analyze():
     if not url_result:
         return jsonify({'error': 'Analysis result is required'}), 400
 
-    # Build document from URL analysis result
-    lines = []
-    platform = url_result.get('platform', 'unknown')
-    title = url_result.get('title', url_result.get('username', 'Unknown'))
-    lines.append(f"# {platform.upper()} Analysis: {title}")
-    if url_result.get('description'):
-        lines.append(f"\n## Description\n{url_result['description']}")
-    if url_result.get('content'):
-        lines.append(f"\n## Content\n{str(url_result['content'])[:3000]}")
-
-    # Stats
-    stat_keys = ['view_count', 'like_count', 'comment_count', 'subscriber_count',
-                 'follower_count', 'tweet_count', 'total_posts', 'score']
-    stats = {k: url_result[k] for k in stat_keys if url_result.get(k) is not None}
-    if stats:
-        lines.append("\n## Stats")
-        for k, v in stats.items():
-            lines.append(f"- {k}: {v}")
-
-    # Posts/Comments
-    items = (url_result.get('comments') or url_result.get('replies')
-             or url_result.get('posts') or url_result.get('recent_videos') or [])
-    if items:
-        label = 'Comments' if url_result.get('comments') else 'Posts'
-        lines.append(f"\n## {label} ({len(items)} items)")
-        for i, item in enumerate(items[:50]):
-            text = item.get('text', item.get('title', ''))
-            author = item.get('author', '')
-            if text:
-                lines.append(f"{i+1}. [{author}] {str(text)[:200]}")
-
-    # Existing sentiment
-    analysis = url_result.get('analysis')
-    if analysis:
-        lines.append("\n## Existing Sentiment Analysis")
-        lines.append(f"- Overall: {analysis.get('overall', 'N/A')}")
-        s = analysis.get('sentiment', {})
-        lines.append(f"- Positive: {s.get('positive', 0)}, Neutral: {s.get('neutral', 0)}, Negative: {s.get('negative', 0)}")
-
-    document = '\n'.join(lines)
+    document = _build_document_from_url_result(url_result)
     result = analyze_with_llm(document, question if question else None, **_session_llm_kwargs())
 
     if 'error' in result and not result.get('success'):
@@ -1093,20 +1104,7 @@ def ai_url_chat():
     if not url_result:
         return jsonify({'error': 'Analysis result is required'}), 400
 
-    # Build context from URL result
-    lines = [f"# {url_result.get('platform', '').upper()} Analysis: {url_result.get('title', '')}"]
-    if url_result.get('description'):
-        lines.append(url_result['description'][:1000])
-    items = (url_result.get('comments') or url_result.get('replies')
-             or url_result.get('posts') or [])
-    if items:
-        lines.append(f"\n{len(items)} items collected:")
-        for i, item in enumerate(items[:30]):
-            text = item.get('text', item.get('title', ''))
-            if text:
-                lines.append(f"- {str(text)[:150]}")
-
-    document = '\n'.join(lines)
+    document = _build_document_from_url_result(url_result, compact=True)
     result = chat_with_llm(document, message, chat_history, **_session_llm_kwargs())
 
     if 'error' in result and not result.get('success'):
