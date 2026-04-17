@@ -465,7 +465,7 @@ function Dashboard({ onShowError }) {
 
       {/* ===== SCAN HISTORY ===== */}
       <section className="dash__scan-history" aria-labelledby="scan-history-title">
-        <h2 id="scan-history-title" className="dash__section-title" style={{ fontSize: '1rem', marginBottom: 14 }}>
+        <h2 id="scan-history-title" className="dash__section-title dash__scan-history-title">
           스캔 기록
         </h2>
         <ScanHistoryPanel />
@@ -505,7 +505,7 @@ function Dashboard({ onShowError }) {
    Sub-components
    ============================================================ */
 
-function StatBox({ icon, label, value }) {
+const StatBox = React.memo(function StatBox({ icon, label, value }) {
   return (
     <div className="dash__stat-box">
       <span className="dash__stat-icon">{icon}</span>
@@ -515,6 +515,6 @@ function StatBox({ icon, label, value }) {
       </div>
     </div>
   );
-}
+});
 
 export default Dashboard;

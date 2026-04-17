@@ -38,7 +38,44 @@ MAX_ANALYZE_URL_LENGTH = 2048
 @limiter.limit("30 per minute")
 @csrf_protect
 def analyze_url():
-    """Analyze content from any supported platform URL."""
+    """URL 콘텐츠 분석
+    지원 플랫폼(YouTube, DCInside, Reddit, Telegram, Kakao, 네이버 카페)의 URL을 분석합니다.
+    ---
+    tags:
+      - 분석
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          required:
+            - url
+          properties:
+            url:
+              type: string
+              description: 분석할 플랫폼 URL
+              example: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+            options:
+              type: object
+              description: 분석 옵션 (선택 사항)
+    responses:
+      200:
+        description: 분석 결과
+        schema:
+          type: object
+          properties:
+            platform:
+              type: string
+            title:
+              type: string
+            analysis:
+              type: object
+      400:
+        description: 잘못된 요청 (URL 누락 또는 형식 오류)
+      500:
+        description: 서버 내부 오류
+    """
     data = request.get_json(silent=True)
     if not data or "url" not in data:
         return jsonify(
@@ -71,7 +108,40 @@ def analyze_url():
 @limiter.limit("10 per minute")
 @csrf_protect
 def summarize_analysis():
-    """Summarize analysis results using AI service."""
+    """분석 결과 AI 요약
+    분석 결과를 AI(MiroFish, LLM 또는 로컬 폴백)를 사용하여 한국어로 요약합니다.
+    ---
+    tags:
+      - 분석
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          required:
+            - result
+          properties:
+            result:
+              type: object
+              description: /api/analyze/url 에서 반환된 분석 결과 객체
+    responses:
+      200:
+        description: 요약 결과
+        schema:
+          type: object
+          properties:
+            summary:
+              type: string
+              description: 한국어 요약 텍스트
+            source:
+              type: string
+              description: 요약 생성 출처 (mirofish / llm / local)
+      400:
+        description: 분석 결과 누락
+      500:
+        description: 서버 내부 오류
+    """
     data = request.get_json(silent=True)
     if not data or "result" not in data:
         return jsonify({"error": "Analysis result is required"}), 400
@@ -308,7 +378,29 @@ def summarize_analysis():
 
 @analyze_bp.route("/api/platforms", methods=["GET"])
 def list_platforms():
-    """List supported platforms with example URLs."""
+    """지원 플랫폼 목록 조회
+    분석 가능한 플랫폼 목록과 예시 URL, API 사용량을 반환합니다.
+    ---
+    tags:
+      - 분석
+    responses:
+      200:
+        description: 지원 플랫폼 목록
+        schema:
+          type: object
+          properties:
+            platforms:
+              type: array
+              items:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  example_url:
+                    type: string
+            api_usage:
+              type: object
+    """
     analyzer = _get_analyzer()
     return jsonify({
         "platforms": analyzer.list_platforms(),

@@ -125,7 +125,7 @@ function App() {
                 tabIndex={0}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') window.history.pushState({}, '', '/'); }}
                 aria-label="SNS Monitor 홈으로 이동"
-                style={{ cursor: 'pointer' }}
+                className="app__title-link"
               >
                 🔍 SNS Monitor
               </span>
@@ -155,7 +155,7 @@ function App() {
       )}
 
       <main className="App-main">
-        <React.Suspense fallback={<div style={{ textAlign: 'center', padding: '60px 20px', color: '#888' }}>로딩 중...</div>}>
+        <React.Suspense fallback={<div className="app__suspense-fallback">로딩 중...</div>}>
           {renderContent()}
         </React.Suspense>
       </main>

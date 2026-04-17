@@ -319,7 +319,25 @@ def _handle_vuddy_creators_local():
 
 @vuddy_bp.route('/api/vuddy/creators', methods=['GET'])
 def vuddy_creators():
-    """Vuddy 크리에이터 목록"""
+    """Vuddy 크리에이터 목록 조회
+    로컬 파일 시스템에서 vuddy-creators.json을 읽어 크리에이터 정보를 반환합니다.
+    ---
+    tags:
+      - 크리에이터
+    responses:
+      200:
+        description: "크리에이터 목록 반환 성공"
+        schema:
+          type: object
+          properties:
+            creators:
+              type: array
+              description: "크리에이터 정보 목록"
+              items:
+                type: object
+      501:
+        description: "LOCAL_MODE가 아닌 경우 미지원"
+    """
     if not Config.LOCAL_MODE:
         return jsonify({"error": "S3 mode not supported. Set LOCAL_MODE=true"}), 501
 

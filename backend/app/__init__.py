@@ -124,5 +124,28 @@ def create_app(config_class=Config):
     from .api import register_blueprints
     register_blueprints(app)
 
+    # Swagger/OpenAPI documentation
+    from flasgger import Swagger
+
+    swagger_config = {
+        "headers": [],
+        "specs": [{"endpoint": "apispec", "route": "/apispec.json"}],
+        "static_url_path": "/flasgger_static",
+        "swagger_ui": True,
+        "specs_route": "/api/docs/",
+    }
+
+    swagger_template = {
+        "info": {
+            "title": "SNS Monitor API",
+            "description": "멀티 플랫폼 소셜 미디어 콘텐츠 분석기 API",
+            "version": "2.0.0",
+        },
+        "basePath": "/",
+        "schemes": ["http", "https"],
+    }
+
+    Swagger(app, config=swagger_config, template=swagger_template)
+
     logger.info("SNS Monitor Backend started (local_mode=%s)", Config.LOCAL_MODE)
     return app

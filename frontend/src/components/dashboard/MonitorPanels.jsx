@@ -8,7 +8,7 @@ import {
 import { API_BASE } from '../../config';
 import { PLATFORMS, formatNumber } from '../../constants/platforms';
 
-export function MiniStat({ icon, value, label }) {
+export const MiniStat = React.memo(function MiniStat({ icon, value, label }) {
   return (
     <div className="result__mini-stat">
       <span className="result__mini-icon">{icon}</span>
@@ -16,7 +16,7 @@ export function MiniStat({ icon, value, label }) {
       <span className="result__mini-label">{label}</span>
     </div>
   );
-}
+});
 
 /** Mini sentiment bar (CSS classes, dark mode compatible) */
 export function SentimentMiniBar({ sentiment }) {
@@ -675,7 +675,7 @@ export function ScanHistoryPanel() {
   );
 }
 
-export function EmptyHint({ title, description, text }) {
+export const EmptyHint = React.memo(function EmptyHint({ title, description, text }) {
   const heading = title || '데이터 없음';
   const body = description || text || '상단 URL 검색으로 즉시 분석할 수 있습니다.';
   return (
@@ -685,10 +685,10 @@ export function EmptyHint({ title, description, text }) {
       <p className="dash__empty-desc">{body}</p>
     </div>
   );
-}
+});
 
 /* StatBox is used internally by DCInsidePanel */
-function StatBox({ icon, label, value }) {
+const StatBox = React.memo(function StatBox({ icon, label, value }) {
   return (
     <div className="dash__stat-box">
       <span className="dash__stat-icon">{icon}</span>
@@ -698,4 +698,4 @@ function StatBox({ icon, label, value }) {
       </div>
     </div>
   );
-}
+});

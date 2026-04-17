@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import './AuthPanel.css';
 
 /** Map provider string to display name */
 export function providerLabel(provider) {
@@ -40,15 +41,15 @@ export function AuthPanel({ apiBase, onKeySet, openaiOAuthAvailable }) {
 
   return (
     <>
-      <strong style={{ display: 'block', marginBottom: '10px' }}>API Key를 입력하면 AI 분석이 활성화됩니다</strong>
+      <strong className="auth-panel__label">API Key를 입력하면 AI 분석이 활성화됩니다</strong>
 
       {/* API Key input (primary) */}
-      <div style={{ padding: '12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '10px' }}>
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
+      <div className="auth-panel__key-box">
+        <div className="auth-panel__key-row">
           <select
             value={keyProvider}
             onChange={e => setKeyProvider(e.target.value)}
-            style={{ padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+            className="auth-panel__select"
           >
             <option value="openai">OpenAI (ChatGPT)</option>
             <option value="anthropic">Anthropic (Claude)</option>
@@ -59,41 +60,37 @@ export function AuthPanel({ apiBase, onKeySet, openaiOAuthAvailable }) {
             onChange={e => setApiKey(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && submitKey()}
             placeholder={keyProvider === 'anthropic' ? 'sk-ant-api03-...' : 'sk-proj-...'}
-            style={{ flex: 1, padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+            className="auth-panel__input"
           />
           <button
             type="button" onClick={submitKey} disabled={keySaving || !apiKey.trim()}
-            style={{
-              padding: '8px 18px', fontSize: '13px', fontWeight: '600',
-              background: keySaving ? '#94a3b8' : '#3b82f6', color: 'white',
-              border: 'none', borderRadius: '6px', cursor: keySaving ? 'not-allowed' : 'pointer',
-            }}
+            className={`auth-panel__submit-btn ${keySaving ? 'auth-panel__submit-btn--saving' : 'auth-panel__submit-btn--ready'}`}
           >
             {keySaving ? '...' : '연결'}
           </button>
         </div>
-        {keyError && <div style={{ color: '#dc2626', fontSize: '12px', marginTop: '4px' }}>{keyError}</div>}
-        <p style={{ margin: '6px 0 0', fontSize: '11px', color: '#94a3b8' }}>
+        {keyError && <div className="auth-panel__key-error">{keyError}</div>}
+        <p className="auth-panel__key-hint">
           세션에만 저장됩니다 (브라우저 종료 시 삭제).
-          {keyProvider === 'openai' && <> <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" style={{ color: '#64748b' }}>OpenAI Key 발급</a></>}
-          {keyProvider === 'anthropic' && <> <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer" style={{ color: '#64748b' }}>Anthropic Key 발급</a></>}
+          {keyProvider === 'openai' && <> <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="auth-panel__key-link">OpenAI Key 발급</a></>}
+          {keyProvider === 'anthropic' && <> <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer" className="auth-panel__key-link">Anthropic Key 발급</a></>}
         </p>
       </div>
 
       {/* OAuth (secondary) */}
-      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-        <span style={{ fontSize: '12px', color: '#94a3b8' }}>또는 OAuth 로그인:</span>
+      <div className="auth-panel__oauth-row">
+        <span className="auth-panel__oauth-label">또는 OAuth 로그인:</span>
         <button
           type="button"
           onClick={() => { window.location.href = `${apiBase}/api/auth/anthropic?return_to=/analysis`; }}
-          style={{ padding: '5px 12px', fontSize: '12px', background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', cursor: 'pointer' }}
+          className="auth-panel__oauth-btn"
         >
           Claude
         </button>
         <button
           type="button"
           onClick={() => { window.location.href = `${apiBase}/api/auth/openai?return_to=/analysis`; }}
-          style={{ padding: '5px 12px', fontSize: '12px', background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', cursor: 'pointer' }}
+          className="auth-panel__oauth-btn"
         >
           ChatGPT
         </button>
