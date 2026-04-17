@@ -18,6 +18,7 @@ __pycache__/
 *.so
 .Python
 venv/
+.venv/
 env/
 ENV/
 .pytest_cache/
@@ -68,6 +69,7 @@ k8s/config/secrets.yaml
 .claude/
 .omc/
 frontend/.omc/
+.omc-config.json
 
 # Editor configs
 .cursor.md
