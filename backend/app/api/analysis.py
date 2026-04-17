@@ -1,16 +1,16 @@
 """
-SNS AI Analysis Bridge API.
-Transforms SNS crawled data into documents and proxies analysis requests to the AI analysis service.
+SNS local analysis, sentiment, LLM AI routes.
+MiroFish proxy routes are in analysis_mirofish.py.
 """
 
 import json
 import logging
-import os
+import os  # noqa: F401 — used by analysis_mirofish via this module's namespace
 import re
 from datetime import datetime
 from pathlib import Path
 
-import requests
+import requests  # noqa: F401 — used by analysis_mirofish via this module's namespace
 from flask import request, jsonify, session
 
 from . import analysis_bp, csrf_protect
@@ -27,7 +27,8 @@ ALLOWED_CHAT_ROLES = {"user", "assistant"}
 
 logger = logging.getLogger(__name__)
 
-MIROFISH_URL = os.environ.get('MIROFISH_ENDPOINT', 'http://mirofish:5001')
+# Re-export MiroFish helpers for backward compatibility (tests import from here)
+from .analysis_mirofish import _mirofish_headers, _proxy_json, MIROFISH_URL  # noqa: F401
 
 
 def _validate_chat_history(data):
@@ -50,28 +51,6 @@ def _validate_chat_history(data):
             continue
         chat_history.append({'role': role, 'content': content[:5000]})
     return chat_history
-
-
-def _proxy_json(resp):
-    """Safely extract JSON from a proxied response, returning a Flask tuple."""
-    try:
-        return jsonify(resp.json()), resp.status_code
-    except (ValueError, requests.exceptions.JSONDecodeError):
-        logger.warning("MiroFish returned non-JSON (status %d): %s", resp.status_code, resp.text[:200])
-        return jsonify({'error': 'Invalid response from AI analysis service'}), 502
-
-
-def _mirofish_headers():
-    """Forward OpenAI OAuth access token to AI analysis service so it can call OpenAI API without LLM_API_KEY."""
-    headers = {}
-    token = session.get('access_token')
-    # Validate: must be a non-empty ASCII string with no control characters (header-injection guard).
-    if isinstance(token, str) and token.strip() and all(c >= ' ' and c <= '~' for c in token):
-        headers['Authorization'] = f'Bearer {token}'
-        headers['X-OpenAI-Access-Token'] = token  # service can use either header
-    elif token is not None:
-        logger.warning("Ignoring invalid access_token type in session: %s", type(token).__name__)
-    return headers
 
 
 def _get_local_data_dir():
@@ -268,252 +247,6 @@ def _transform_dcinside_to_document(gallery_id):
             logger.warning("Failed to read %s: %s", json_file, e)
 
     return '\n'.join(lines) if lines else None
-
-
-@analysis_bp.route('/api/analysis/status', methods=['GET'])
-@limiter.limit("30 per minute")
-def analysis_status():
-    """Check AI analysis service availability."""
-    try:
-        resp = requests.get(
-            f'{MIROFISH_URL}/api/graph/project/list',
-            timeout=5,
-            headers=_mirofish_headers(),
-        )
-        available = resp.status_code == 200
-    except Exception:
-        available = False
-
-    return jsonify({
-        'mirofish_available': available,
-        'mirofish_endpoint': MIROFISH_URL
-    })
-
-
-@analysis_bp.route('/api/analysis/transform', methods=['POST'])
-@limiter.limit("5 per minute")
-@csrf_protect
-@require_analysis_auth
-def transform_sns_data():
-    """
-    Transform SNS crawled data into a document and send to AI analysis service.
-
-    Request JSON:
-    {
-        "sources": [
-            {"type": "youtube", "id": "example-creator-1"},
-            {"type": "dcinside", "id": "example-gallery-1"}
-        ],
-        "project_name": "SNS Analysis - Jan 2025",
-        "simulation_requirement": "Analyze community sentiment trends and predict reactions"
-    }
-    """
-    data = request.get_json() or {}
-    sources = data.get('sources', [])
-    project_name = data.get('project_name', f'SNS Analysis - {datetime.now().strftime("%Y-%m-%d")}')
-    simulation_requirement = data.get('simulation_requirement',
-        'Analyze social media community sentiment, identify key trends, and predict audience reactions')
-
-    if not sources:
-        return jsonify({'error': 'No data sources specified'}), 400
-
-    # Transform each source to Markdown document
-    documents = []
-    for src in sources:
-        src_type = src.get('type')
-        src_id = src.get('id', '')
-        if not _SAFE_ID_RE.match(src_id):
-            return jsonify({'error': f'Invalid source id'}), 400
-
-        if src_type == 'youtube':
-            doc = _transform_youtube_to_document(src_id)
-        elif src_type == 'dcinside':
-            doc = _transform_dcinside_to_document(src_id)
-        else:
-            continue
-
-        if doc:
-            documents.append({
-                'filename': f'{src_type}_{src_id}.md',
-                'content': doc
-            })
-
-    if not documents:
-        return jsonify({'error': 'No data found for specified sources'}), 404
-
-    # Send to AI analysis service as file upload
-    import tempfile
-    files = []
-    temp_files = []
-    try:
-        for doc in documents:
-            tmp = tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False, encoding='utf-8')
-            tmp.write(doc['content'])
-            tmp.close()
-            temp_files.append(tmp.name)
-            files.append(('files', (doc['filename'], open(tmp.name, 'rb'), 'text/markdown')))
-
-        resp = requests.post(
-            f'{MIROFISH_URL}/api/graph/ontology/generate',
-            data={
-                'simulation_requirement': simulation_requirement,
-                'project_name': project_name,
-            },
-            files=files,
-            timeout=120,
-            headers=_mirofish_headers(),
-        )
-
-        if resp.status_code != 200:
-            logger.warning("MiroFish returned %d: %s", resp.status_code, resp.text[:200])
-        try:
-            result = resp.json()
-        except ValueError:
-            return jsonify({'error': 'Invalid response from AI analysis service'}), 502
-        return jsonify(result), resp.status_code
-
-    except requests.ConnectionError:
-        return jsonify({
-            'error': 'AI analysis service not available. Start with: docker-compose --profile analysis up -d'
-        }), 503
-    except Exception as e:
-        logger.error("AI analysis transform failed: %s", e, exc_info=True)
-        return jsonify({'error': 'Internal server error'}), 500
-    finally:
-        for f_tuple in files:
-            try:
-                f_tuple[1][1].close()
-            except Exception:
-                pass
-        for tmp_path in temp_files:
-            try:
-                os.unlink(tmp_path)
-            except OSError:
-                pass
-
-
-@analysis_bp.route('/api/analysis/graph/build', methods=['POST'])
-@limiter.limit("5 per minute")
-@csrf_protect
-@require_analysis_auth
-def build_analysis_graph():
-    """Proxy graph build request to AI analysis service."""
-    try:
-        resp = requests.post(
-            f'{MIROFISH_URL}/api/graph/build',
-            json=request.get_json(),
-            timeout=30,
-            headers=_mirofish_headers(),
-        )
-        return _proxy_json(resp)
-    except requests.ConnectionError:
-        return jsonify({'error': 'AI analysis service not available'}), 503
-
-
-@analysis_bp.route('/api/analysis/graph/task/<task_id>', methods=['GET'])
-@limiter.limit("30 per minute")
-@require_analysis_auth
-def get_analysis_task(task_id):
-    """Proxy task status query to AI analysis service."""
-    if not _SAFE_ID_RE.match(task_id):
-        return jsonify({'error': 'Invalid task_id'}), 400
-    try:
-        resp = requests.get(
-            f'{MIROFISH_URL}/api/graph/task/{task_id}',
-            timeout=10,
-            headers=_mirofish_headers(),
-        )
-        return _proxy_json(resp)
-    except requests.ConnectionError:
-        return jsonify({'error': 'AI analysis service not available'}), 503
-
-
-@analysis_bp.route('/api/analysis/graph/data/<graph_id>', methods=['GET'])
-@limiter.limit("30 per minute")
-@require_analysis_auth
-def get_analysis_graph_data(graph_id):
-    """Proxy graph data query to AI analysis service."""
-    if not _SAFE_ID_RE.match(graph_id):
-        return jsonify({'error': 'Invalid graph_id'}), 400
-    try:
-        resp = requests.get(
-            f'{MIROFISH_URL}/api/graph/data/{graph_id}',
-            timeout=30,
-            headers=_mirofish_headers(),
-        )
-        return _proxy_json(resp)
-    except requests.ConnectionError:
-        return jsonify({'error': 'AI analysis service not available'}), 503
-
-
-@analysis_bp.route('/api/analysis/report/generate', methods=['POST'])
-@limiter.limit("5 per minute")
-@csrf_protect
-@require_analysis_auth
-def generate_analysis_report():
-    """Proxy report generation to AI analysis service."""
-    try:
-        resp = requests.post(
-            f'{MIROFISH_URL}/api/report/generate',
-            json=request.get_json(),
-            timeout=30,
-            headers=_mirofish_headers(),
-        )
-        return _proxy_json(resp)
-    except requests.ConnectionError:
-        return jsonify({'error': 'AI analysis service not available'}), 503
-
-
-@analysis_bp.route('/api/analysis/report/<report_id>', methods=['GET'])
-@limiter.limit("30 per minute")
-@require_analysis_auth
-def get_analysis_report(report_id):
-    """Proxy report retrieval from AI analysis service."""
-    if not _SAFE_ID_RE.match(report_id):
-        return jsonify({'error': 'Invalid report_id'}), 400
-    try:
-        resp = requests.get(
-            f'{MIROFISH_URL}/api/report/{report_id}',
-            timeout=30,
-            headers=_mirofish_headers(),
-        )
-        return _proxy_json(resp)
-    except requests.ConnectionError:
-        return jsonify({'error': 'AI analysis service not available'}), 503
-
-
-@analysis_bp.route('/api/analysis/report/chat', methods=['POST'])
-@limiter.limit("20 per minute")
-@csrf_protect
-@require_analysis_auth
-def chat_with_analysis():
-    """Proxy chat with AI analysis ReportAgent."""
-    try:
-        resp = requests.post(
-            f'{MIROFISH_URL}/api/report/chat',
-            json=request.get_json(),
-            timeout=60,
-            headers=_mirofish_headers(),
-        )
-        return _proxy_json(resp)
-    except requests.ConnectionError:
-        return jsonify({'error': 'AI analysis service not available'}), 503
-
-
-@analysis_bp.route('/api/analysis/projects', methods=['GET'])
-@limiter.limit("30 per minute")
-@require_analysis_auth
-def list_analysis_projects():
-    """Proxy project list from AI analysis service."""
-    try:
-        resp = requests.get(
-            f'{MIROFISH_URL}/api/graph/project/list',
-            timeout=10,
-            headers=_mirofish_headers(),
-        )
-        return _proxy_json(resp)
-    except requests.ConnectionError:
-        return jsonify({'error': 'AI analysis service not available'}), 503
 
 
 def _source_display_name_youtube(json_path):

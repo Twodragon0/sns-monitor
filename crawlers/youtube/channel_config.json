@@ -1,0 +1,64 @@
+{
+  "channel_id_override": {
+    "@example-studio-official": "UCExampleStudioOfficial1",
+    "@ExampleStudioOfficial": "UCExampleStudioOfficial1",
+    "@example-creator-1": "UCExampleCreator00000001",
+    "@example-creator-2": "UCExampleCreator00000002",
+    "@example-creator-3": "UCExampleCreator00000003",
+    "@example-creator-4": "UCExampleCreator00000004",
+    "@example-creator-5": "UCExampleCreator00000005",
+    "@example-group-b": "UCExampleGroupB000000001",
+    "@example-creator-6": "UCExampleCreator00000006",
+    "@example-creator-7": "UCExampleCreator00000007",
+    "@example-creator-8": "UCExampleCreator00000008",
+    "@example-creator-9": "UCExampleCreator00000009",
+    "@example-creator-10": "UCExampleCreator0000010A",
+    "@example-creator-11": "UCExampleCreator0000011B",
+    "@example-creator-12": "UCExampleCreator0000012C",
+    "@example-creator-13": "UCExampleCreator0000013D",
+    "@example-creator-14": "UCExampleCreator0000014E"
+  },
+  "channel_korean_names": {
+    "@example-creator-1": "Creator1",
+    "@example-creator-2": "Creator2",
+    "@example-creator-3": "Creator3",
+    "@example-creator-4": "Creator4",
+    "@example-creator-5": "Creator5",
+    "@example-creator-6": "Creator6",
+    "@example-creator-7": "Creator7",
+    "@example-creator-8": "Creator8",
+    "@example-creator-9": "Creator9",
+    "@example-creator-10": "Creator10",
+    "@example-creator-11": "Creator11",
+    "@example-creator-12": "Creator12",
+    "@example-creator-13": "Creator13",
+    "@example-creator-14": "Creator14"
+  },
+  "channel_search_keywords": {
+    "@example-creator-1": ["Creator1 vtuber", "ExampleCorp creator1"],
+    "@example-creator-2": ["Creator2 vtuber", "ExampleCorp creator2"],
+    "@example-creator-3": ["Creator3 vtuber", "GroupA creator3"],
+    "@example-creator-4": ["Creator4 vtuber", "GroupA creator4"],
+    "@example-creator-5": ["Creator5 vtuber", "GroupA creator5"],
+    "@example-creator-6": ["Creator6 vtuber", "GroupB creator6"],
+    "@example-creator-7": ["Creator7 vtuber", "GroupB creator7"],
+    "@example-creator-8": ["Creator8 vtuber", "GroupB creator8"],
+    "@example-creator-9": ["Creator9 vtuber", "GroupB creator9"],
+    "@example-creator-10": ["Creator10 vtuber", "GroupC creator10"],
+    "@example-creator-11": ["Creator11 vtuber", "GroupC creator11"],
+    "@example-creator-12": ["Creator12 vtuber", "GroupC creator12"],
+    "@example-creator-13": ["Creator13 vtuber", "GroupC creator13"],
+    "@example-creator-14": ["Creator14 vtuber", "GroupC creator14"]
+  },
+  "blocked_channel_ids": [],
+  "keyword_filters": {
+    "ExampleCorp": {
+      "match_terms": ["examplecorp"],
+      "require_in_title_or_description": true
+    },
+    "GroupB": {
+      "match_terms": ["groupb"],
+      "skip_if_channel_filter": true
+    }
+  }
+}

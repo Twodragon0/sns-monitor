@@ -79,7 +79,7 @@ class TestMirofishHeaders:
         with app.test_request_context('/'):
             from flask import session as flask_session
             flask_session['access_token'] = 12345  # int, not string
-            with patch('app.api.analysis.logger') as mock_log:
+            with patch('app.api.analysis_mirofish.logger') as mock_log:
                 headers = _mirofish_headers()
                 mock_log.warning.assert_called_once()
         assert 'Authorization' not in headers

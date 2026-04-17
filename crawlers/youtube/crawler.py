@@ -112,78 +112,23 @@ YOUTUBE_CHANNELS = [ch.strip() for ch in YOUTUBE_CHANNELS_STR.split(',') if ch.s
 MAX_VIDEOS = int(os.environ.get('MAX_VIDEOS', '15'))
 MAX_COMMENTS = int(os.environ.get('MAX_COMMENTS', '50'))
 
-# 채널 핸들 -> 채널 ID 직접 매핑 (YouTube 검색이 잘못된 결과를 반환하는 경우 사용)
-# GroupA channel members and GroupA Studio member channels
-CHANNEL_ID_OVERRIDE = {
-    # GroupA 공식 채널
-    '@example-studio-official': 'UCExampleStudioOfficial1',  # Example Studio official
-    '@ExampleStudioOfficial': 'UCExampleStudioOfficial1',    # Example Studio official (alt)
+# 채널 설정을 외부 JSON에서 로드 (channel_config.json)
+def _load_channel_config():
+    """Load channel configuration from channel_config.json."""
+    config_path = os.path.join(os.path.dirname(__file__), 'channel_config.json')
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        logger.warning("channel_config.json not found or invalid (%s), using empty defaults", e)
+        return {}
 
-    # GroupA / Creator Group 1 멤버들
-    '@example-creator-1': 'UCExampleCreator00000001',  # Creator1
-    '@example-creator-2': 'UCExampleCreator00000002',  # Creator2
-    '@example-creator-3': 'UCExampleCreator00000003',  # Creator3
-    '@example-creator-4': 'UCExampleCreator00000004',  # Creator4
-    '@example-creator-5': 'UCExampleCreator00000005',  # Creator5
-
-    # GroupB 소속
-    '@example-group-b': 'UCExampleGroupB000000001',  # GroupB official
-
-    # GroupB 멤버들
-    '@example-creator-6': 'UCExampleCreator00000006',  # Creator6
-    '@example-creator-7': 'UCExampleCreator00000007',  # Creator7
-    '@example-creator-8': 'UCExampleCreator00000008',  # Creator8
-    '@example-creator-9': 'UCExampleCreator00000009',  # Creator9
-
-    # GroupC 멤버들
-    '@example-creator-10': 'UCExampleCreator0000010A',  # Creator10
-    '@example-creator-11': 'UCExampleCreator0000011B',  # Creator11
-    '@example-creator-12': 'UCExampleCreator0000012C',  # Creator12
-    '@example-creator-13': 'UCExampleCreator0000013D',  # Creator13
-    '@example-creator-14': 'UCExampleCreator0000014E',  # Creator14
-}
-
-# 채널 핸들에 대응하는 한국어 이름 (검색용)
-CHANNEL_KOREAN_NAMES = {
-    '@example-creator-1': 'Creator1',
-    '@example-creator-2': 'Creator2',
-    '@example-creator-3': 'Creator3',
-    '@example-creator-4': 'Creator4',
-    '@example-creator-5': 'Creator5',
-    '@example-creator-6': 'Creator6',
-    '@example-creator-7': 'Creator7',
-    '@example-creator-8': 'Creator8',
-    '@example-creator-9': 'Creator9',
-    '@example-creator-10': 'Creator10',
-    '@example-creator-11': 'Creator11',
-    '@example-creator-12': 'Creator12',
-    '@example-creator-13': 'Creator13',
-    '@example-creator-14': 'Creator14',
-}
-
-# 추가 검색 키워드 (채널을 찾지 못할 경우 사용)
-CHANNEL_SEARCH_KEYWORDS = {
-    '@example-creator-1': ['Creator1 vtuber', 'ExampleCorp creator1'],
-    '@example-creator-2': ['Creator2 vtuber', 'ExampleCorp creator2'],
-    '@example-creator-3': ['Creator3 vtuber', 'GroupA creator3'],
-    '@example-creator-4': ['Creator4 vtuber', 'GroupA creator4'],
-    '@example-creator-5': ['Creator5 vtuber', 'GroupA creator5'],
-    '@example-creator-6': ['Creator6 vtuber', 'GroupB creator6'],
-    '@example-creator-7': ['Creator7 vtuber', 'GroupB creator7'],
-    '@example-creator-8': ['Creator8 vtuber', 'GroupB creator8'],
-    '@example-creator-9': ['Creator9 vtuber', 'GroupB creator9'],
-    '@example-creator-10': ['Creator10 vtuber', 'GroupC creator10'],
-    '@example-creator-11': ['Creator11 vtuber', 'GroupC creator11'],
-    '@example-creator-12': ['Creator12 vtuber', 'GroupC creator12'],
-    '@example-creator-13': ['Creator13 vtuber', 'GroupC creator13'],
-    '@example-creator-14': ['Creator14 vtuber', 'GroupC creator14'],
-}
-
-# 잘못된 채널 ID 필터링 (이 채널 ID는 수집하지 않음)
-BLOCKED_CHANNEL_IDS = {
-    # Add channel IDs to block here (e.g., unrelated channels with similar names)
-    # 'UCExampleBlockedChannel000',  # Example blocked channel
-}
+_channel_config = _load_channel_config()
+CHANNEL_ID_OVERRIDE = _channel_config.get('channel_id_override', {})
+CHANNEL_KOREAN_NAMES = _channel_config.get('channel_korean_names', {})
+CHANNEL_SEARCH_KEYWORDS = _channel_config.get('channel_search_keywords', {})
+BLOCKED_CHANNEL_IDS = set(_channel_config.get('blocked_channel_ids', []))
+_KEYWORD_FILTERS = _channel_config.get('keyword_filters', {})
 
 # API Rate Limiting 설정
 API_REQUEST_DELAY = float(os.environ.get('API_REQUEST_DELAY', '0.5'))  # 기본 0.5초 딜레이
@@ -374,20 +319,21 @@ def search_videos(youtube, keyword, max_results=10, regions=None, channel_id_fil
                     title_lower = title.lower()
                     description_lower = description.lower()
                     
-                    # 정확한 키워드 매칭 확인
+                    # 정확한 키워드 매칭 확인 (config-driven)
                     should_include = False
-                    
-                    if keyword == "ExampleCorp" or keyword == "examplecorp":
-                        if "examplecorp" in title_lower or "examplecorp" in description_lower:
+                    kf = _KEYWORD_FILTERS.get(keyword) or _KEYWORD_FILTERS.get(keyword.lower())
+
+                    if kf:
+                        match_terms = kf.get('match_terms', [keyword_lower])
+                        if kf.get('skip_if_channel_filter') and channel_id_filter:
                             should_include = True
+                        elif kf.get('require_in_title_or_description', False):
+                            if any(t in title_lower or t in description_lower for t in match_terms):
+                                should_include = True
+                            else:
+                                continue
                         else:
-                            continue
-                    elif keyword.lower() == "groupb" or keyword == "GroupB":
-                        # GroupB 키워드의 경우 채널 필터가 있으면 이미 필터링됨
-                        if channel_id_filter:
-                            should_include = True
-                        else:
-                            if "groupb" in title_lower or "groupb" in description_lower:
+                            if any(t in title_lower or t in description_lower for t in match_terms):
                                 should_include = True
                     else:
                         if keyword_lower in title_lower or keyword_lower in description_lower:
