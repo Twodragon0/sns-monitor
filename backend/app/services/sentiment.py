@@ -140,48 +140,8 @@ def _calculate_sentiment_from_samples(comment_samples):
 
 
 def _simple_sentiment_analysis(items):
-    """간단한 감성 분석 (키워드 기반)"""
-    positive_words = ['좋아', '최고', '감사', '사랑', '대박', '멋지', '예쁘', '귀엽',
-                      '응원', '화이팅', 'love', 'great', 'amazing', 'awesome', 'best',
-                      '좋다', '재밌', '웃기', '감동', '완벽', '훌륭', '행복']
-    negative_words = ['싫어', '나쁘', '최악', '실망', '별로', '짜증', '혐오',
-                      'hate', 'worst', 'bad', 'terrible', 'awful',
-                      '쓰레기', '망했', '노잼']
-
-    total = len(items)
-    if total == 0:
+    """간단한 감성 분석. SentimentAnalyzer로 위임 (Kiwi 기반, 더 정확한 결과)."""
+    if not items:
         return None
-
-    pos = 0
-    neg = 0
-    top_keywords = {}
-
-    for item in items:
-        text = (item.get('text', '') or '').lower()
-        is_pos = any(w in text for w in positive_words)
-        is_neg = any(w in text for w in negative_words)
-        if is_pos and not is_neg:
-            pos += 1
-        elif is_neg and not is_pos:
-            neg += 1
-
-        for word in text.split():
-            word = word.strip('.,!?()[]{}"\':;')
-            if len(word) >= 2 and word not in ('the', 'and', 'for', 'that', 'this', 'with', 'are', 'was', 'has'):
-                top_keywords[word] = top_keywords.get(word, 0) + 1
-
-    neu = total - pos - neg
-    overall = 'positive' if pos > neg else ('negative' if neg > pos else 'neutral')
-
-    sorted_keywords = sorted(top_keywords.items(), key=lambda x: x[1], reverse=True)[:15]
-
-    return {
-        'total': total,
-        'sentiment': {
-            'positive': pos,
-            'neutral': neu,
-            'negative': neg,
-        },
-        'overall': overall,
-        'top_keywords': [{'word': w, 'count': c} for w, c in sorted_keywords],
-    }
+    from .sentiment_analyzer import SentimentAnalyzer
+    return SentimentAnalyzer().analyze(items)
