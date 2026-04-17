@@ -119,14 +119,71 @@ def _save_dcinside_result(result: dict, timestamp: str):
 @data_bp.route('/api/data/<path:s3_key>', methods=['GET'])
 @limiter.limit("60 per minute")
 def get_data(s3_key):
-    """S3 키(또는 로컬 경로)로 데이터 조회."""
+    """S3 키로 데이터 조회 (현재 미지원)
+    S3 키 또는 로컬 경로로 데이터를 조회합니다. LOCAL_MODE에서는 501을 반환합니다.
+    ---
+    tags:
+      - 데이터
+    parameters:
+      - name: s3_key
+        in: path
+        type: string
+        required: true
+        description: "S3 오브젝트 키 또는 로컬 파일 경로"
+    responses:
+      501:
+        description: "LOCAL_MODE=true 설정 필요"
+    """
     return jsonify({"error": "S3 mode not supported. Set LOCAL_MODE=true"}), 501
 
 
 @data_bp.route('/api/crawler/results', methods=['POST'])
 @limiter.limit("10 per minute")
 def crawler_results():
-    """크롤러 결과 저장 엔드포인트 (DCInside + YouTube)."""
+    """크롤러 수집 결과 저장
+    DCInside 및 YouTube 크롤러가 수집한 결과를 로컬 파일 시스템에 저장합니다.
+    X-Crawler-Token 헤더로 내부 인증을 수행합니다.
+    ---
+    tags:
+      - 데이터
+    parameters:
+      - name: X-Crawler-Token
+        in: header
+        type: string
+        required: false
+        description: "크롤러 내부 인증 토큰 (CRAWLER_INTERNAL_TOKEN 환경변수)"
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            results:
+              type: array
+              description: "크롤러 결과 배열 (YouTube 또는 DCInside 형식)"
+              items:
+                type: object
+    responses:
+      200:
+        description: "저장 성공"
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+            saved_count:
+              type: integer
+            youtube_channels:
+              type: array
+              items:
+                type: string
+      401:
+        description: "인증 실패"
+      501:
+        description: "LOCAL_MODE=true 설정 필요"
+      500:
+        description: "서버 내부 오류"
+    """
     token = request.headers.get('X-Crawler-Token', '')
     expected = os.environ.get('CRAWLER_INTERNAL_TOKEN', '')
     if not expected:
@@ -168,7 +225,54 @@ def crawler_results():
 @limiter.limit("60 per minute")
 @csrf_protect
 def twitter_search():
-    """Twitter 키워드 검색 엔드포인트."""
+    """Twitter 키워드 검색
+    키워드로 트윗 및 답글을 검색합니다. 크롤러 API 호출과 로컬 파일 검색을 병행합니다.
+    bulk_search 액션으로 여러 키워드를 동시에 검색할 수 있습니다.
+    ---
+    tags:
+      - 데이터
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            action:
+              type: string
+              enum: [search, bulk_search]
+              description: "검색 액션 (기본값: search)"
+            keyword:
+              type: string
+              description: "검색 키워드 (search 액션 시 필수, 최대 100자)"
+            keywords:
+              type: array
+              items:
+                type: string
+              description: "검색 키워드 목록 (bulk_search 액션 시 사용)"
+    responses:
+      200:
+        description: "검색 성공"
+        schema:
+          type: object
+          properties:
+            tweets:
+              type: array
+            replies:
+              type: array
+            keyword:
+              type: string
+            total_tweets:
+              type: integer
+            total_replies:
+              type: integer
+      400:
+        description: "잘못된 요청 (유효하지 않은 액션 또는 키워드)"
+      501:
+        description: "LOCAL_MODE=true 설정 필요"
+      500:
+        description: "서버 내부 오류"
+    """
     if not Config.LOCAL_MODE:
         return jsonify({"error": "S3 mode not supported. Set LOCAL_MODE=true"}), 501
 

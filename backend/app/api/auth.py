@@ -53,6 +53,10 @@ def _is_safe_redirect(url):
         return False
     if url.startswith("//") or url.startswith("/\\"):
         return False
+    # Block encoded schemes (javascript:, data:, vbscript:)
+    url_lower = url.lower().replace(" ", "").replace("\t", "")
+    if any(scheme in url_lower for scheme in ("javascript:", "data:", "vbscript:")):
+        return False
     parsed = urlparse(url)
     if parsed.netloc or parsed.scheme:
         return False
@@ -79,7 +83,33 @@ def _get_callback_uri():
 # ==========================================
 @auth_bp.route("/api/auth/me", methods=["GET"])
 def auth_me():
-    """Return current user session info."""
+    """현재 로그인 세션 정보 조회
+    세션에 저장된 사용자 정보와 OAuth 설정 상태를 반환합니다.
+    ---
+    tags:
+      - 인증
+    responses:
+      200:
+        description: "세션 상태 반환 성공"
+        schema:
+          type: object
+          properties:
+            logged_in:
+              type: boolean
+              description: "로그인 여부"
+            user:
+              type: object
+              description: "로그인된 사용자 정보 (logged_in=true 시)"
+            auth_required:
+              type: boolean
+              description: "분석 기능 인증 필요 여부"
+            anthropic_oauth_available:
+              type: boolean
+              description: "Anthropic OAuth 지원 여부 (logged_in=false 시)"
+            openai_oauth_available:
+              type: boolean
+              description: "OpenAI OAuth 지원 여부 (logged_in=false 시)"
+    """
     user = session.get("user")
     if user:
         return jsonify({
@@ -101,7 +131,24 @@ def auth_me():
 @auth_bp.route("/api/auth/anthropic", methods=["GET"])
 @limiter.limit("10 per minute")
 def auth_anthropic_start():
-    """Start Anthropic OAuth with PKCE (same flow as Claude Code)."""
+    """Anthropic OAuth 로그인 시작 (PKCE)
+    Claude Code와 동일한 PKCE 방식으로 Anthropic OAuth 인증을 시작합니다.
+    ANTHROPIC_OAUTH_CLIENT_ID 환경변수가 설정되어야 합니다.
+    ---
+    tags:
+      - 인증
+    parameters:
+      - name: return_to
+        in: query
+        type: string
+        required: false
+        description: "인증 완료 후 리디렉션할 경로 (기본값: /analysis)"
+    responses:
+      302:
+        description: "Anthropic OAuth 인증 페이지로 리디렉션"
+      503:
+        description: "ANTHROPIC_OAUTH_CLIENT_ID 미설정"
+    """
     if not _ANTHROPIC_CLIENT_ID:
         return jsonify({"error": "Anthropic OAuth is not configured. Set ANTHROPIC_OAUTH_CLIENT_ID."}), 503
     code_verifier = secrets.token_urlsafe(64)[:128]
@@ -155,7 +202,24 @@ def _get_openai_callback_uri():
 @auth_bp.route("/api/auth/openai", methods=["GET"])
 @limiter.limit("10 per minute")
 def auth_openai_start():
-    """Start OpenAI OAuth with PKCE (OpenCode compatible)."""
+    """OpenAI OAuth 로그인 시작 (PKCE)
+    OpenCode CLI와 호환되는 PKCE 방식으로 OpenAI OAuth 인증을 시작합니다.
+    OPENAI_OAUTH_CLIENT_ID 환경변수가 설정되어야 합니다.
+    ---
+    tags:
+      - 인증
+    parameters:
+      - name: return_to
+        in: query
+        type: string
+        required: false
+        description: "인증 완료 후 리디렉션할 경로 (기본값: /analysis)"
+    responses:
+      302:
+        description: "OpenAI OAuth 인증 페이지로 리디렉션"
+      503:
+        description: "OPENAI_OAUTH_CLIENT_ID 미설정"
+    """
     client_id = Config.OPENAI_OAUTH_CLIENT_ID or _OPENAI_CLIENT_ID
     if not client_id:
         return jsonify({"error": "OpenAI OAuth is not configured. Set OPENAI_OAUTH_CLIENT_ID."}), 503
@@ -201,7 +265,32 @@ def auth_openai_start():
 @auth_bp.route("/callback", methods=["GET"])
 @limiter.limit("10 per minute")
 def auth_callback():
-    """Exchange OAuth code for tokens (Anthropic PKCE or OpenAI PKCE)."""
+    """OAuth 인증 코드 교환 (Anthropic PKCE 또는 OpenAI PKCE)
+    OAuth 인증 서버에서 리디렉션된 후 인증 코드를 액세스 토큰으로 교환합니다.
+    세션에 저장된 provider에 따라 Anthropic 또는 OpenAI 토큰 교환을 처리합니다.
+    ---
+    tags:
+      - 인증
+    parameters:
+      - name: code
+        in: query
+        type: string
+        required: true
+        description: "OAuth 인증 서버에서 발급된 인증 코드"
+      - name: state
+        in: query
+        type: string
+        required: true
+        description: "CSRF 방지용 state 파라미터"
+      - name: error
+        in: query
+        type: string
+        required: false
+        description: "인증 오류 코드 (오류 발생 시)"
+    responses:
+      302:
+        description: "토큰 교환 성공 후 프론트엔드로 리디렉션"
+    """
     err = request.args.get("error")
     if err:
         logger.warning("OAuth error: %s", err)
@@ -229,7 +318,27 @@ def auth_callback():
 @auth_bp.route("/auth/callback", methods=["GET"])
 @limiter.limit("10 per minute")
 def auth_openai_callback():
-    """OpenAI OAuth callback at /auth/callback (OpenCode compatible)."""
+    """OpenAI OAuth 콜백 경로 (OpenCode 패턴)
+    OpenCode CLI와 호환되는 /auth/callback 경로의 OAuth 콜백을 처리합니다.
+    내부적으로 auth_callback()을 호출합니다.
+    ---
+    tags:
+      - 인증
+    parameters:
+      - name: code
+        in: query
+        type: string
+        required: true
+        description: "OAuth 인증 코드"
+      - name: state
+        in: query
+        type: string
+        required: true
+        description: "CSRF 방지용 state 파라미터"
+    responses:
+      302:
+        description: "토큰 교환 후 프론트엔드로 리디렉션"
+    """
     return auth_callback()
 
 
@@ -237,7 +346,27 @@ def auth_openai_callback():
 @auth_bp.route("/api/auth/callback", methods=["GET"])
 @limiter.limit("10 per minute")
 def auth_callback_legacy():
-    """Legacy callback path."""
+    """레거시 OAuth 콜백 경로 (하위 호환)
+    이전 버전과의 호환성을 위해 /api/auth/callback 경로를 지원합니다.
+    내부적으로 auth_callback()을 호출합니다.
+    ---
+    tags:
+      - 인증
+    parameters:
+      - name: code
+        in: query
+        type: string
+        required: true
+        description: "OAuth 인증 코드"
+      - name: state
+        in: query
+        type: string
+        required: true
+        description: "CSRF 방지용 state 파라미터"
+    responses:
+      302:
+        description: "토큰 교환 후 프론트엔드로 리디렉션"
+    """
     return auth_callback()
 
 
@@ -340,7 +469,42 @@ def _handle_openai_callback(code):
 @limiter.limit("10 per minute")
 @csrf_protect
 def set_api_key():
-    """Store API key in session. Fallback for when OAuth is unavailable."""
+    """API 키를 세션에 저장 (OAuth 미사용 시 대체 수단)
+    OAuth 인증을 사용할 수 없을 때 브라우저 세션에 API 키를 저장합니다.
+    Origin 헤더가 필요합니다 (CSRF 보호).
+    ---
+    tags:
+      - 인증
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          required:
+            - provider
+            - api_key
+          properties:
+            provider:
+              type: string
+              enum: [openai, anthropic]
+              description: "API 키 제공자"
+            api_key:
+              type: string
+              description: "API 키 (openai: sk-..., anthropic: sk-ant-...)"
+    responses:
+      200:
+        description: "API 키 저장 성공"
+        schema:
+          type: object
+          properties:
+            ok:
+              type: boolean
+            provider:
+              type: string
+      400:
+        description: "잘못된 provider 또는 API 키 형식"
+    """
     data = request.get_json() or {}
     provider = data.get("provider", "").strip()
     api_key = data.get("api_key", "").strip()

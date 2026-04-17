@@ -1714,6 +1714,12 @@
   .dash__creator-grid { grid-template-columns: 1fr; }
 }
 
+/* ===== Scan History title override ===== */
+.dash__scan-history-title {
+  font-size: 1rem;
+  margin-bottom: 14px;
+}
+
 /* ===== Scan History ===== */
 .dash__scan-history {
   background: var(--c-surface);

@@ -68,7 +68,33 @@ def _compute_stats():
 @dashboard_bp.route('/api/dashboard/stats', methods=['GET'])
 @limiter.limit("60 per minute")
 def dashboard_stats():
-    """Dashboard statistics with caching (Redis or in-memory, 5-min TTL)."""
+    """대시보드 통계 조회
+    전체 수집 항목, 오늘 수집 수, 분석 완료 수, 댓글 총계 등 대시보드 통계를 반환합니다. Redis 또는 메모리 캐시(5분 TTL)를 사용합니다.
+    ---
+    tags:
+      - 대시보드
+    responses:
+      200:
+        description: 대시보드 통계
+        schema:
+          type: object
+          properties:
+            total_items:
+              type: integer
+              description: 전체 수집 항목 수
+            today_items:
+              type: integer
+              description: 오늘 수집된 항목 수
+            analyzed_items:
+              type: integer
+              description: 분석 완료된 항목 수
+            total_comments:
+              type: integer
+              description: 수집된 댓글 총계
+            avg_sentiment:
+              type: string
+              description: 평균 감성 (positive/neutral/negative)
+    """
     global _stats_cache
     cache_key = 'sns-monitor:dashboard:stats'
 
@@ -120,7 +146,22 @@ def dashboard_stats():
 @dashboard_bp.route('/api/channels', methods=['GET'])
 @limiter.limit("60 per minute")
 def channels():
-    """Channel list — migrated from api_handlers."""
+    """YouTube 채널 목록 조회
+    로컬 데이터에서 수집된 YouTube 채널 목록을 반환합니다.
+    ---
+    tags:
+      - 대시보드
+    responses:
+      200:
+        description: 채널 목록
+        schema:
+          type: object
+          properties:
+            channels:
+              type: array
+              items:
+                type: object
+    """
     try:
         youtube_dir = os.path.join(Config.LOCAL_DATA_DIR, 'youtube')
         channel_list = load_channels_from_local(youtube_dir)
@@ -134,12 +175,42 @@ def channels():
 @dashboard_bp.route('/api/scans', methods=['GET'])
 @limiter.limit("60 per minute")
 def scans():
-    """Scan list with pagination and optional platform filter.
-
-    Query params:
-        page (int): Page number, 1-based (default: 1)
-        limit (int): Items per page, max 200 (default: 50)
-        platform (str): Filter by platform name (optional)
+    """스캔 이력 조회 (페이지네이션)
+    수집된 스캔 이력을 페이지네이션 및 플랫폼 필터와 함께 반환합니다.
+    ---
+    tags:
+      - 대시보드
+    parameters:
+      - name: page
+        in: query
+        type: integer
+        default: 1
+        description: 페이지 번호 (1부터 시작)
+      - name: limit
+        in: query
+        type: integer
+        default: 50
+        description: 페이지당 항목 수 (최대 200)
+      - name: platform
+        in: query
+        type: string
+        description: "플랫폼 이름으로 필터 (예: youtube, dcinside)"
+    responses:
+      200:
+        description: 스캔 목록
+        schema:
+          type: object
+          properties:
+            scans:
+              type: array
+              items:
+                type: object
+            total:
+              type: integer
+            page:
+              type: integer
+            limit:
+              type: integer
     """
     page = max(1, request.args.get('page', 1, type=int))
     limit = min(200, max(1, request.args.get('limit', 50, type=int)))

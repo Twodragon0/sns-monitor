@@ -167,7 +167,47 @@ def _format_post(post_data, max_comments=None):
 @dcinside_bp.route('/api/dcinside/galleries', methods=['GET'])
 @limiter.limit("60 per minute")
 def galleries():
-    """DC인사이드 갤러리 목록 반환."""
+    """DC인사이드 갤러리 목록 조회
+    로컬 데이터에서 수집된 DC인사이드 갤러리 목록과 최근 게시글을 반환합니다.
+    ---
+    tags:
+      - DCInside
+    responses:
+      200:
+        description: 갤러리 목록
+        schema:
+          type: object
+          properties:
+            galleries:
+              type: array
+              items:
+                type: object
+                properties:
+                  gallery_id:
+                    type: string
+                  gallery_name:
+                    type: string
+                  total_posts:
+                    type: integer
+                  total_comments:
+                    type: integer
+                  positive_count:
+                    type: integer
+                  negative_count:
+                    type: integer
+                  crawled_at:
+                    type: string
+                  keywords:
+                    type: array
+                    items:
+                      type: string
+                  posts:
+                    type: array
+                    items:
+                      type: object
+      501:
+        description: LOCAL_MODE가 비활성화된 경우
+    """
     if not Config.LOCAL_MODE:
         return jsonify({"error": "S3 mode not supported. Set LOCAL_MODE=true"}), 501
 

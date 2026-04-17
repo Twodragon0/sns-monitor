@@ -21,6 +21,12 @@ from comment_collector import (
     get_post_comments_direct,
     get_comments_with_playwright,
     _parse_comment_item,
+    _extract_comments_from_json,
+    _parse_json_comments,
+    _parse_html_comments,
+    _extract_comment_author,
+    _extract_comment_text,
+    _extract_comment_date,
 )
 
 logger = logging.getLogger(__name__)

@@ -334,6 +334,18 @@ textarea:focus-visible {
   outline: none; /* inputs use box-shadow focus ring via their own rules */
 }
 
+/* ===== Suspense fallback ===== */
+.app__suspense-fallback {
+  text-align: center;
+  padding: 60px 20px;
+  color: #888;
+}
+
+/* ===== Clickable title span ===== */
+.app__title-link {
+  cursor: pointer;
+}
+
 /* ===== Responsive ===== */
 @media (max-width: 768px) {
   .App-header__title { font-size: 24px; }

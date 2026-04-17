@@ -85,7 +85,9 @@ export const useToast = () => {
   const [toasts, setToasts] = useState([]);
 
   const showToast = (message, type = 'info', duration = 3000) => {
-    const id = Date.now() + Math.random();
+    const id = typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     setToasts((prev) => [...prev, { id, message, type, duration }]);
     return id;
   };
@@ -111,10 +113,6 @@ export const useToast = () => {
 };
 
 export default Toast;
-
-
-
-
 
 
 

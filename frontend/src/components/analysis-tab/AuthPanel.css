@@ -1,0 +1,91 @@
+/* ===== AuthPanel ===== */
+.auth-panel__label {
+  display: block;
+  margin-bottom: 10px;
+}
+
+.auth-panel__key-box {
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 10px;
+}
+
+.auth-panel__key-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.auth-panel__select {
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  font-size: 13px;
+}
+
+.auth-panel__input {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  font-size: 13px;
+}
+
+.auth-panel__submit-btn {
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.auth-panel__submit-btn--saving {
+  background: #94a3b8;
+  cursor: not-allowed;
+}
+
+.auth-panel__submit-btn--ready {
+  background: #3b82f6;
+}
+
+.auth-panel__key-error {
+  color: #dc2626;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.auth-panel__key-hint {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.auth-panel__oauth-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.auth-panel__oauth-label {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.auth-panel__oauth-btn {
+  padding: 5px 12px;
+  font-size: 12px;
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.auth-panel__key-link {
+  color: #64748b;
+}
