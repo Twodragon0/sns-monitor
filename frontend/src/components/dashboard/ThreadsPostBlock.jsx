@@ -46,7 +46,7 @@ export function ThreadsPostBlock({ embedHtml, url, replies, description, content
         <p className="result__threads-no-embed">게시글 내용을 불러오지 못했습니다. 원문 링크에서 확인해 주세요.</p>
       )}
       {url && (
-        <a href={url} target="_blank" rel="noopener noreferrer" className="result__link" style={{ display: 'inline-block', marginTop: 8 }}>
+        <a href={url} target="_blank" rel="noopener noreferrer" className="result__link result__link--inline-block">
           Threads 원문 보기 →
         </a>
       )}

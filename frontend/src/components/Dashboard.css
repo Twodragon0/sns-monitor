@@ -1149,6 +1149,8 @@
 
 .result__link:hover { text-decoration: underline; }
 
+.result__link--inline-block { display: inline-block; margin-top: 8px; }
+
 .result__summary {
   margin: 14px 20px;
   padding: 14px;
@@ -2061,6 +2063,7 @@
 /* ===== Show more / pagination button (shared) ===== */
 .result__show-more-btn { padding: 8px 18px; font-size: 0.82rem; font-weight: 600; color: var(--c-primary); background: var(--c-primary-light); border: 1px solid var(--c-border); border-radius: 8px; cursor: pointer; transition: background 0.15s, border-color 0.15s; }
 .result__show-more-btn:hover { border-color: var(--c-primary); }
+.result__show-more-btn--center { display: block; margin: 12px auto; }
 
 /* ===== Comment show-more list item ===== */
 .result__comment-show-more { list-style: none; padding: 8px 0; text-align: center; }
