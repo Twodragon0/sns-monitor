@@ -268,7 +268,7 @@ function Dashboard({ onShowError }) {
             {detectedPlatform && (
               <span
                 className="dash__search-badge"
-                style={{ background: PLATFORMS[detectedPlatform]?.color }}
+                style={{ '--pf-color': PLATFORMS[detectedPlatform]?.color }}
               >
                 {PLATFORMS[detectedPlatform]?.icon} {PLATFORMS[detectedPlatform]?.label}
               </span>
@@ -290,7 +290,7 @@ function Dashboard({ onShowError }) {
 
         <div className="dash__platforms">
           {Object.entries(PLATFORMS).map(([k, v]) => (
-            <span key={k} className="dash__platform-tag" style={{ borderColor: v.color, color: v.color }}>
+            <span key={k} className="dash__platform-tag" style={{ '--pf-color': v.color }}>
               {v.icon} {v.label}
             </span>
           ))}
@@ -348,26 +348,17 @@ function Dashboard({ onShowError }) {
                   >
                     <span
                       className="dash__history-icon"
-                      style={{
-                        color: pInfo?.color || 'var(--c-text-secondary)',
-                        fontSize: 15,
-                      }}
+                      style={pInfo?.color ? { '--pf-color': pInfo.color } : undefined}
                       title={pInfo?.label || h.platform || ''}
                     >
                       {pInfo?.icon || '🔗'}
                     </span>
                     <span className="dash__history-title">{h.title}</span>
                     {pInfo && (
-                      <span style={{
-                        fontSize: 10,
-                        fontWeight: 700,
-                        padding: '2px 6px',
-                        borderRadius: 8,
-                        background: pInfo.color + '22',
-                        color: pInfo.color,
-                        whiteSpace: 'nowrap',
-                        flexShrink: 0,
-                      }}>
+                      <span
+                        className="dash__history-badge"
+                        style={{ '--pf-color': pInfo.color, '--pf-color-soft': pInfo.color + '22' }}
+                      >
                         {pInfo.label}
                       </span>
                     )}
