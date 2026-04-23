@@ -254,7 +254,7 @@ export function AnalysisResult({ result, summary, summaryLoading, onSummarize, o
   return (
     <div className="result">
       <div className="result__header">
-        <span className="result__platform" style={{ background: platform.color }}>{platform.label}</span>
+        <span className="result__platform" style={{ '--pf-color': platform.color }}>{platform.label}</span>
         <h3 className="result__title">{title}</h3>
         {result.analyzed_at && (
           <span className="result__time">{new Date(result.analyzed_at).toLocaleString('ko-KR')}</span>
