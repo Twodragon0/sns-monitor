@@ -31,7 +31,7 @@ test.describe('URL Analyzer', () => {
     for (const { url, badge } of cases) {
       await urlInput.fill(url);
       // Platform badge/label should appear somewhere in the form area
-      const badgeLocator = page.locator('.dash__hero').getByText(badge, { exact: false });
+      const badgeLocator = page.locator('.dash__hero').getByText(badge, { exact: false }).first();
       await expect(badgeLocator).toBeVisible({ timeout: 5000 });
     }
   });
