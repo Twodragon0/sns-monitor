@@ -16,9 +16,10 @@ test.describe('Dashboard', () => {
     const analyzeBtn = page.getByRole('button', { name: /^분석$/ });
     await expect(analyzeBtn).toBeVisible();
 
-    // Platform names visible somewhere on page
-    await expect(page.getByText('YouTube', { exact: false })).toBeVisible();
-    await expect(page.getByText('DCInside', { exact: false })).toBeVisible();
+    // Platform names visible somewhere on page (page shows multiple occurrences
+    // across badge, platform-tag, and history — use first() to avoid strict mode)
+    await expect(page.getByText('YouTube', { exact: false }).first()).toBeVisible();
+    await expect(page.getByText('DCInside', { exact: false }).first()).toBeVisible();
 
     // Stats section (전체 개요 tab panel area)
     await expect(page.getByRole('tablist', { name: '플랫폼 탭' })).toBeVisible();
