@@ -63,9 +63,8 @@ export function TelegramMessages({ messages, totalMessages }) {
           {sorted.length > visibleCount && (
             <button
               type="button"
-              className="result__show-more-btn"
+              className="result__show-more-btn result__show-more-btn--center"
               onClick={() => setVisibleCount(v => v + PAGE_SIZE)}
-              style={{ margin: '12px auto', display: 'block' }}
             >
               더 보기 ({visibleCount}/{sorted.length})
             </button>
