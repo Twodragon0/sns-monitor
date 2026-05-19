@@ -76,6 +76,7 @@ def csrf_protect(f):
 from . import analyze  # noqa: E402, F401
 from . import analysis  # noqa: E402, F401
 from . import analysis_mirofish  # noqa: E402, F401
+from . import analysis_llm  # noqa: E402, F401
 from . import auth      # noqa: E402, F401
 from . import dashboard  # noqa: E402, F401
 from . import dcinside   # noqa: E402, F401
