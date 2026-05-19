@@ -9,6 +9,7 @@ In non-LOCAL_MODE: delegates to legacy api_handlers for S3 access.
 import json
 import logging
 import os
+import re
 from datetime import datetime, timedelta
 from flask import request, Response, jsonify
 
@@ -20,6 +21,9 @@ from ..services.local_data import decimal_default, is_timestamp_comment
 logger = logging.getLogger(__name__)
 
 members_bp = Blueprint('members', __name__)
+
+# YouTube handle whitelist: leading @ optional, then 3-30 chars of [A-Za-z0-9._-]
+_HANDLE_RE = re.compile(r'^@?[A-Za-z0-9._-]{1,64}$')
 
 # ---------------------------------------------------------------------------
 # Group config: maps group_id -> members JSON filename (under
@@ -503,6 +507,12 @@ def _handle_channel_local(group_id: str) -> dict:
         # group-b / group-c: aggregate from members JSON
         members_data, _ = _load_members_json(group_id)
         return _handle_channel_all_local(group_id, members_data)
+
+    if not _HANDLE_RE.match(requested_handle):
+        return {
+            'statusCode': 400,
+            'body': json.dumps({'error': 'Invalid channel_handle'}),
+        }
 
     if not requested_handle.startswith('@'):
         requested_handle = '@' + requested_handle

@@ -82,6 +82,7 @@ def _get_callback_uri():
 # Auth status
 # ==========================================
 @auth_bp.route("/api/auth/me", methods=["GET"])
+@limiter.limit("60 per minute")
 def auth_me():
     """현재 로그인 세션 정보 조회
     세션에 저장된 사용자 정보와 OAuth 설정 상태를 반환합니다.
@@ -513,6 +514,8 @@ def set_api_key():
         return jsonify({"error": "Provider must be 'openai' or 'anthropic'"}), 400
     if not api_key:
         return jsonify({"error": "API key is required"}), 400
+    if len(api_key) > 256:
+        return jsonify({"error": "API key exceeds maximum length"}), 400
     if provider == "openai" and not api_key.startswith("sk-"):
         return jsonify({"error": "OpenAI API key should start with 'sk-'"}), 400
     if provider == "anthropic" and not api_key.startswith("sk-ant-"):
@@ -532,6 +535,7 @@ def set_api_key():
 # Logout
 # ==========================================
 @auth_bp.route("/api/auth/logout", methods=["POST"])
+@limiter.limit("30 per minute")
 @csrf_protect
 def auth_logout():
     """Clear session and log out."""

@@ -301,6 +301,15 @@ class TestMembersRoutes:
         resp = client.get('/api/group-b/channel?channel=testchannel')
         assert resp.status_code == 200
 
+    def test_channel_handle_rejects_path_traversal(self, client):
+        resp = client.get('/api/group-a/channel?channel_handle=../etc/passwd')
+        assert resp.status_code == 400
+        assert b'Invalid channel_handle' in resp.data
+
+    def test_channel_handle_rejects_control_chars(self, client):
+        resp = client.get('/api/group-a/channel?channel_handle=%40bad%0aname')
+        assert resp.status_code == 400
+
 
 class TestLoadMembersJson:
     """Test _load_members_json file loading."""
