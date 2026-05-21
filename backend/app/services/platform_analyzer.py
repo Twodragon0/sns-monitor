@@ -8,6 +8,8 @@ import json
 import os
 import re
 import logging
+import threading
+from contextlib import contextmanager
 from typing import Any, Optional
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlparse, parse_qs
@@ -17,6 +19,46 @@ import ipaddress
 import socket
 
 import requests
+
+
+# ---------------------------------------------------------------------------
+# DNS-pinning for SSRF protection (DNS rebinding mitigation).
+# The hostname is resolved and validated once; subsequent socket lookups for
+# that hostname within the pinned scope return the validated IP so a malicious
+# authoritative DNS server cannot swap to an internal IP between validation
+# and the actual HTTP connection (TOCTOU rebinding).
+# ---------------------------------------------------------------------------
+_pinning_state = threading.local()
+_orig_getaddrinfo = socket.getaddrinfo
+
+
+def _pinned_getaddrinfo(host, port, *args, **kwargs):
+    pinned = getattr(_pinning_state, "map", None)
+    if pinned and host in pinned:
+        ip = pinned[host]
+        family = socket.AF_INET6 if ":" in ip else socket.AF_INET
+        return [(family, socket.SOCK_STREAM, 6, "", (ip, port or 0))]
+    return _orig_getaddrinfo(host, port, *args, **kwargs)
+
+
+# Install once. Falls through to original when no pin is active, so other
+# code in the process is unaffected.
+if socket.getaddrinfo is not _pinned_getaddrinfo:
+    socket.getaddrinfo = _pinned_getaddrinfo
+
+
+@contextmanager
+def _pin_dns(host, ip):
+    """Pin host -> ip for the duration of the context (thread-local)."""
+    if not host or not ip:
+        yield
+        return
+    cur = getattr(_pinning_state, "map", None) or {}
+    _pinning_state.map = dict(cur, **{host: ip})
+    try:
+        yield
+    finally:
+        _pinning_state.map = cur
 
 from .platforms import (
     YouTubeMixin, DCInsideMixin, NaverCafeMixin,
@@ -178,8 +220,10 @@ class PlatformAnalyzer(
     def _validate_url_host(url):
         """Block requests to private/internal/metadata addresses (SSRF protection).
 
-        Resolves the hostname once and caches the result to mitigate DNS rebinding
-        (TOCTOU) attacks where a second resolution could return a different IP.
+        Returns ``(hostname, primary_ip)`` so callers can pin the resolved IP
+        and prevent DNS-rebinding (TOCTOU) where a second resolution returns
+        a different IP. Backward compatible: callers ignoring the return get
+        the same raise-on-bad-host behavior as before.
         """
         parsed = urlparse(url)
         hostname = parsed.hostname
@@ -187,22 +231,28 @@ class PlatformAnalyzer(
             raise ValueError("Invalid URL: missing hostname")
         if hostname in _BLOCKED_HOSTS:
             raise ValueError("Blocked host")
-        # Resolve hostname and check ALL resolved IPs
+        # Pin map is empty during validation (we populate it after this returns),
+        # so socket.getaddrinfo falls through to the real resolver via our hook.
         try:
             addr_infos = socket.getaddrinfo(hostname, None)
         except socket.gaierror:
             raise ValueError("Cannot resolve hostname")
         if not addr_infos:
             raise ValueError("Cannot resolve hostname")
+        primary_ip = None
         for family, _, _, _, sockaddr in addr_infos:
+            ip_str = sockaddr[0]
             try:
-                ip = ipaddress.ip_address(sockaddr[0])
+                ip = ipaddress.ip_address(ip_str)
                 if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
                     raise ValueError("Internal addresses not allowed")
             except ValueError as ve:
                 if "Internal" in str(ve) or "Blocked" in str(ve):
                     raise
                 raise ValueError("Internal addresses not allowed")
+            if primary_ip is None:
+                primary_ip = ip_str
+        return hostname, primary_ip
 
     def detect_platform(self, url):
         """Detect which platform a URL belongs to by matching against parsed hostname."""
@@ -219,7 +269,11 @@ class PlatformAnalyzer(
         """Main entry point: detect platform and analyze content.
         options: dict with platform-specific flags (e.g. fetch_comments, max_comments).
         """
-        self._validate_url_host(url)
+        # Validate now and capture the resolved IP; pin it for the request scope
+        # so a malicious authoritative DNS cannot rebind to an internal IP.
+        validated = self._validate_url_host(url)
+        pinned_host, pinned_ip = (validated if isinstance(validated, tuple) else (None, None))
+
         platform = self.detect_platform(url)
         if not platform:
             raise ValueError(
@@ -231,7 +285,8 @@ class PlatformAnalyzer(
             raise ValueError(f"Analyzer not implemented for: {platform}")
 
         self._analyze_options = options or {}
-        result = handler(url)
+        with _pin_dns(pinned_host, pinned_ip):
+            result = handler(url)
         result["platform"] = platform
         result["source_url"] = url
         result["analyzed_at"] = datetime.now(KST).isoformat()
