@@ -35,9 +35,12 @@ _orig_getaddrinfo = socket.getaddrinfo
 def _pinned_getaddrinfo(host, port, *args, **kwargs):
     pinned = getattr(_pinning_state, "map", None)
     if pinned and host in pinned:
-        ip = pinned[host]
-        family = socket.AF_INET6 if ":" in ip else socket.AF_INET
-        return [(family, socket.SOCK_STREAM, 6, "", (ip, port or 0))]
+        # Delegate to the real getaddrinfo using the pinned IP literal. This
+        # preserves the platform-correct sockaddr tuple shape (4-tuple for
+        # AF_INET6) and honors caller-supplied family / socktype / proto /
+        # flags arguments — a hand-fabricated tuple gets these wrong for IPv6
+        # and breaks callers that pass non-default socket parameters.
+        return _orig_getaddrinfo(pinned[host], port, *args, **kwargs)
     return _orig_getaddrinfo(host, port, *args, **kwargs)
 
 

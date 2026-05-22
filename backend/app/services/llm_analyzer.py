@@ -11,6 +11,7 @@ Supports multiple modes (in priority order):
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -28,15 +29,20 @@ _INJECTION_GUARD = (
 )
 
 
-def _sanitize_for_xml(text: str) -> str:
+# Match a closing breakout tag tolerantly: optional whitespace inside the
+# brackets and case-insensitive, so attackers can't slip past with
+# `</ SNS_DATA >`, `</Sns_Data\t>`, etc.
+_XML_BREAKOUT_RE = re.compile(
+    r"</\s*(sns_data|user_question|chat_history)\s*>",
+    re.IGNORECASE,
+)
+
+
+def _sanitize_for_xml(text: Optional[str]) -> str:
     """Neutralize stray closing tags / instruction breakout markers in user data."""
     if not text:
         return ""
-    return (
-        text.replace("</sns_data>", "<_sns_data>")
-        .replace("</user_question>", "<_user_question>")
-        .replace("</chat_history>", "<_chat_history>")
-    )
+    return _XML_BREAKOUT_RE.sub(lambda m: f"<_{m.group(1).lower()}>", text)
 
 
 # System prompt for SNS analysis
