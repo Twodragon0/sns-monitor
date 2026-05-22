@@ -5,8 +5,6 @@ Split from analysis.py for feature-domain separation. Sentiment/report routes
 remain in analysis.py; MiroFish proxies stay in analysis_mirofish.py.
 """
 
-import logging
-
 from flask import request, jsonify, session
 
 from . import analysis_bp, csrf_protect
@@ -17,8 +15,6 @@ from .analysis import (
 )
 from .auth import require_analysis_auth
 from .. import limiter
-
-logger = logging.getLogger(__name__)
 
 
 def _session_llm_kwargs():

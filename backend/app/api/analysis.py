@@ -5,12 +5,12 @@ MiroFish proxy routes are in analysis_mirofish.py.
 
 import json
 import logging
-import os  # noqa: F401 — used by analysis_mirofish via this module's namespace
+import os  # noqa: F401 — re-exported namespace; mocked via app.api.analysis.os in tests
 import re
 from datetime import datetime
 from pathlib import Path
 
-import requests  # noqa: F401 — used by analysis_mirofish via this module's namespace
+import requests  # noqa: F401 — re-exported namespace; mocked via app.api.analysis.requests in tests
 from flask import request, jsonify
 
 from . import analysis_bp, csrf_protect
