@@ -22,7 +22,9 @@ logger = logging.getLogger(__name__)
 
 members_bp = Blueprint('members', __name__)
 
-# YouTube handle whitelist: leading @ optional, then 3-30 chars of [A-Za-z0-9._-]
+# YouTube handle whitelist: leading @ optional, then 1-64 chars of [A-Za-z0-9._-].
+# (YouTube's documented user-facing limit is 30, but accept up to 64 to leave
+# room for legacy / non-handle identifiers passed through this same param.)
 _HANDLE_RE = re.compile(r'^@?[A-Za-z0-9._-]{1,64}$')
 
 # ---------------------------------------------------------------------------
@@ -499,7 +501,15 @@ def _trigger_youtube_crawler(requested_handle: str) -> None:
 def _handle_channel_local(group_id: str) -> dict:
     """Unified local channel handler."""
     query_params = dict(request.args) if request.args else {}
-    requested_handle = query_params.get('channel_handle') or query_params.get('channel', '')
+    # Accept either query name for backward compatibility — remember which one
+    # was actually used so the validation error can name the right param.
+    raw_handle = query_params.get('channel_handle')
+    handle_param_name = 'channel_handle'
+    if raw_handle is None:
+        raw_handle = query_params.get('channel', '')
+        if 'channel' in query_params:
+            handle_param_name = 'channel'
+    requested_handle = raw_handle
 
     if not requested_handle:
         if group_id == 'group-a':
@@ -511,7 +521,7 @@ def _handle_channel_local(group_id: str) -> dict:
     if not _HANDLE_RE.match(requested_handle):
         return {
             'statusCode': 400,
-            'body': json.dumps({'error': 'Invalid channel_handle'}),
+            'body': json.dumps({'error': f'Invalid {handle_param_name}'}),
         }
 
     if not requested_handle.startswith('@'):
