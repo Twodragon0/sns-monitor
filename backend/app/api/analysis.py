@@ -5,13 +5,13 @@ MiroFish proxy routes are in analysis_mirofish.py.
 
 import json
 import logging
-import os  # noqa: F401 — used by analysis_mirofish via this module's namespace
+import os  # noqa: F401 — re-exported namespace; mocked via app.api.analysis.os in tests
 import re
 from datetime import datetime
 from pathlib import Path
 
-import requests  # noqa: F401 — used by analysis_mirofish via this module's namespace
-from flask import request, jsonify, session
+import requests  # noqa: F401 — re-exported namespace; mocked via app.api.analysis.requests in tests
+from flask import request, jsonify
 
 from . import analysis_bp, csrf_protect
 from .auth import require_analysis_auth
@@ -34,13 +34,13 @@ from .analysis_mirofish import _mirofish_headers, _proxy_json, MIROFISH_URL  # n
 def _validate_chat_history(data):
     """Validate and sanitize chat_history from request data.
 
-    Returns a validated list of message dicts, or a Flask error response tuple
-    (jsonify(...), status_code) if the raw value is not a list.
-    Callers must check: if isinstance(result, tuple): return result
+    Returns a validated list of message dicts, or None if the raw value is not
+    a list. Callers translate None into a constant error response so that user
+    input never flows into the HTTP response body (avoids CodeQL py/reflective-xss).
     """
     raw_history = data.get('chat_history', [])
     if not isinstance(raw_history, list):
-        return jsonify({'error': 'Invalid chat_history format'}), 400
+        return None
     chat_history = []
     for msg in raw_history[:MAX_CHAT_HISTORY]:
         if not isinstance(msg, dict):
@@ -144,15 +144,16 @@ def _build_document_from_url_result(url_result, compact=False):
 def _build_documents_from_sources(sources_list):
     """Build Markdown documents from a list of source dicts.
 
-    Returns (documents: list[str], error_response: tuple|None).
-    If error_response is not None, caller should return it directly.
+    Returns the document list on success, or None when any source id fails the
+    safe-id regex. Callers translate None into a constant error response so that
+    user input never flows into the HTTP response body (CodeQL py/reflective-xss).
     """
     documents = []
     for src in sources_list:
         src_type = src.get('type', '')
         src_id = src.get('id', '')
         if not _SAFE_ID_RE.match(src_id):
-            return [], (jsonify({'error': 'Invalid source id'}), 400)
+            return None
 
         if src_type == 'youtube':
             doc = _transform_youtube_to_document(src_id)
@@ -164,7 +165,7 @@ def _build_documents_from_sources(sources_list):
         if doc:
             documents.append(doc)
 
-    return documents, None
+    return documents
 
 
 def _transform_youtube_to_document(channel_handle):
@@ -651,196 +652,4 @@ def get_report(date):
         return jsonify(json.load(f))
 
 
-def _session_llm_kwargs():
-    """Extract LLM credentials from Flask session."""
-    return {
-        'oauth_token': session.get('access_token'),
-        'token_provider': session.get('token_provider'),
-        'session_api_key': session.get('session_api_key'),
-        'session_api_provider': session.get('session_api_provider'),
-    }
-
-
-@analysis_bp.route('/api/analysis/llm/status', methods=['GET'])
-def llm_status():
-    """Check local LLM availability (Claude / OpenAI / OAuth)."""
-    from ..services.llm_analyzer import get_llm_status
-    status = get_llm_status(**_session_llm_kwargs())
-    return jsonify(status)
-
-
-@analysis_bp.route('/api/analysis/ai-summary', methods=['POST'])
-@limiter.limit("5 per minute")
-@csrf_protect
-def ai_summary():
-    """
-    AI-powered analysis using local LLM (Claude or ChatGPT).
-    Works standalone — calls LLM APIs directly.
-
-    Request JSON:
-    {
-        "sources": [{"type": "youtube", "id": "channel-handle"}, ...],
-        "question": "optional specific question"
-    }
-    """
-    from ..services.llm_analyzer import analyze_with_llm, get_available_provider
-
-    provider = get_available_provider(**_session_llm_kwargs())
-    if not provider:
-        return jsonify({
-            'error': 'LLM 인증이 필요합니다. Anthropic OAuth 로그인 또는 API Key를 입력하세요.'
-        }), 503
-
-    data = request.get_json() or {}
-    sources_list = data.get('sources', [])
-    question = data.get('question', '')
-
-    if not sources_list:
-        return jsonify({'error': 'No data sources specified'}), 400
-
-    documents, err = _build_documents_from_sources(sources_list)
-    if err:
-        return err
-    if not documents:
-        return jsonify({'error': 'No data found for specified sources'}), 404
-
-    full_document = '\n\n---\n\n'.join(documents)
-    result = analyze_with_llm(full_document, question if question else None, **_session_llm_kwargs())
-
-    if 'error' in result and not result.get('success'):
-        return jsonify(result), 500
-
-    return jsonify(result)
-
-
-@analysis_bp.route('/api/analysis/ai-chat', methods=['POST'])
-@limiter.limit("20 per minute")
-@csrf_protect
-def ai_chat():
-    """
-    Chat with local LLM about SNS data.
-
-    Request JSON:
-    {
-        "sources": [{"type": "youtube", "id": "channel-handle"}, ...],
-        "message": "user question",
-        "chat_history": [{"role": "user", "content": "..."}, ...]
-    }
-    """
-    from ..services.llm_analyzer import chat_with_llm, get_available_provider
-
-    provider = get_available_provider(**_session_llm_kwargs())
-    if not provider:
-        return jsonify({'error': 'LLM 인증이 필요합니다. OAuth 로그인 또는 API Key를 입력하세요.'}), 503
-
-    data = request.get_json() or {}
-    sources_list = data.get('sources', [])
-    message = (data.get('message') or '').strip()
-
-    chat_history = _validate_chat_history(data)
-    if isinstance(chat_history, tuple):
-        return chat_history
-
-    if not message:
-        return jsonify({'error': 'Message is required'}), 400
-    if len(message) > 5000:
-        return jsonify({'error': 'Message exceeds maximum length of 5000 characters'}), 400
-    if not sources_list:
-        return jsonify({'error': 'No data sources specified'}), 400
-
-    documents, err = _build_documents_from_sources(sources_list)
-    if err:
-        return err
-    if not documents:
-        return jsonify({'error': 'No data found for specified sources'}), 404
-
-    full_document = '\n\n---\n\n'.join(documents)
-    result = chat_with_llm(full_document, message, chat_history, **_session_llm_kwargs())
-
-    if 'error' in result and not result.get('success'):
-        return jsonify(result), 500
-
-    return jsonify(result)
-
-
-@analysis_bp.route('/api/analysis/ai-url-analyze', methods=['POST'])
-@limiter.limit("5 per minute")
-@csrf_protect
-def ai_url_analyze():
-    """
-    AI analysis of URL analyzer results (direct pass-through from URLAnalyzer).
-    Accepts pre-built analysis result and sends to LLM for deep analysis.
-
-    Request JSON:
-    {
-        "result": { ... URL analyzer result ... },
-        "question": "optional question"
-    }
-    """
-    from ..services.llm_analyzer import analyze_with_llm, get_available_provider
-
-    provider = get_available_provider(**_session_llm_kwargs())
-    if not provider:
-        return jsonify({
-            'error': 'No LLM available. Set OPENAI_API_KEY or ANTHROPIC_API_KEY, or login with OAuth.'
-        }), 503
-
-    data = request.get_json() or {}
-    url_result = data.get('result')
-    question = data.get('question', '')
-
-    if not url_result:
-        return jsonify({'error': 'Analysis result is required'}), 400
-
-    document = _build_document_from_url_result(url_result)
-    result = analyze_with_llm(document, question if question else None, **_session_llm_kwargs())
-
-    if 'error' in result and not result.get('success'):
-        return jsonify(result), 500
-
-    return jsonify(result)
-
-
-@analysis_bp.route('/api/analysis/ai-url-chat', methods=['POST'])
-@limiter.limit("20 per minute")
-@csrf_protect
-def ai_url_chat():
-    """
-    Chat about URL analysis results with LLM.
-
-    Request JSON:
-    {
-        "result": { ... URL analyzer result ... },
-        "message": "user question",
-        "chat_history": [...]
-    }
-    """
-    from ..services.llm_analyzer import chat_with_llm, get_available_provider
-
-    oauth_token = session.get('access_token')
-    provider = get_available_provider(oauth_token=oauth_token)
-    if not provider:
-        return jsonify({'error': 'No LLM available'}), 503
-
-    data = request.get_json() or {}
-    url_result = data.get('result')
-    message = (data.get('message') or '').strip()
-
-    chat_history = _validate_chat_history(data)
-    if isinstance(chat_history, tuple):
-        return chat_history
-
-    if not message:
-        return jsonify({'error': 'Message is required'}), 400
-    if len(message) > 5000:
-        return jsonify({'error': 'Message exceeds maximum length of 5000 characters'}), 400
-    if not url_result:
-        return jsonify({'error': 'Analysis result is required'}), 400
-
-    document = _build_document_from_url_result(url_result, compact=True)
-    result = chat_with_llm(document, message, chat_history, **_session_llm_kwargs())
-
-    if 'error' in result and not result.get('success'):
-        return jsonify(result), 500
-
-    return jsonify(result)
+# LLM routes (status / summary / chat) live in analysis_llm.py.
