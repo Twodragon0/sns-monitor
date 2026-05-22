@@ -40,12 +40,13 @@ class HttpClientService:
         # platform-scoped opt-out (e.g. NAVER_CAFE_DISABLE_SSL_VERIFY below) is
         # the only supported way to relax it for a specific upstream.
         if os.environ.get("REQUESTS_CA_BUNDLE") or os.environ.get("SSL_CERT_FILE"):
-            pass  # Use system CA bundle
+            pass  # requests honors these env vars to load a custom CA bundle.
         if os.environ.get("DISABLE_SSL_VERIFY", "").lower() in ("1", "true", "yes"):
             logger.warning(
                 "DISABLE_SSL_VERIFY env var is set but is no longer honored. "
                 "Use NAVER_CAFE_DISABLE_SSL_VERIFY for the Naver-specific path "
-                "or set REQUESTS_CA_BUNDLE/SSL_CERT_FILE for a custom CA."
+                "or set REQUESTS_CA_BUNDLE/SSL_CERT_FILE to provide a custom "
+                "CA bundle."
             )
 
         # --- Naver cookie configuration ---
