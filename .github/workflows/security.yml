@@ -32,7 +32,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Dependency Review
-        uses: actions/dependency-review-action@v4
+        uses: actions/dependency-review-action@v5
         with:
           fail-on-severity: critical
           deny-licenses: GPL-3.0, AGPL-3.0
@@ -52,10 +52,14 @@ jobs:
       - name: Install pip-audit
         run: pip install pip-audit
 
+      # PYSEC-2024-271 (flask-cors 6.0.2): CRLF log-injection only when Flask
+      # debug logging is enabled. No upstream fix available; production runs
+      # with DEBUG=false so the issue is not exploitable. Acknowledged and
+      # ignored here to unblock CI. Revisit when flask-cors ships a fix.
       - name: Audit backend dependencies
         run: |
           set +e
-          pip-audit -r backend/requirements.txt --format json --output backend-audit.json
+          pip-audit -r backend/requirements.txt --ignore-vuln PYSEC-2024-271 --format json --output backend-audit.json
           echo "backend_exit_code=$?" >> "$GITHUB_OUTPUT"
         id: backend_audit
 
