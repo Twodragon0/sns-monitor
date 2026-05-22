@@ -12,7 +12,6 @@ These are intentionally light-touch black-box tests so they survive route
 refactors. If a future change quietly drops a decorator, the suite catches it.
 """
 
-import importlib
 import pytest
 from unittest.mock import patch
 
@@ -35,27 +34,45 @@ CSRF_GUARDED_POSTS = [
 
 
 class TestCsrfBoundary:
+    """All CSRF_GUARDED_POSTS routes carry @csrf_protect, which fires before
+    body validation. A missing or foreign Origin must therefore be rejected
+    with status 403 specifically — accepting 400 here would silently mask a
+    regression where @csrf_protect is dropped and the route's own validation
+    returns 400 for the empty body instead."""
+
     @pytest.mark.parametrize("path, body", CSRF_GUARDED_POSTS)
     def test_post_without_origin_rejected(self, client, path, body):
         # Drop the default Origin header set by the client fixture
         resp = client.post(path, json=body, headers={"Origin": ""})
-        # 403 for CSRF; some routes may return 400 before CSRF kicks in
-        # (e.g. invalid payload) — both prove CSRF + validation are wired.
-        assert resp.status_code in (400, 403), (
-            f"{path}: expected CSRF/validation rejection, got {resp.status_code}"
+        assert resp.status_code == 403, (
+            f"{path}: expected CSRF 403, got {resp.status_code} — @csrf_protect may be missing"
         )
 
     @pytest.mark.parametrize("path, body", CSRF_GUARDED_POSTS)
     def test_post_with_foreign_origin_rejected(self, client, path, body):
         resp = client.post(path, json=body, headers={"Origin": "https://evil.example"})
-        assert resp.status_code in (400, 403)
+        assert resp.status_code == 403, (
+            f"{path}: expected CSRF 403, got {resp.status_code} — @csrf_protect may be missing"
+        )
 
 
 # ---------------------------------------------------------------------------
 # Rate limiting — limiter caps trip; new caps from audit are wired up.
 # ---------------------------------------------------------------------------
 
+@pytest.fixture
+def reset_limiter(app):
+    """Reset Flask-Limiter counters before and after each test so the
+    REMOTE_ADDR-keyed (127.0.0.1) budget is not shared across tests."""
+    from app import limiter as _limiter
+    _limiter.reset()
+    yield
+    _limiter.reset()
+
+
 class TestRateLimitBoundary:
+    pytestmark = pytest.mark.usefixtures("reset_limiter")
+
     def test_auth_me_rate_limit_trips(self, app, client):
         """auth/me is capped at 60/min; bursting past it returns 429."""
         # 65 requests should exceed any sane cap; we rely on the limiter
