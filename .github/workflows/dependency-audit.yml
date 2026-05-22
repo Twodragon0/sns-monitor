@@ -7,12 +7,15 @@ on:
       - 'backend/requirements.txt'
       - 'frontend/package.json'
       - 'frontend/package-lock.json'
+      - '.github/workflows/dependency-audit.yml'
   pull_request:
     branches: [main]
     paths:
       - 'backend/requirements.txt'
       - 'frontend/package.json'
       - 'frontend/package-lock.json'
+      - '.github/workflows/dependency-audit.yml'
+  workflow_dispatch: {}
   schedule:
     - cron: '0 9 * * 1' # Every Monday at 9:00 UTC
 
@@ -44,7 +47,12 @@ jobs:
 
       - name: Audit backend dependencies
         continue-on-error: false
-        run: pip-audit -r backend/requirements.txt --desc on
+        # PYSEC-2024-271 (flask-cors): CRLF log-injection only when Flask
+        # debug logging is enabled. Production runs with DEBUG=false and
+        # the upstream advisory lists no fix version, so this finding is
+        # acknowledged and explicitly ignored to unblock CI. Revisit when
+        # flask-cors ships a fixed release.
+        run: pip-audit -r backend/requirements.txt --desc on --ignore-vuln PYSEC-2024-271
 
   npm-audit:
     name: npm Dependency Audit
