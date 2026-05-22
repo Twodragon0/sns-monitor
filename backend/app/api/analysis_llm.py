@@ -64,9 +64,9 @@ def ai_summary():
     if not sources_list:
         return jsonify({'error': 'No data sources specified'}), 400
 
-    documents, err = _build_documents_from_sources(sources_list)
-    if err:
-        return err
+    documents = _build_documents_from_sources(sources_list)
+    if documents is None:
+        return jsonify({'error': 'Invalid source id'}), 400
     if not documents:
         return jsonify({'error': 'No data found for specified sources'}), 404
 
@@ -96,8 +96,8 @@ def ai_chat():
     message = (data.get('message') or '').strip()
 
     chat_history = _validate_chat_history(data)
-    if isinstance(chat_history, tuple):
-        return chat_history
+    if chat_history is None:
+        return jsonify({'error': 'Invalid chat_history format'}), 400
 
     if not message:
         return jsonify({'error': 'Message is required'}), 400
@@ -106,9 +106,9 @@ def ai_chat():
     if not sources_list:
         return jsonify({'error': 'No data sources specified'}), 400
 
-    documents, err = _build_documents_from_sources(sources_list)
-    if err:
-        return err
+    documents = _build_documents_from_sources(sources_list)
+    if documents is None:
+        return jsonify({'error': 'Invalid source id'}), 400
     if not documents:
         return jsonify({'error': 'No data found for specified sources'}), 404
 
@@ -170,8 +170,8 @@ def ai_url_chat():
     message = (data.get('message') or '').strip()
 
     chat_history = _validate_chat_history(data)
-    if isinstance(chat_history, tuple):
-        return chat_history
+    if chat_history is None:
+        return jsonify({'error': 'Invalid chat_history format'}), 400
 
     if not message:
         return jsonify({'error': 'Message is required'}), 400

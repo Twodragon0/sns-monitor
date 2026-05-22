@@ -34,13 +34,13 @@ from .analysis_mirofish import _mirofish_headers, _proxy_json, MIROFISH_URL  # n
 def _validate_chat_history(data):
     """Validate and sanitize chat_history from request data.
 
-    Returns a validated list of message dicts, or a Flask error response tuple
-    (jsonify(...), status_code) if the raw value is not a list.
-    Callers must check: if isinstance(result, tuple): return result
+    Returns a validated list of message dicts, or None if the raw value is not
+    a list. Callers translate None into a constant error response so that user
+    input never flows into the HTTP response body (avoids CodeQL py/reflective-xss).
     """
     raw_history = data.get('chat_history', [])
     if not isinstance(raw_history, list):
-        return jsonify({'error': 'Invalid chat_history format'}), 400
+        return None
     chat_history = []
     for msg in raw_history[:MAX_CHAT_HISTORY]:
         if not isinstance(msg, dict):
@@ -144,15 +144,16 @@ def _build_document_from_url_result(url_result, compact=False):
 def _build_documents_from_sources(sources_list):
     """Build Markdown documents from a list of source dicts.
 
-    Returns (documents: list[str], error_response: tuple|None).
-    If error_response is not None, caller should return it directly.
+    Returns the document list on success, or None when any source id fails the
+    safe-id regex. Callers translate None into a constant error response so that
+    user input never flows into the HTTP response body (CodeQL py/reflective-xss).
     """
     documents = []
     for src in sources_list:
         src_type = src.get('type', '')
         src_id = src.get('id', '')
         if not _SAFE_ID_RE.match(src_id):
-            return [], (jsonify({'error': 'Invalid source id'}), 400)
+            return None
 
         if src_type == 'youtube':
             doc = _transform_youtube_to_document(src_id)
@@ -164,7 +165,7 @@ def _build_documents_from_sources(sources_list):
         if doc:
             documents.append(doc)
 
-    return documents, None
+    return documents
 
 
 def _transform_youtube_to_document(channel_handle):
