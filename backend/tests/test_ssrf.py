@@ -60,3 +60,45 @@ class TestValidateUrlHost:
         mock_getaddrinfo.side_effect = socket.gaierror("Name resolution failed")
         with pytest.raises(ValueError, match="Cannot resolve hostname"):
             PlatformAnalyzer._validate_url_host("http://nonexistent.invalid/")
+
+
+class TestDnsPinning:
+    """Validate that validate-then-pin closes the DNS rebinding TOCTOU window."""
+
+    @patch('app.services.platform_analyzer.socket.getaddrinfo')
+    def test_validate_returns_hostname_and_primary_ip(self, mock_getaddrinfo):
+        import socket as _s
+        mock_getaddrinfo.return_value = [
+            (_s.AF_INET, _s.SOCK_STREAM, 6, '', ('8.8.8.8', 0))
+        ]
+        host, ip = PlatformAnalyzer._validate_url_host('https://example.com/x')
+        assert host == 'example.com'
+        assert ip == '8.8.8.8'
+
+    def test_pin_dns_context_overrides_resolution(self):
+        import socket as _s
+        from app.services.platform_analyzer import _pin_dns, _pinned_getaddrinfo
+        with _pin_dns('example.com', '203.0.113.7'):
+            info = _pinned_getaddrinfo('example.com', 443)
+            # Delegating to the real getaddrinfo with the pinned IP literal can
+            # yield multiple socktype entries (SOCK_STREAM + SOCK_DGRAM).
+            # Every entry must still point at the pinned IP, and the result
+            # cannot be empty.
+            assert info
+            for entry in info:
+                assert entry[4][0] == '203.0.113.7'
+        # After exit, pinning is cleared
+        from app.services.platform_analyzer import _pinning_state
+        assert getattr(_pinning_state, 'map', {}) in ({}, None)
+
+    def test_pin_dns_falls_through_for_other_hosts(self):
+        import socket as _s
+        from app.services.platform_analyzer import _pin_dns, _pinned_getaddrinfo
+        # Should pass through to original for unrelated hosts; we mock the
+        # original to avoid touching the real DNS.
+        with patch('app.services.platform_analyzer._orig_getaddrinfo') as orig:
+            orig.return_value = [(_s.AF_INET, _s.SOCK_STREAM, 6, '', ('1.1.1.1', 0))]
+            with _pin_dns('example.com', '203.0.113.7'):
+                info = _pinned_getaddrinfo('cloudflare.com', 443)
+            orig.assert_called_once()
+            assert info[0][4][0] == '1.1.1.1'
