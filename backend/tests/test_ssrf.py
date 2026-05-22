@@ -80,8 +80,13 @@ class TestDnsPinning:
         from app.services.platform_analyzer import _pin_dns, _pinned_getaddrinfo
         with _pin_dns('example.com', '203.0.113.7'):
             info = _pinned_getaddrinfo('example.com', 443)
-            assert len(info) == 1
-            assert info[0][4][0] == '203.0.113.7'
+            # Delegating to the real getaddrinfo with the pinned IP literal can
+            # yield multiple socktype entries (SOCK_STREAM + SOCK_DGRAM).
+            # Every entry must still point at the pinned IP, and the result
+            # cannot be empty.
+            assert info
+            for entry in info:
+                assert entry[4][0] == '203.0.113.7'
         # After exit, pinning is cleared
         from app.services.platform_analyzer import _pinning_state
         assert getattr(_pinning_state, 'map', {}) in ({}, None)

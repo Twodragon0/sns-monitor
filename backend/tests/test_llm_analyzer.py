@@ -200,6 +200,27 @@ class TestSanitizeForXml:
         assert "<_user_question>" in out
         assert "<_chat_history>" in out
 
+    def test_closing_tags_case_and_whitespace_variants_neutralized(self):
+        """Attackers cannot bypass via casing / whitespace inside the brackets."""
+        from app.services.llm_analyzer import _sanitize_for_xml
+        evil = (
+            "a </SNS_DATA> b </Sns_Data\t> c </ user_question > "
+            "d </chat_history > e </CHAT_HISTORY>"
+        )
+        out = _sanitize_for_xml(evil)
+        # No closing-tag variant should survive — regex is case-insensitive
+        # and tolerates whitespace inside the brackets.
+        import re as _re
+        assert not _re.search(
+            r"</\s*(sns_data|user_question|chat_history)\s*>",
+            out,
+            _re.IGNORECASE,
+        )
+        # And the replacement uses the canonical lowercase tag name.
+        assert "<_sns_data>" in out
+        assert "<_user_question>" in out
+        assert "<_chat_history>" in out
+
     def test_summarize_wraps_document(self, monkeypatch):
         """summarize_with_llm builds an XML-tagged prompt and passes it to provider."""
         from app.services import llm_analyzer
