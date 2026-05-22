@@ -257,6 +257,15 @@ class TestSessionKeyValidation:
         assert _is_valid_session_key("notakey", "openai") is False
         assert _is_valid_session_key("sk-ant-short", "openai") is False
 
+    def test_anthropic_key_rejected_for_openai_provider(self):
+        """openai regex must NOT match sk-ant- keys (negative-lookahead guard)."""
+        from app.services.llm_analyzer import _is_valid_session_key
+        long_anthropic_key = "sk-ant-" + "abcdefghij1234567890"
+        # Same key passes for anthropic provider...
+        assert _is_valid_session_key(long_anthropic_key, "anthropic") is True
+        # ...but must be rejected when posted under the openai provider.
+        assert _is_valid_session_key(long_anthropic_key, "openai") is False
+
     def test_oversized_key_rejected(self):
         from app.services.llm_analyzer import _is_valid_session_key
         assert _is_valid_session_key("sk-" + "a" * 300, "openai") is False
