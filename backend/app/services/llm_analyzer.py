@@ -29,7 +29,9 @@ _LLM_PROMPT_MAX = _LLM_DOC_MAX
 # refuse to consume anything that doesn't match here either).
 _SESSION_KEY_PATTERNS = {
     "anthropic": re.compile(r"^sk-ant-[A-Za-z0-9_\-]{10,}$"),
-    "openai": re.compile(r"^sk-[A-Za-z0-9_\-]{10,}$"),
+    # Negative lookahead rejects sk-ant-... so an Anthropic key cannot satisfy
+    # both providers and bypass the provider gate.
+    "openai": re.compile(r"^sk-(?!ant-)[A-Za-z0-9_\-]{10,}$"),
 }
 _SESSION_KEY_MAX_LEN = 256
 
@@ -239,7 +241,9 @@ def _call_cli(tool_name: str, prompt: str, timeout: int = 120) -> Optional[str]:
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
         if result.stderr:
-            logger.warning("CLI %s stderr: %s", tool_name, _mask_token_like(result.stderr[:200]))
+            # Mask first, then truncate — slicing before masking can split a
+            # token across the boundary and leak a prefix into logs.
+            logger.warning("CLI %s stderr: %s", tool_name, _mask_token_like(result.stderr)[:200])
         return None
     except subprocess.TimeoutExpired:
         logger.warning("CLI %s timed out after %ds", tool_name, timeout)
