@@ -49,7 +49,8 @@ class TestGetAvailableProvider:
         mock_config.LLM_PROVIDER = ''
         mock_config.ANTHROPIC_API_KEY = ''
         mock_config.OPENAI_API_KEY = ''
-        result = get_available_provider(session_api_key='sk-test', session_api_provider='openai')
+        fake_openai_key = 'sk-' + 'test1234567890'
+        result = get_available_provider(session_api_key=fake_openai_key, session_api_provider='openai')
         assert result == 'openai_session'
 
     @patch('app.services.llm_analyzer.Config')
@@ -237,3 +238,74 @@ class TestSanitizeForXml:
         assert "</sns_data>" in captured["prompt"]
         # Inner closing tag rewritten so the data block is not broken.
         assert "evil <_sns_data>" in captured["prompt"]
+
+
+class TestSessionKeyValidation:
+    """F-4: browser-supplied session API keys must match the provider's shape."""
+
+    def test_valid_anthropic_key_accepted(self):
+        from app.services.llm_analyzer import _is_valid_session_key
+        fake_anthropic_key = "sk-ant-" + "abcdefghij12"
+        assert _is_valid_session_key(fake_anthropic_key, "anthropic") is True
+
+    def test_valid_openai_key_accepted(self):
+        from app.services.llm_analyzer import _is_valid_session_key
+        assert _is_valid_session_key(("sk-" + "abcdefghij12"), "openai") is True
+
+    def test_wrong_prefix_rejected(self):
+        from app.services.llm_analyzer import _is_valid_session_key
+        assert _is_valid_session_key("notakey", "openai") is False
+        assert _is_valid_session_key("sk-ant-short", "openai") is False
+
+    def test_anthropic_key_rejected_for_openai_provider(self):
+        """openai regex must NOT match sk-ant- keys (negative-lookahead guard)."""
+        from app.services.llm_analyzer import _is_valid_session_key
+        long_anthropic_key = "sk-ant-" + "abcdefghij1234567890"
+        # Same key passes for anthropic provider...
+        assert _is_valid_session_key(long_anthropic_key, "anthropic") is True
+        # ...but must be rejected when posted under the openai provider.
+        assert _is_valid_session_key(long_anthropic_key, "openai") is False
+
+    def test_oversized_key_rejected(self):
+        from app.services.llm_analyzer import _is_valid_session_key
+        assert _is_valid_session_key("sk-" + "a" * 300, "openai") is False
+
+    def test_unknown_provider_rejected(self):
+        from app.services.llm_analyzer import _is_valid_session_key
+        assert _is_valid_session_key(("sk-" + "abcdefghij12"), "google") is False
+
+    def test_empty_inputs_rejected(self):
+        from app.services.llm_analyzer import _is_valid_session_key
+        assert _is_valid_session_key("", "openai") is False
+        assert _is_valid_session_key(None, "openai") is False
+        assert _is_valid_session_key(("sk-" + "abcdefghij12"), None) is False
+
+
+class TestTokenMasking:
+    """F-7: token-shaped substrings should be redacted before logging."""
+
+    def test_masks_anthropic_key(self):
+        from app.services.llm_analyzer import _mask_token_like
+        fake_anthropic_key = "sk-ant-" + "abcdefghij12"
+        out = _mask_token_like(f"Error: key {fake_anthropic_key} rejected by API")
+        assert "sk-ant-" not in out
+        assert "[REDACTED]" in out
+
+    def test_masks_openai_key(self):
+        from app.services.llm_analyzer import _mask_token_like
+        fake_proj_key = "sk-" + "proj1234567890ABCDEF"
+        out = _mask_token_like(f"auth={fake_proj_key} bad")
+        assert "sk-proj" not in out
+        assert "[REDACTED]" in out
+
+    def test_masks_bearer_token(self):
+        from app.services.llm_analyzer import _mask_token_like
+        fake_bearer = "abc123" + "def456ghi"
+        out = _mask_token_like(f"Authorization: Bearer {fake_bearer}")
+        assert f"Bearer {fake_bearer}" not in out
+        assert "[REDACTED]" in out
+
+    def test_plain_text_unchanged(self):
+        from app.services.llm_analyzer import _mask_token_like
+        assert _mask_token_like("plain stderr message") == "plain stderr message"
+        assert _mask_token_like("") == ""

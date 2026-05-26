@@ -302,8 +302,9 @@ class TestGetLlmStatusExtended:
         mock_config.ANTHROPIC_API_KEY = ""
         mock_config.OPENAI_API_KEY = ""
         mock_config.LLM_MODEL = ""
+        fake_session_key = "sk-" + "sess1234567890"
         status = get_llm_status(
-            session_api_key="sk-sess", session_api_provider="openai"
+            session_api_key=fake_session_key, session_api_provider="openai"
         )
         assert status["available"] is True
         assert status["auth_mode"] == "api_key_session"

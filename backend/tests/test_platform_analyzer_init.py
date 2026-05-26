@@ -7,20 +7,19 @@ from unittest.mock import patch, MagicMock
 class TestPlatformAnalyzerInit:
     """Cover initialization branches in PlatformAnalyzer.__init__ (lines 103-159)."""
 
-    def test_ssl_verify_disabled_via_env(self):
-        """DISABLE_SSL_VERIFY=1 sets session.verify=False (lines 104-108)."""
+    def test_disable_ssl_verify_env_is_ignored(self):
+        """Audit F-6: DISABLE_SSL_VERIFY=1 is no longer honored; verify stays on."""
         with patch.dict("os.environ", {"DISABLE_SSL_VERIFY": "1"}, clear=False):
             from app.services.platform_analyzer import PlatformAnalyzer
-            with patch("urllib3.disable_warnings") as mock_warn:
-                analyzer = PlatformAnalyzer(data_dir="/tmp")
-                assert analyzer._session.verify is False
+            analyzer = PlatformAnalyzer(data_dir="/tmp")
+            assert bool(analyzer._session.verify) is True
 
-    def test_ssl_verify_disabled_true_string(self):
-        """DISABLE_SSL_VERIFY=true also disables SSL."""
+    def test_disable_ssl_verify_true_string_is_ignored(self):
+        """Audit F-6: DISABLE_SSL_VERIFY=true also does not disable SSL."""
         with patch.dict("os.environ", {"DISABLE_SSL_VERIFY": "true"}, clear=False):
             from app.services.platform_analyzer import PlatformAnalyzer
             analyzer = PlatformAnalyzer(data_dir="/tmp")
-            assert analyzer._session.verify is False
+            assert bool(analyzer._session.verify) is True
 
     def test_naver_cookie_sets_session_cookies(self):
         """NAVER_CAFE_COOKIE sets cookies on session (lines 111-119)."""
@@ -470,7 +469,7 @@ class TestMiscCoverage:
             from app.services.platform_analyzer import PlatformAnalyzer
             analyzer = PlatformAnalyzer(data_dir="/tmp")
             # REQUESTS_CA_BUNDLE set → pass branch hit, verify not changed to False
-            assert analyzer._session.verify is not False or True  # just ensure no crash
+            assert bool(analyzer._session.verify) is True or True  # just ensure no crash
 
     def test_init_with_ssl_cert_file(self):
         """line 103: SSL_CERT_FILE env var path (pass statement)."""
