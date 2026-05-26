@@ -372,6 +372,14 @@ class TestSetApiKey:
             assert sess["session_api_provider"] == "openai"
             assert sess["user"]["provider"] == "openai"
 
+    def test_oversized_api_key_returns_400(self, client):
+        resp = client.post(
+            "/api/auth/apikey",
+            json={"provider": "openai", "api_key": "sk-" + ("a" * 300)},
+        )
+        assert resp.status_code == 400
+        assert "maximum length" in resp.get_json()["error"]
+
 
 class TestAuthLogout:
     """Tests for POST /api/auth/logout."""

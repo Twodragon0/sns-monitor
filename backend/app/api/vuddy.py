@@ -12,6 +12,7 @@ from decimal import Decimal
 
 from flask import Blueprint, Response, jsonify
 
+from .. import limiter
 from ..config import Config
 from ..services.local_data import decimal_default, is_timestamp_comment
 from ..services.sentiment import (
@@ -318,6 +319,7 @@ def _handle_vuddy_creators_local():
 # ---------------------------------------------------------------------------
 
 @vuddy_bp.route('/api/vuddy/creators', methods=['GET'])
+@limiter.limit("30 per minute")
 def vuddy_creators():
     """Vuddy 크리에이터 목록 조회
     로컬 파일 시스템에서 vuddy-creators.json을 읽어 크리에이터 정보를 반환합니다.

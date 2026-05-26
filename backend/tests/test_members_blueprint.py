@@ -301,6 +301,22 @@ class TestMembersRoutes:
         resp = client.get('/api/group-b/channel?channel=testchannel')
         assert resp.status_code == 200
 
+    def test_channel_handle_rejects_path_traversal(self, client):
+        resp = client.get('/api/group-a/channel?channel_handle=../etc/passwd')
+        assert resp.status_code == 400
+        assert b'Invalid channel_handle' in resp.data
+
+    def test_channel_handle_rejects_control_chars(self, client):
+        resp = client.get('/api/group-a/channel?channel_handle=%40bad%0aname')
+        assert resp.status_code == 400
+
+    def test_channel_param_error_uses_channel_name(self, client):
+        """When validation fails via `?channel=…`, the error should name `channel`."""
+        resp = client.get('/api/group-a/channel?channel=../etc/passwd')
+        assert resp.status_code == 400
+        assert b'Invalid channel' in resp.data
+        assert b'Invalid channel_handle' not in resp.data
+
 
 class TestLoadMembersJson:
     """Test _load_members_json file loading."""

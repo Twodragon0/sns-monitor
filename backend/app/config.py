@@ -127,4 +127,10 @@ class Config:
                 "Sessions will NOT persist across restarts. "
                 "Set SECRET_KEY in .env for production deployments."
             )
+        if not cls.DEBUG and not cls.SESSION_COOKIE_SECURE:
+            logger.critical(
+                "SESSION_COOKIE_SECURE=false in production. "
+                "Session cookies may transit plaintext over HTTP. "
+                "Set SESSION_COOKIE_SECURE=true behind HTTPS."
+            )
         return errors
