@@ -369,3 +369,58 @@ GET  /api/analysis/reports/<date>
 | `GOOGLE_API_KEY` | 선택 | Google/Gemini API 키 |
 
 > **참고**: 상세 기술 명세는 `spec.md` 참조. 신규 플랫폼 추가 전 반드시 확인.
+
+---
+
+## Agent Teams Configuration
+
+This repository runs a multi-platform SNS monitoring stack (React + Flask + crawlers + infra manifests).
+
+### Team Roles
+
+#### Backend API Engineer (`oh-my-claudecode:executor`)
+- Scope: `backend/app/**`, `backend/api_handlers.py`
+- Focus: API correctness, input validation, error handling, cache behavior
+- Rules:
+  - Keep Flask app-factory pattern intact
+  - Validate URL inputs with whitelist-first logic
+  - No direct secret handling in code; use env only
+
+#### Frontend Dashboard Engineer (`oh-my-claudecode:designer`)
+- Scope: `frontend/src/**`
+- Focus: analyzer UX, dashboard performance, clear status states
+- Rules:
+  - Preserve existing component boundaries and API contracts
+  - Keep mobile/desktop responsiveness intact
+
+#### Crawler Engineer (`oh-my-claudecode:executor`)
+- Scope: `crawlers/**`
+- Focus: source-specific collectors, throttling, resilient scraping
+- Rules:
+  - Respect target platform rate limits
+  - Handle partial failures without crashing full crawl cycles
+
+#### Platform Ops Engineer (`oh-my-claudecode:build-fixer`)
+- Scope: `docker-compose*.yml`, `helm/**`, `k8s/**`, `terraform/**`
+- Focus: deployment safety, cronjob reliability, observability
+- Rules:
+  - Keep manifests environment-aware and reproducible
+  - Verify health endpoints after infra changes
+
+#### Security Reviewer (`oh-my-claudecode:security-reviewer`)
+- Scope: full stack
+- Focus: secret hygiene, safe logging, dependency risk
+- Rules:
+  - Never commit `.env` or credentials
+  - Strip sensitive data from logs and samples
+
+### Core Runtime Checks
+
+- Docker stack: `docker-compose up -d --build`
+- API health: `curl http://localhost:8080/health`
+- Frontend health: open `http://localhost:3000/analyze`
+
+### Collaboration Guardrails
+
+- Backend/frontend/infrastructure edits should be split into reviewable units.
+- Cron-like scheduler changes must include rollback-friendly defaults.
