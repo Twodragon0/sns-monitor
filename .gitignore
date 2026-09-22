@@ -70,6 +70,7 @@ k8s/config/secrets.yaml
 .omc/
 frontend/.omc/
 .omc-config.json
+.opencode/
 
 # Editor configs
 .cursor.md
