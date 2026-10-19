@@ -4,9 +4,9 @@
   "private": true,
   "dependencies": {
     "axios": "^1.20.0",
-    "dompurify": "^3.4.16",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0",
+    "dompurify": "^3.4.17",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "recharts": "^3.10.1"
   },
   "scripts": {
@@ -20,14 +20,14 @@
     "test:e2e:report": "playwright show-report e2e/test-results"
   },
   "devDependencies": {
-    "@playwright/test": "1.63.0",
+    "@playwright/test": "1.64.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.3",
-    "@vitejs/plugin-react": "^6.1.1",
+    "@vitejs/plugin-react": "^6.1.2",
     "@vitest/coverage-v8": "4.1.8",
     "jest-axe": "^10.0.0",
     "jsdom": "29.1.1",
-    "vite": "^8.3.1",
+    "vite": "^8.3.4",
     "vitest": "4.1.8"
   }
 }
